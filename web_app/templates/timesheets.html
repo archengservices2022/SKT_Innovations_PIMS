@@ -1,0 +1,973 @@
+﻿{% extends "base.html" %}
+{% block title %}Timesheets{% endblock %}
+{% block page_title %}Timesheets{% endblock %}
+
+{% block head %}
+<style>
+/* ?? Global crisp rendering ???????????????????????????????????? */
+.ts-root * {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  box-sizing: border-box;
+}
+
+/* ?? Page header ??????????????????????????????????????????????? */
+.ts-hero {
+  background: linear-gradient(120deg, #0D9488 0%, #0369a1 100%);
+  border-radius: 14px;
+  padding: 22px 28px;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.ts-hero-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  letter-spacing: -.2px;
+}
+.ts-hero-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,.72);
+  margin-top: 3px;
+  font-weight: 400;
+}
+.ts-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all .15s;
+  cursor: pointer;
+  border: none;
+}
+.ts-hero-btn.primary {
+  background: #fff;
+  color: #0D9488;
+}
+.ts-hero-btn.primary:hover { background: #f0fdfa; color: #0D9488; }
+.ts-hero-btn.ghost {
+  background: rgba(255,255,255,.12);
+  color: rgba(255,255,255,.9);
+  border: 1px solid rgba(255,255,255,.25);
+}
+.ts-hero-btn.ghost:hover { background: rgba(255,255,255,.22); color: #fff; }
+
+/* ?? KPI cards ????????????????????????????????????????????????? */
+.kpi-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.kpi-card {
+  flex: 1;
+  min-width: 140px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px 20px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+  border-left: 4px solid #e2e8f0;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.kpi-card.c-teal  { border-left-color: #0D9488; }
+.kpi-card.c-blue  { border-left-color: #2563eb; }
+.kpi-card.c-green { border-left-color: #16a34a; }
+.kpi-card.c-amber { border-left-color: #d97706; }
+.kpi-card.c-slate { border-left-color: #64748b; }
+.kpi-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.c-teal  .kpi-icon { background: #f0fdfa; color: #0D9488; }
+.c-blue  .kpi-icon { background: #eff6ff; color: #2563eb; }
+.c-green .kpi-icon { background: #f0fdf4; color: #16a34a; }
+.c-amber .kpi-icon { background: #fffbeb; color: #d97706; }
+.c-slate .kpi-icon { background: #f8fafc; color: #64748b; }
+.kpi-body { flex: 1; min-width: 0; }
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+.kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+  letter-spacing: -.5px;
+}
+.kpi-sub { font-size: 11px; color: #cbd5e1; margin-top: 3px; font-weight: 400; }
+
+/* ?? Week navigation ??????????????????????????????????????????? */
+.week-nav {
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  flex-wrap: wrap;
+}
+.wn-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  min-width: 210px;
+  text-align: center;
+  letter-spacing: -.1px;
+}
+.wn-btn {
+  width: 30px; height: 30px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  text-decoration: none;
+  font-size: 13px;
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.wn-btn:hover { background: #0D9488; border-color: #0D9488; color: #fff; }
+.wn-cur {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  text-decoration: none;
+  transition: all .15s;
+}
+.wn-cur:hover { background: #0D9488; border-color: #0D9488; color: #fff; }
+
+/* ?? Grid table ???????????????????????????????????????????????? */
+.ts-grid-wrap {
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+}
+.ts-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ts-grid thead th {
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #64748b;
+  padding: 12px 6px;
+  border-bottom: 2px solid #e2e8f0;
+  text-align: center;
+  white-space: nowrap;
+}
+.ts-grid thead th.emp-col { text-align: left; padding-left: 20px; min-width: 180px; }
+.ts-grid tbody td {
+  padding: 6px 5px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  text-align: center;
+}
+.ts-grid tbody tr:last-child td { border-bottom: none; }
+.ts-grid tbody tr:hover td { background: #fafbfc; }
+.ts-grid tbody td.emp-col { text-align: left; padding: 10px 8px 10px 20px; }
+
+/* ?? Day header in th ?????????????????????????????????????????? */
+.day-abbr { font-size: 11px; font-weight: 700; display: block; }
+.day-date { font-size: 10px; font-weight: 500; color: #b0bec5; margin-top: 1px; display: block; }
+
+/* ?? Day cells ????????????????????????????????????????????????? */
+.dc {
+  border-radius: 8px;
+  min-height: 56px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 6px 4px;
+  cursor: pointer;
+  transition: box-shadow .15s, transform .15s;
+  text-decoration: none;
+}
+.dc:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.13); }
+.dc-time {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.dc-proj {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: .8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+  line-height: 1.2;
+}
+.dc-hrs {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: 0;
+}
+/* Status-based cell colours */
+.dc-approved { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.dc-submitted { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.dc-draft     { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
+.dc-rejected  { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+/* Empty cell */
+.dc-empty {
+  border-radius: 8px;
+  min-height: 56px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border: 1.5px dashed #e2e8f0;
+  color: #d1d5db;
+  font-size: 12px;
+}
+
+/* ?? Status badge ?????????????????????????????????????????????? */
+.sbadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  white-space: nowrap;
+}
+.sb-approved { background: #dcfce7; color: #15803d; }
+.sb-submitted { background: #dbeafe; color: #1e40af; }
+.sb-draft     { background: #ede9fe; color: #6d28d9; }
+.sb-rejected  { background: #fee2e2; color: #b91c1c; }
+.sb-none { color: #cbd5e1; font-size: 12px; font-weight: 500; }
+
+/* ?? Total hours col ??????????????????????????????????????????? */
+.total-col {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -.2px;
+}
+
+/* ?? Employee cell ????????????????????????????????????????????? */
+.emp-row { display: flex; align-items: center; gap: 10px; }
+.emp-av {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #0D9488, #0369a1);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+}
+.emp-nm { font-size: 13px; font-weight: 600; color: #1e293b; }
+
+/* ?? Action buttons ???????????????????????????????????????????? */
+.act-btns { display: flex; gap: 4px; justify-content: center; align-items: center; }
+.act-btn {
+  width: 28px; height: 28px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all .15s;
+}
+.act-btn:hover { transform: translateY(-1px); }
+.act-btn.approve:hover   { background: #16a34a; border-color: #16a34a; color: #fff; }
+.act-btn.reject:hover    { background: #dc2626; border-color: #dc2626; color: #fff; }
+.act-btn.sendback:hover  { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+.act-btn.view:hover      { background: #0D9488; border-color: #0D9488; color: #fff; }
+.act-btn.remind:hover    { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.act-btn.del:hover       { background: #dc2626; border-color: #dc2626; color: #fff; }
+
+/* ?? My Timesheets — personal grid card ??????????????????????? */
+.my-week-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.my-week-header {
+  padding: 16px 22px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+}
+.my-week-user { font-size: 15px; font-weight: 700; color: #0f172a; }
+.my-week-sub  { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+
+/* ?? History table ????????????????????????????????????????????? */
+.hist-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+.hist-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+}
+.hist-table th {
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #64748b;
+  padding: 12px 16px;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+.hist-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #334155;
+  vertical-align: middle;
+}
+.hist-table tbody tr:last-child td { border-bottom: none; }
+.hist-table tbody tr:hover td { background: #fafbfc; }
+
+/* ?? Empty state ??????????????????????????????????????????????? */
+.ts-empty-state {
+  padding: 52px 20px;
+  text-align: center;
+}
+.ts-empty-state i { font-size: 36px; color: #cbd5e1; display: block; margin-bottom: 12px; }
+.ts-empty-state p { font-size: 13px; color: #94a3b8; margin: 0; }
+
+.ot-val { color: #dc2626; font-weight: 700; }
+
+/* ?? Small link btn ???????????????????????????????????????????? */
+.link-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; border-radius: 7px; font-size: 12px; font-weight: 600;
+  text-decoration: none; transition: all .15s; border: 1px solid transparent; cursor: pointer;
+}
+.link-btn.outline {
+  border-color: #e2e8f0; color: #475569; background: #f8fafc;
+}
+.link-btn.outline:hover { border-color: #0D9488; color: #0D9488; background: #f0fdfa; }
+.link-btn.teal { background: #0D9488; color: #fff; }
+.link-btn.teal:hover { background: #0b8075; }
+.link-btn.amber { background: #f59e0b; color: #fff; }
+.link-btn.amber:hover { background: #d97706; }
+.link-btn.green { background: #16a34a; color: #fff; }
+.link-btn.green:hover { background: #15803d; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set is_admin = user_role in ('admin', 'finance', 'accountant') %}
+<div class="ts-root">
+
+<!-- ?? Hero Header ????????????????????????????????????????????? -->
+<div class="ts-hero">
+  <div>
+    <div class="ts-hero-title">
+      <i class="bi bi-calendar-week me-2"></i>{% if view == 'admin' %}Team Weekly Schedule{% else %}My Timesheets{% endif %}
+    </div>
+    <div class="ts-hero-sub">{% if view == 'admin' %}Review and approve your team's weekly time entries{% else %}Track your hours and submission history{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('timesheets_submit') }}" class="ts-hero-btn primary">
+      <i class="bi bi-plus-lg"></i> Submit Timesheet
+    </a>
+    {% if is_admin %}
+    <a href="{{ url_for('api_timesheets_export', week=week_of) }}" class="ts-hero-btn ghost">
+      <i class="bi bi-download"></i> Export CSV
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if view == 'admin' %}
+<!-- ?? KPI Row ?????????????????????????????????????????????????? -->
+<div class="kpi-row">
+  <div class="kpi-card c-teal">
+    <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Team Size</div>
+      <div class="kpi-value">{{ kpi_employees }}</div>
+      <div class="kpi-sub">employees</div>
+    </div>
+  </div>
+  <div class="kpi-card c-slate">
+    <div class="kpi-icon"><i class="bi bi-send-fill"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Submitted</div>
+      <div class="kpi-value">{{ kpi_submitted }}</div>
+      <div class="kpi-sub">this week</div>
+    </div>
+  </div>
+  <div class="kpi-card c-blue">
+    <div class="kpi-icon"><i class="bi bi-hourglass-split"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Pending Review</div>
+      <div class="kpi-value" style="color:#2563eb;">{{ kpi_pending }}</div>
+      <div class="kpi-sub">awaiting approval</div>
+    </div>
+  </div>
+  <div class="kpi-card c-green">
+    <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Approved</div>
+      <div class="kpi-value" style="color:#16a34a;">{{ kpi_approved }}</div>
+      <div class="kpi-sub">this week</div>
+    </div>
+  </div>
+  <div class="kpi-card c-amber">
+    <div class="kpi-icon"><i class="bi bi-clock-fill"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Total Hours</div>
+      <div class="kpi-value">{{ "%.1f"|format(kpi_hours) }}</div>
+      <div class="kpi-sub">all employees</div>
+    </div>
+  </div>
+</div>
+
+<!-- ?? Week Nav ???????????????????????????????????????????????? -->
+<div class="week-nav">
+  <a href="{{ url_for('timesheets', week=prev_week) }}" class="wn-btn"><i class="bi bi-chevron-left"></i></a>
+  <div class="wn-label">Week of {{ week_label }}</div>
+  <a href="{{ url_for('timesheets', week=next_week) }}" class="wn-btn"><i class="bi bi-chevron-right"></i></a>
+  <a href="{{ url_for('timesheets') }}" class="wn-cur ms-1">Current Week</a>
+</div>
+
+<!-- ?? Grid ???????????????????????????????????????????????????? -->
+<div class="ts-grid-wrap">
+  <div class="table-responsive">
+    <table class="ts-grid">
+      <thead>
+        <tr>
+          <th class="emp-col">Employee</th>
+          {% for dl in day_labels %}
+          <th>
+            <span class="day-abbr">{{ dl.abbr }}</span>
+            <span class="day-date">{{ dl.display }}</span>
+          </th>
+          {% endfor %}
+          <th>Total Hrs</th>
+          <th>Status</th>
+          {% if is_admin %}<th>Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if grid_rows %}
+          {% for row in grid_rows %}
+          <tr>
+            <td class="emp-col">
+              <div class="emp-row">
+                <div class="emp-av">{{ row.name[0].upper() if row.name else '—' }}</div>
+                <span class="emp-nm">{{ row.name }}</span>
+              </div>
+            </td>
+            {% for dl in day_labels %}
+              {% set cell = row.cells.get(dl.date) %}
+              <td style="min-width:96px;">
+                {% if cell %}
+                  <div class="dc dc-{{ cell.status | lower }}"
+                       title="{{ cell.projects | join(', ') or 'No project' }} — {{ cell.time_range }} — {{ '%.1f'|format(cell.hours) }}h"
+                       {% if cell.sheet_id %}onclick="window.location='{{ url_for('timesheet_detail', sheet_id=cell.sheet_id) }}'"{% endif %}>
+                    <div class="dc-hrs">{{ "%.1f"|format(cell.hours) }}h</div>
+                  </div>
+                {% else %}
+                  <div class="dc-empty">—</div>
+                {% endif %}
+              </td>
+            {% endfor %}
+            <td class="total-col">
+              {% if row.total_hours > 0 %}{{ "%.1f"|format(row.total_hours) }}{% else %}<span style="color:#d1d5db;">—</span>{% endif %}
+            </td>
+            <td>
+              {% if row.sheet %}
+                <span class="sbadge sb-{{ row.sheet.status | lower }}">{{ row.sheet.status }}</span>
+              {% else %}
+                <span class="sb-none">No Entry</span>
+              {% endif %}
+            </td>
+            {% if is_admin %}
+            <td>
+              {% if row.sheet %}
+              <div class="act-btns">
+                {% if row.sheet.status == 'Submitted' %}
+                  <button class="act-btn approve" onclick="approveSheet('{{ row.sheet.firebase_id }}','approve')" title="Approve">
+                    <i class="bi bi-check2"></i>
+                  </button>
+                  <button class="act-btn reject" onclick="approveSheet('{{ row.sheet.firebase_id }}','reject')" title="Reject">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                  <button class="act-btn sendback" onclick='sendBackSheet("{{ row.sheet.firebase_id }}", {{ row.name|tojson }})' title="Send Back to Employee">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                  </button>
+                {% endif %}
+                {% if row.sheet.status == 'Draft' %}
+                  <button class="act-btn remind" onclick='sendTimesheetReminder({{ row.uid|tojson }}, {{ week_of|tojson }}, {{ row.name|tojson }})' title="Remind to submit">
+                    <i class="bi bi-bell"></i>
+                  </button>
+                {% endif %}
+                <a class="act-btn view" href="{{ url_for('timesheet_detail', sheet_id=row.sheet.firebase_id) }}" title="View">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% if user_role == 'admin' %}
+                <button class="act-btn del" onclick="deleteSheet('{{ row.sheet.firebase_id }}')" title="Delete">
+                  <i class="bi bi-trash3"></i>
+                </button>
+                {% endif %}
+              </div>
+              {% else %}
+              <div class="act-btns">
+                <button class="act-btn remind" onclick='sendTimesheetReminder({{ row.uid|tojson }}, {{ week_of|tojson }}, {{ row.name|tojson }})' title="Remind to submit">
+                  <i class="bi bi-bell"></i>
+                </button>
+              </div>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        {% else %}
+        <tr>
+          <td colspan="{{ 7 + (3 if is_admin else 2) + 1 }}">
+            <div class="ts-empty-state">
+              <i class="bi bi-people"></i>
+              <p>No employees found. Add employees in <strong>Settings — Users</strong>.</p>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<!-- ?? Employee: My Timesheets ?????????????????????????????????? -->
+
+<!-- KPI Row -->
+<div class="kpi-row">
+  <div class="kpi-card c-teal">
+    <div class="kpi-icon"><i class="bi bi-calendar-check"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">This Month</div>
+      <div class="kpi-value">{{ "%.1f"|format(stat_month_hours) }}</div>
+      <div class="kpi-sub">total hours</div>
+    </div>
+  </div>
+  <div class="kpi-card {% if stat_month_ot > 0 %}c-amber{% endif %}">
+    <div class="kpi-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Overtime</div>
+      <div class="kpi-value" style="color:{% if stat_month_ot > 0 %}#dc2626{% else %}#0f172a{% endif %};">{{ "%.1f"|format(stat_month_ot) }}</div>
+      <div class="kpi-sub">OT hours this month</div>
+    </div>
+  </div>
+  <div class="kpi-card c-green">
+    <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Approved</div>
+      <div class="kpi-value" style="color:#16a34a;">{{ stat_approved }}</div>
+      <div class="kpi-sub">weeks approved</div>
+    </div>
+  </div>
+  <div class="kpi-card c-blue">
+    <div class="kpi-icon"><i class="bi bi-hourglass-split"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">Pending Review</div>
+      <div class="kpi-value" style="color:#2563eb;">{{ stat_pending }}</div>
+      <div class="kpi-sub">awaiting approval</div>
+    </div>
+  </div>
+  <div class="kpi-card c-slate">
+    <div class="kpi-icon"><i class="bi bi-clock-fill"></i></div>
+    <div class="kpi-body">
+      <div class="kpi-label">This Week</div>
+      <div class="kpi-value">{{ "%.1f"|format(week_total) }}</div>
+      <div class="kpi-sub">hours logged</div>
+    </div>
+  </div>
+</div>
+
+<!-- Week Nav -->
+<div class="week-nav">
+  <a href="{{ url_for('timesheets', week=prev_week) }}" class="wn-btn"><i class="bi bi-chevron-left"></i></a>
+  <div class="wn-label">Week of {{ week_label }}</div>
+  <a href="{{ url_for('timesheets', week=next_week) }}" class="wn-btn"><i class="bi bi-chevron-right"></i></a>
+  <a href="{{ url_for('timesheets') }}" class="wn-cur ms-1">Current Week</a>
+</div>
+
+<!-- Personal weekly card -->
+<div class="my-week-card">
+  <div class="my-week-header">
+    <div class="d-flex align-items-center gap-3">
+      <div class="emp-av" style="width:40px;height:40px;font-size:15px;">{{ user_name[0].upper() if user_name else '—' }}</div>
+      <div>
+        <div class="my-week-user">{{ user_name }}</div>
+        <div class="my-week-sub">Personal weekly summary</div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      {% if week_sheet %}
+        <span class="sbadge sb-{{ week_sheet.status | lower }}">{{ week_sheet.status }}</span>
+        {% if week_sheet.status in ('Draft', 'Rejected') %}
+          <a href="{{ url_for('timesheets_submit', week=week_of) }}" class="link-btn amber">
+            <i class="bi bi-pencil"></i> Edit & Resubmit
+          </a>
+        {% elif week_sheet.status == 'Submitted' %}
+          <a href="{{ url_for('timesheet_detail', sheet_id=week_sheet.firebase_id) }}" class="link-btn outline">
+            <i class="bi bi-eye"></i> View Details
+          </a>
+        {% elif week_sheet.status == 'Approved' %}
+          <a href="{{ url_for('timesheet_detail', sheet_id=week_sheet.firebase_id) }}" class="link-btn green">
+            <i class="bi bi-check2-circle"></i> Approved
+          </a>
+        {% endif %}
+      {% else %}
+        <span style="font-size:12px;color:#94a3b8;">No entry for this week</span>
+        <a href="{{ url_for('timesheets_submit', week=week_of) }}" class="link-btn teal">
+          <i class="bi bi-plus-lg"></i> Submit Timesheet
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 7-day personal grid -->
+  <div class="table-responsive">
+    <table class="ts-grid" style="border-radius:0;">
+      <thead>
+        <tr>
+          {% for dl in day_labels %}
+          <th>
+            <span class="day-abbr">{{ dl.abbr }}</span>
+            <span class="day-date">{{ dl.display }}</span>
+          </th>
+          {% endfor %}
+          <th style="min-width:72px;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          {% for dl in day_labels %}
+            {% set cell = emp_cells.get(dl.date) %}
+            <td style="min-width:96px;">
+              {% if cell %}
+                <div class="dc dc-{{ cell.status | lower }}"
+                     title="{{ cell.projects | join(', ') or 'General' }} — {{ cell.time_range }} — {{ '%.1f'|format(cell.hours) }}h"
+                     {% if cell.sheet_id %}onclick="window.location='{{ url_for('timesheet_detail', sheet_id=cell.sheet_id) }}'"{% endif %}>
+                  <div class="dc-hrs">{{ "%.1f"|format(cell.hours) }}h</div>
+                </div>
+              {% else %}
+                <div class="dc-empty">—</div>
+              {% endif %}
+            </td>
+          {% endfor %}
+          <td class="total-col">
+            {% if week_total > 0 %}{{ "%.1f"|format(week_total) }}h{% else %}<span style="color:#d1d5db;">—</span>{% endif %}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {% if week_sheet and week_sheet.status == 'Rejected' and week_sheet.rejection_notes %}
+  <div style="background:#fff1f2;border-top:1px solid #fecdd3;padding:12px 22px;font-size:13px;color:#b91c1c;">
+    <i class="bi bi-exclamation-circle-fill me-1"></i>
+    <strong>Rejected:</strong> {{ week_sheet.rejection_notes }}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Submission History -->
+<div class="hist-section-label">Submission History</div>
+<table class="hist-table">
+  <thead>
+    <tr>
+      <th>Week Of</th>
+      <th>Total Hrs</th>
+      <th>Regular</th>
+      <th>Overtime</th>
+      <th>Status</th>
+      <th>Submitted</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% if my_sheets %}
+      {% for sheet in my_sheets %}
+      <tr>
+        <td>
+          <strong>{{ sheet.week_of }}</strong>
+          {% if sheet.week_of == current_week %}
+          <span style="background:#fef3c7;color:#b45309;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;vertical-align:middle;">CURRENT</span>
+          {% endif %}
+        </td>
+        <td><strong>{{ "%.1f"|format(sheet.total_hours | float) }}h</strong></td>
+        <td style="color:#64748b;">{{ "%.1f"|format(sheet.total_regular_hours | float) }}h</td>
+        <td class="{% if sheet.total_overtime_hours | float > 0 %}ot-val{% else %}text-muted{% endif %}">
+          {{ "%.1f"|format(sheet.total_overtime_hours | float) }}h
+        </td>
+        <td><span class="sbadge sb-{{ sheet.status | lower }}">{{ sheet.status }}</span></td>
+        <td style="color:#94a3b8;font-size:12px;">
+          {{ (sheet.submitted_at[:10] | format_date) if sheet.submitted_at else '—' }}
+        </td>
+        <td>
+          <div class="d-flex gap-2">
+            <a href="{{ url_for('timesheet_detail', sheet_id=sheet.firebase_id) }}" class="link-btn outline">
+              <i class="bi bi-eye"></i> View
+            </a>
+            {% if sheet.status in ('Draft', 'Rejected') %}
+            <a href="{{ url_for('timesheets_submit', week=sheet.week_of) }}" class="link-btn teal">
+              <i class="bi bi-pencil"></i> Edit
+            </a>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    {% else %}
+    <tr>
+      <td colspan="7">
+        <div class="ts-empty-state">
+          <i class="bi bi-clipboard-x"></i>
+          <p>No timesheets yet. <a href="{{ url_for('timesheets_submit') }}" style="color:#0D9488;font-weight:600;">Submit your first timesheet ?</a></p>
+        </div>
+      </td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+{% endif %}
+
+</div><!-- /ts-root -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showConfirmDialog(title, message, action, headerBg, onConfirm, includeReasonInput = false) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  `;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-width: 500px;
+    width: 90%;
+    overflow: hidden;
+  `;
+
+  const header = document.createElement('div');
+  header.style.cssText = `
+    background: ${headerBg};
+    color: white;
+    padding: 18px 24px;
+    font-weight: 700;
+    font-size: 16px;
+  `;
+  header.textContent = title;
+
+  const body = document.createElement('div');
+  body.style.cssText = `
+    padding: 24px;
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.6;
+  `;
+  body.innerHTML = message;
+
+  if (includeReasonInput) {
+    body.innerHTML += `
+      <label style="display: block; margin-top: 16px; margin-bottom: 8px; font-weight: 600; color: #1e293b;">
+        Rejection Reason (optional):
+      </label>
+      <textarea id="rejectionReason" style="
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 13px;
+        resize: vertical;
+        min-height: 80px;
+        box-sizing: border-box;
+      " placeholder="Enter reason for rejection..."></textarea>
+    `;
+  }
+
+  const footer = document.createElement('div');
+  footer.style.cssText = `
+    padding: 18px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid #e2e8f0;
+  `;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = `
+    padding: 9px 18px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: white;
+    color: #334155;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  `;
+  cancelBtn.onclick = () => overlay.remove();
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.textContent = action;
+  confirmBtn.style.cssText = `
+    padding: 9px 18px;
+    border: none;
+    border-radius: 6px;
+    background: ${headerBg};
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  `;
+  confirmBtn.onclick = () => {
+    let reasonText = '';
+    if (includeReasonInput) {
+      reasonText = document.getElementById('rejectionReason')?.value ?? '';
+    }
+    overlay.remove();
+    onConfirm(reasonText);
+  };
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(confirmBtn);
+
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function approveSheet(sheetId, action) {
+  const title = action === 'approve' ? 'Confirm Approval' : 'Confirm Rejection';
+  const icon = action === 'approve' ? 'check-circle-fill' : 'x-circle-fill';
+  const headerBg = action === 'approve' ? '#10b981' : '#ef4444';
+  const message = action === 'approve'
+    ? 'You are about to <strong>approve</strong> this timesheet. This action cannot be undone.'
+    : 'You are about to <strong>reject</strong> this timesheet. This action cannot be undone.';
+
+  showConfirmDialog(title, message, action === 'approve' ? 'Approve' : 'Reject', headerBg, (reasonText) => {
+    let notes = reasonText || '';
+    fetch(`/api/timesheets/${sheetId}/approve`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action, notes})
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) location.reload();
+      else alert('Error: ' + (d.error || 'Unknown'));
+    })
+    .catch(() => alert('Network error. Please try again.'));
+  }, action === 'reject');
+}
+
+function sendBackSheet(sheetId, name) {
+  var msg = 'You are about to send this timesheet back for correction. This action cannot be undone.';
+  showConfirmDialog('Send Back to Employee', msg, 'Send Back', '#7c3aed', function() {
+    fetch('/api/timesheets/' + sheetId + '/send-back', {method: 'POST'}).then(function(r) {
+      return r.json();
+    }).then(function(d) {
+      if (d.success) location.reload();
+      else alert('Error: ' + (d.error || 'Unknown error'));
+    }).catch(function(e) {
+      alert('Network error. Please try again.');
+    });
+  }, false);
+}
+
+function deleteSheet(sheetId) {
+  const title = 'Delete Timesheet';
+  const message = '<strong>Are you sure you want to delete this timesheet?</strong><br><br>This action cannot be undone and all associated data will be permanently deleted.';
+
+  showConfirmDialog(title, message, 'Delete', '#dc2626', () => {
+    fetch(`/api/timesheets/${sheetId}/delete`, {method: 'POST'})
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) location.reload();
+      else alert('Error: ' + (d.error || 'Unknown'));
+    })
+    .catch(() => alert('Network error. Please try again.'));
+  });
+}
+
+function sendTimesheetReminder(uid, weekOf, name) {
+  if (!uid) return;
+  const title = 'Send Reminder';
+  const message = `Send a timesheet submission reminder to <strong>${name || 'this employee'}</strong>?`;
+
+  showConfirmDialog(title, message, 'Send Reminder', '#f59e0b', () => {
+    fetch('/api/timesheets/remind', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({employee_uid: uid, week_of: weekOf})
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        alert('Reminder sent.');
+        location.reload();
+      }
+      else alert('Error: ' + (d.error || 'Unknown'));
+    })
+    .catch(() => alert('Network error. Please try again.'));
+  });
+}
+// v1 - fixed send back button
+</script>
+{% endblock %}

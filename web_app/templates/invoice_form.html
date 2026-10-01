@@ -1,0 +1,1132 @@
+﻿{% extends "base.html" %}
+{% block title %}{{ 'New Invoice' if is_new else 'Edit Invoice' }}{% endblock %}
+{% block page_title %}{{ 'New Invoice' if is_new else 'Edit Invoice' }}{% endblock %}
+{% block head %}
+<style>
+/* $ prefix inside Unit Price and Amount inputs */
+.item-price, .item-total {
+  padding-left: 20px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='16'%3E%3Ctext x='1' y='12' fill='%2364748b' font-family='system-ui,sans-serif' font-size='13'%3E%24%3C/text%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 5px center;
+}
+
+/* Searchable project select — type-to-filter overlay on top of the real
+   <select>, which stays in the DOM (hidden) and keeps submitting normally. */
+.ss-wrap { position: relative; }
+select.ss-hidden-select { display: none; }
+.ss-list {
+  display: none;
+  position: fixed;
+  z-index: 1055;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(15,23,42,.15);
+  font-size: 12px;
+}
+.ss-item {
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ss-item:hover, .ss-item.ss-active { background: #f0fdfa; color: #0f766e; }
+.ss-empty { padding: 6px 10px; color: #94a3b8; font-style: italic; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <a href="{{ url_for('invoicing') }}" class="btn btn-sm btn-outline-secondary me-2">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h5 class="mb-0">{{ 'Create New Invoice' if is_new else 'Edit Invoice' }}</h5>
+</div>
+
+{% set meta = invoice.get('meta', {}) if invoice else {} %}
+{% set stage_idx = stage_idx|default('') %}
+{% set stage_name = stage_name|default('') %}
+{% set stage_amount = stage_amount|default('') %}
+
+{% macro project_select(selected) %}
+<select name="item_project[]" class="form-select form-select-sm">
+  <option value="">— invoice project —</option>
+  {% for p in projects %}
+  <option value="{{ p.get('project_number','') }}" {{ 'selected' if selected == p.get('project_number','') }}>{{ p.get('project_number','') }}</option>
+  {% endfor %}
+</select>
+{% endmacro %}
+
+<form method="POST" id="invoiceForm">
+  {% if stage_idx != '' %}
+  <input type="hidden" name="payment_stage_index" value="{{ stage_idx }}">
+  <input type="hidden" name="payment_stage" value="{{ stage_name }}">
+  <div class="alert alert-info py-2 px-3 mb-3 small">
+    <i class="bi bi-info-circle me-1"></i>
+    Generating invoice for payment plan stage <strong>{{ stage_name }}</strong>
+    ({{ currency_symbol }}{{ "{:,.2f}".format(stage_amount|float) }}). This invoice will be linked to that stage.
+  </div>
+  {% endif %}
+  {% if request.args.get('co_number') %}
+  <input type="hidden" name="co_number" value="{{ request.args.get('co_number') }}">
+  {% endif %}
+  {% if request.args.get('page') %}
+  <input type="hidden" name="page" value="{{ request.args.get('page') }}">
+  {% endif %}
+  <div class="row g-3">
+    <div class="col-lg-8">
+
+      <div class="card-panel mb-3">
+        <h6 class="section-heading">Invoice Details</h6>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Invoice Number</label>
+            <input type="text" name="invoice_number" class="form-control"
+                   value="{{ meta.get('invoice_number', next_num or '') }}"
+                   {% if not is_new %}readonly{% endif %} required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Invoice Date</label>
+            <input type="date" name="invoice_date" id="invoiceDate" class="form-control"
+                   value="{{ meta.get('invoice_date') or (now.strftime('%Y-%m-%d') if is_new else '') }}"
+                   onchange="applyNetTerms()">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Net Terms (days)</label>
+            <input type="number" name="net_terms" id="netTerms" class="form-control"
+                   min="0" placeholder="e.g. 30"
+                   value="{{ meta.get('net_terms', '') }}"
+                   onchange="applyNetTerms()" oninput="applyNetTerms()">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Due Date</label>
+            <input type="date" name="due_date" id="dueDate" class="form-control"
+                   value="{{ meta.get('due_date') or ((now + timedelta(days=30)).strftime('%Y-%m-%d') if is_new else '') }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Client</label>
+            <select name="client_name" id="clientSelect" class="form-select" onchange="renderClientProjects()">
+              <option value="">-- Select Client --</option>
+              {% for c in clients %}
+              <option value="{{ c }}" {{ 'selected' if (prefill_client or meta.get('company_name') or meta.get('client_name')) == c }}>{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Project</label>
+            <select name="project_number" class="form-select" onchange="renderClientProjects()">
+              <option value="">-- Select Project --</option>
+              {% for p in projects %}
+              <option value="{{ p.get('project_number','') }}"
+                {{ 'selected' if (meta.get('project_number') or prefill_proj|default('')) == p.get('project_number','') }}>
+                {{ p.get('project_number','') }} — {{ p.get('project_name','') }}
+              </option>
+              {% endfor %}
+            </select>
+            <div class="form-text small">
+              Default project for line items below.
+            </div>
+          </div>
+          <div class="col-12" id="projectsPickerWrap" style="display:none;">
+            <div class="border rounded p-2 ps-3" style="background:#f8fafc;">
+              <div class="small fw-bold text-muted mb-2">
+                <i class="bi bi-kanban me-1 text-teal"></i>Active projects for this client
+                <span class="fw-normal">— check any to also bill on this invoice (one invoice can cover several projects)</span>
+              </div>
+              <div id="clientProjectsList" class="row g-2"></div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Status</label>
+            <select name="status" id="invoiceStatus" class="form-select" onchange="togglePaymentFields()">
+              {% if invoice %}
+                {% set current_status = meta.get('status') or invoice.get('status') or 'Draft' %}
+              {% else %}
+                {% set current_status = 'Draft' %}
+              {% endif %}
+              {% for s in ['Draft','Sent','Viewed','Paid','Partial','Overdue','Cancelled','Invoice Disputed','Incorrect Invoice'] %}
+              <option value="{{ s }}" {{ 'selected' if current_status == s }}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3" id="paymentMethodWrap" style="display:none;">
+            <label class="form-label">Payment Method</label>
+            <select name="payment_method" class="form-select">
+              <option value="">— Select —</option>
+              {% for pm in ['Check','Wire Transfer','ACH','Cash','Zelle','Credit Card','Other'] %}
+              <option value="{{ pm }}" {{ 'selected' if meta.get('payment_method') == pm }}>{{ pm }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3" id="amountPaidWrap" style="display:none;">
+            <label class="form-label">Amount Paid ($)</label>
+            <input type="number" id="paymentAmountField" name="payment_amount" class="form-control"
+                   min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="col-md-2" id="paymentDateWrap" style="display:none;">
+            <label class="form-label">Payment Date</label>
+            {% set default_payment_date = now.strftime('%Y-%m-%d') %}
+            {% if invoice and invoice.get('payment_log') and invoice.get('payment_log')|length > 0 %}
+              {% set payment_list = invoice.get('payment_log') %}
+              {% if payment_list is iterable and payment_list|length > 0 %}
+                {% set last_payment = payment_list[-1] if payment_list is sequence else none %}
+                {% if last_payment and last_payment.get('date') %}
+                  {% set default_payment_date = last_payment.get('date') %}
+                {% endif %}
+              {% endif %}
+            {% endif %}
+            <input type="date" name="payment_date" class="form-control" value="{{ default_payment_date }}" id="paymentDateInput">
+          </div>
+          <div class="col-md-2" id="paymentReferenceWrap" style="display:none;">
+            <label class="form-label">Reference</label>
+            <input type="text" name="payment_reference" class="form-control" placeholder="e.g. Check #">
+          </div>
+        </div>
+      </div>
+
+
+      <div class="card-panel mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="section-heading mb-0">Line Items</h6>
+          <button type="button" class="btn btn-sm btn-outline-teal" onclick="addLineItem()">
+            <i class="bi bi-plus-lg"></i> Add Item
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th style="width:26%">Description</th>
+                <th style="width:25%">Project <i class="bi bi-info-circle text-muted" title="Override which project this line item bills to — useful when one invoice covers multiple projects"></i></th>
+                <th style="width:10%">Qty</th>
+                <th style="width:17%">Unit Price</th>
+                <th style="width:14%">Amount</th>
+                <th style="width:8%"></th>
+              </tr>
+            </thead>
+            <tbody id="lineItemsBody">
+              {% set items = invoice.get('line_items', []) if invoice else [] %}
+              <!-- DEBUG: items={items|length}, stage_idx='{stage_idx}', prefill_items={prefill_items|length}, prefill_proj='{prefill_proj}' -->
+              {% if items %}
+                {% for item in items %}
+                <tr class="line-item-row">
+                  <td><input type="text" name="item_description[]" class="form-control form-control-sm" value="{{ item.get('description','') }}" required></td>
+                  <td>
+                    {{ project_select(item.get('project_number','')) }}
+                    <input type="hidden" name="item_stage_index[]" value="{{ item.get('payment_stage_index','') if item.get('payment_stage_index') is not none else '' }}">
+                    <input type="hidden" name="item_co_number[]" value="{{ item.get('co_number','') }}">
+                    <input type="hidden" name="item_co_firebase_id[]" value="{{ item.get('co_firebase_id','') }}">
+                    <input type="hidden" name="item_powo_number[]" value="{{ item.get('powo_number','') }}">
+                  </td>
+                  <td><input type="number" name="item_quantity[]" class="form-control form-control-sm item-qty" value="{{ item.get('quantity','1') }}" min="0" step="any" oninput="calcRow(this)"></td>
+                  <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm item-price" value="{{ item.get('unit_price','0') }}" min="0" step="0.01" oninput="calcRow(this)" {% if lock_unit_price %}readonly{% endif %}></td>
+                  <td><input type="text" class="form-control form-control-sm item-total bg-light" value="{{ item.get('amount','0') }}" readonly></td>
+                  <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+                </tr>
+                {% endfor %}
+              {% elif stage_idx != '' %}
+              <tr class="line-item-row">
+                <td><input type="text" name="item_description[]" class="form-control form-control-sm" value="{{ prefill_name }} — {{ stage_name }}" placeholder="Description" required></td>
+                <td>
+                  {{ project_select(prefill_proj|default('')) }}
+                  <input type="hidden" name="item_stage_index[]" value="{{ stage_idx }}">
+                  <input type="hidden" name="item_co_number[]" value="">
+                  <input type="hidden" name="item_co_firebase_id[]" value="">
+                  <input type="hidden" name="item_powo_number[]" value="">
+                </td>
+                <td><input type="number" name="item_quantity[]" class="form-control form-control-sm item-qty" value="1" min="0" step="any" oninput="calcRow(this)"></td>
+                <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm item-price" value="{{ stage_amount }}" min="0" step="0.01" oninput="calcRow(this)"></td>
+                <td><input type="text" class="form-control form-control-sm item-total bg-light" value="{{ '%.2f'|format(stage_amount|float) }}" readonly></td>
+                <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+              </tr>
+              {% elif prefill_items and prefill_items|length > 0 %}
+                {% for item in prefill_items %}
+                <tr class="line-item-row">
+                  <td><input type="text" name="item_description[]" class="form-control form-control-sm" value="{{ item.get('description','') }}" placeholder="Description" required></td>
+                  <td>
+                    {{ project_select(item.get('project','')) }}
+                    <input type="hidden" name="item_stage_index[]" value="{{ item.get('stage_index','') if item.get('stage_index') is not none else '' }}">
+                    <input type="hidden" name="item_co_number[]" value="{{ item.get('co_number','') }}">
+                    <input type="hidden" name="item_co_firebase_id[]" value="{{ item.get('co_firebase_id','') }}">
+                    <input type="hidden" name="item_powo_number[]" value="{{ item.get('powo_number','') }}">
+                  </td>
+                  <td><input type="number" name="item_quantity[]" class="form-control form-control-sm item-qty" value="1" min="0" step="any" oninput="calcRow(this)"></td>
+                  <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm item-price" value="{{ item.get('amount','0') }}" min="0" step="0.01" oninput="calcRow(this)"></td>
+                  <td><input type="text" class="form-control form-control-sm item-total bg-light" value="{{ '%.2f'|format(item.get('amount',0)|float) }}" readonly></td>
+                  <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+                </tr>
+                {% endfor %}
+              {% elif prefill_proj|default('') %}
+              <tr class="line-item-row">
+                <td><input type="text" name="item_description[]" class="form-control form-control-sm" value="{{ prefill_name }} — {{ prefill_proj }}" placeholder="Description" required></td>
+                <td>
+                  {{ project_select(prefill_proj|default('')) }}
+                  <input type="hidden" name="item_stage_index[]" value="">
+                  <input type="hidden" name="item_co_number[]" value="">
+                  <input type="hidden" name="item_co_firebase_id[]" value="">
+                  <input type="hidden" name="item_powo_number[]" value="">
+                </td>
+                <td><input type="number" name="item_quantity[]" class="form-control form-control-sm item-qty" value="1" min="0" step="any" oninput="calcRow(this)"></td>
+                <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm item-price" value="{{ prefill_amount }}" min="0" step="0.01" oninput="calcRow(this)"></td>
+                <td><input type="text" class="form-control form-control-sm item-total bg-light" value="{{ '%.2f'|format(prefill_amount|float) if prefill_amount else '0.00' }}" readonly></td>
+                <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+              </tr>
+              {% else %}
+              <tr class="line-item-row">
+                <td><input type="text" name="item_description[]" class="form-control form-control-sm" placeholder="Description" required></td>
+                <td>
+                  {{ project_select(prefill_proj|default('')) }}
+                  <input type="hidden" name="item_stage_index[]" value="">
+                  <input type="hidden" name="item_co_number[]" value="">
+                  <input type="hidden" name="item_co_firebase_id[]" value="">
+                  <input type="hidden" name="item_powo_number[]" value="">
+                </td>
+                <td><input type="number" name="item_quantity[]" class="form-control form-control-sm item-qty" value="1" min="0" step="any" oninput="calcRow(this)"></td>
+                <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm item-price" value="0" min="0" step="0.01" oninput="calcRow(this)"></td>
+                <td><input type="text" class="form-control form-control-sm item-total bg-light" value="0.00" readonly></td>
+                <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card-panel">
+        <h6 class="section-heading">Notes &amp; Terms</h6>
+        <div class="mb-3">
+          <label class="form-label">Notes</label>
+          <textarea name="notes" class="form-control" rows="2">{{ meta.get('notes','') }}</textarea>
+        </div>
+        <div>
+          <label class="form-label">Terms &amp; Conditions</label>
+          <textarea name="terms" class="form-control" rows="2">{{ meta.get('terms','Thank you for your business!') }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card-panel mb-3">
+        <h6 class="section-heading">Totals</h6>
+        <div class="d-flex justify-content-between mb-2">
+          <span>Subtotal</span>
+          <strong id="subtotalDisplay">$0.00</strong>
+          <input type="hidden" name="subtotal" id="subtotalInput" value="{{ meta.get('subtotal','0') }}">
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span>Tax Rate (%)</span>
+          <input type="number" name="tax_rate" id="taxRate" class="form-control form-control-sm text-end"
+                 style="width:80px;" value="{{ meta.get('tax_rate', default_tax_rate if is_new else '0') }}"
+                 min="0" max="100" step="0.01" oninput="calcTotals()">
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span>Tax</span>
+          <strong id="taxDisplay">$0.00</strong>
+          <input type="hidden" name="tax_amount" id="taxInput">
+        </div>
+        <hr>
+        <div class="d-flex justify-content-between">
+          <strong>Total</strong>
+          <strong id="totalDisplay" class="text-teal fs-5">$0.00</strong>
+          <input type="hidden" name="total" id="totalInput">
+        </div>
+      </div>
+
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-teal">
+          <i class="bi bi-check-lg me-1"></i>
+          {{ 'Create Invoice' if is_new else 'Save Changes' }}
+        </button>
+        <a href="{{ url_for('invoicing') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Stage Picker Modal — opens when a project is chosen in a line item's
+     "invoice project" select and that project still has pending payment
+     stages / approved change orders to bill. -->
+<div class="modal fade" id="stagePickerModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select Stages to Invoice</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="stagePickerBody">
+        <p class="text-muted">Loading...</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="stagePickerConfirmBtn" onclick="confirmStagePicker()">
+          <i class="bi bi-upload me-1"></i>Load Selected
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TODAY_ISO = {{ now.strftime('%Y-%m-%d') | tojson }}; // company-timezone "today", not the browser's local/UTC date
+
+const projectOptionsHtml = '<option value="">— invoice project —</option>' +
+  [{% for p in projects %}{{ p.get('project_number','')|tojson }}{{ ',' if not loop.last }}{% endfor %}]
+    .map(num => `<option value="${num}">${num}</option>`).join('');
+
+// The catalog is fixed for this form; availability is derived from live rows.
+const invoiceStageOptions = {{ invoice_stage_options|default({})|tojson }};
+const editingInvoiceId = {{ invoice_id|default('')|tojson }};
+
+function stageIdentityKeys(info) {
+  const keys = [];
+  if (info.stageIdx !== undefined && info.stageIdx !== null && info.stageIdx !== '') {
+    keys.push('stage:' + Number(info.stageIdx));
+  }
+  if (info.coFirebaseId) keys.push('co-id:' + info.coFirebaseId);
+  if (info.coNumber) keys.push('co-number:' + info.coNumber);
+  return keys;
+}
+
+function usedStageKeys(projectNumber, exceptRow = null) {
+  const keys = new Set();
+  const mainProject = document.querySelector('select[name="project_number"]')?.value || '';
+  document.querySelectorAll('#lineItemsBody tr.line-item-row').forEach(row => {
+    if (row === exceptRow) return;
+    const value = name => row.querySelector(`[name="${name}"]`)?.value || '';
+    if ((value('item_project[]') || mainProject) !== projectNumber) return;
+    stageIdentityKeys({stageIdx: value('item_stage_index[]'),
+      coFirebaseId: value('item_co_firebase_id[]'), coNumber: value('item_co_number[]')})
+      .forEach(key => keys.add(key));
+  });
+  return keys;
+}
+
+function availableStageChoices(data, exceptRow = null) {
+  const used = usedStageKeys(data.project_number, exceptRow);
+  const available = item => !stageIdentityKeys({stageIdx: item.stage_idx,
+    coFirebaseId: item.co_firebase_id, coNumber: item.co_number}).some(key => used.has(key));
+  return {...data,
+    all_pending_stages: (data.all_pending_stages || []).filter(available),
+    approved_pending_cos: (data.approved_pending_cos || []).filter(available)};
+}
+
+function canSelectInvoiceProject(number, exceptRow = null) {
+  const data = invoiceStageOptions[number];
+  if (!data) return true;
+  const available = availableStageChoices(data, exceptRow);
+  if (available.all_pending_stages.length || available.approved_pending_cos.length) return true;
+  // Projects without any structured billing choices still allow manual items.
+  return !data.has_payment_stages && !(data.approved_pending_cos || []).length;
+}
+
+function refreshInvoiceProjectChoices() {
+  document.querySelectorAll('select[name="item_project[]"], select[name="project_number"]').forEach(select => {
+    const row = select.closest('tr.line-item-row');
+    Array.from(select.options).forEach(option => {
+      const unavailable = option.value && !canSelectInvoiceProject(option.value, row);
+      // Keep the selected value intact for form submission, but omit it from
+      // searchable choices when the project has no stages left to add.
+      option.hidden = !!unavailable;
+      option.disabled = !!unavailable && option.value !== select.value;
+    });
+    if (select._ssRefresh) select._ssRefresh();
+  });
+}
+
+// Turn a plain <select> of projects into a type-to-filter combobox. The real
+// <select> stays in the DOM (just visually hidden) so it keeps submitting
+// exactly as before and every existing onchange/event-delegation listener
+// on it keeps working unchanged.
+function enhanceProjectSelect(selectEl) {
+  if (!selectEl || selectEl.dataset.ssEnhanced) return;
+  selectEl.dataset.ssEnhanced = '1';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ss-wrap';
+  selectEl.parentNode.insertBefore(wrap, selectEl);
+  wrap.appendChild(selectEl);
+  selectEl.classList.add('ss-hidden-select');
+
+  const placeholder = (selectEl.options[0] && selectEl.options[0].value === '')
+    ? selectEl.options[0].text : 'Search…';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.autocomplete = 'off';
+  input.className = (selectEl.getAttribute('class') || '').replace('ss-hidden-select', '').trim();
+  input.placeholder = placeholder;
+  wrap.appendChild(input);
+
+  const list = document.createElement('div');
+  list.className = 'ss-list';
+  document.body.appendChild(list); // position:fixed — kept out of any scroll-clipping ancestor (e.g. .table-responsive)
+  selectEl._ssList = list; // so a removed row can clean this up too (it lives in <body>, not the row)
+
+  let activeIdx = -1;
+
+  function optionsData() {
+    return Array.from(selectEl.options)
+      .filter(o => !o.hidden && !o.disabled)
+      .map(o => ({ value: o.value, text: o.text }));
+  }
+  function syncInputFromSelect() {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    input.value = (opt && opt.value !== '') ? opt.text : '';
+  }
+  syncInputFromSelect();
+
+  function positionList() {
+    const r = input.getBoundingClientRect();
+    list.style.left  = r.left + 'px';
+    list.style.top   = (r.bottom + 2) + 'px';
+    list.style.width = r.width + 'px';
+  }
+
+  function closeList() {
+    list.style.display = 'none';
+    syncInputFromSelect();
+  }
+
+  selectEl._ssRefresh = () => {
+    if (list.style.display === 'block') renderList(input.value);
+  };
+
+  function renderList(filter) {
+    const q = (filter || '').trim().toLowerCase();
+    const items = optionsData().filter(o => o.value !== '' && (!q || o.text.toLowerCase().includes(q)));
+    list.innerHTML = '';
+    if (items.length === 0) {
+      list.innerHTML = '<div class="ss-empty">No matches</div>';
+    } else {
+      items.forEach(o => {
+        const row = document.createElement('div');
+        row.className = 'ss-item';
+        row.textContent = o.text;
+        row.dataset.value = o.value;
+        row.addEventListener('mousedown', e => {
+          e.preventDefault(); // fires before input's blur — keeps the click from being lost
+          selectValue(o.value, o.text);
+        });
+        list.appendChild(row);
+      });
+    }
+    activeIdx = -1;
+    positionList();
+    list.style.display = 'block';
+  }
+
+  function selectValue(value, text) {
+    if (!canSelectInvoiceProject(value, selectEl.closest('tr.line-item-row'))) return;
+    selectEl.value = value;
+    input.value = text || '';
+    list.style.display = 'none';
+    selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function updateActive(rows) {
+    rows.forEach((r, i) => r.classList.toggle('ss-active', i === activeIdx));
+    if (rows[activeIdx]) rows[activeIdx].scrollIntoView({ block: 'nearest' });
+  }
+
+  input.addEventListener('focus', () => { refreshInvoiceProjectChoices(); input.select(); renderList(''); });
+  input.addEventListener('input', () => renderList(input.value));
+  input.addEventListener('keydown', e => {
+    const rows = Array.from(list.querySelectorAll('.ss-item'));
+    if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, rows.length - 1); updateActive(rows); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); updateActive(rows); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (activeIdx >= 0 && rows[activeIdx]) selectValue(rows[activeIdx].dataset.value, rows[activeIdx].textContent); }
+    else if (e.key === 'Escape') { closeList(); input.blur(); }
+  });
+  input.addEventListener('blur', () => setTimeout(closeList, 120));
+  window.addEventListener('scroll', () => { if (list.style.display === 'block') positionList(); }, true);
+  window.addEventListener('resize', () => { if (list.style.display === 'block') positionList(); });
+}
+
+function enhanceAllProjectSelects(root) {
+  (root || document).querySelectorAll('select[name="item_project[]"], select[name="project_number"]')
+    .forEach(enhanceProjectSelect);
+}
+
+// A select's dropdown panel lives in <body> (position:fixed), not inside its
+// row, so removing the row alone would leave it behind — clean it up too.
+function cleanupRowSelects(row) {
+  if (!row) return;
+  row.querySelectorAll('select.ss-hidden-select').forEach(sel => { if (sel._ssList) sel._ssList.remove(); });
+}
+
+// Client -> active-projects picker: lets one invoice cover several of a
+// client's projects without hand-building each line item from scratch.
+const projectsData = [
+{% for p in projects %}
+  {number: {{ p.get('project_number','')|tojson }},
+   name: {{ p.get('project_name','')|tojson }},
+   client: {{ p.get('client_name','')|tojson }},
+   status: {{ p.get('status','')|tojson }},
+   outstanding: {{ ((p.get('contract_value',0)|float(0)) - (p.get('amount_paid',0)|float(0))) }},
+   contract: {{ (p.get('contract_value',0)|float(0)) }},
+   stageIdx: {{ (p.get('next_stage_idx') if p.get('next_stage_idx') is not none else '')|tojson }},
+   stageName: {{ (p.get('next_stage_name',''))|tojson }},
+   stageAmount: {{ (p.get('next_stage_amount',0)|float) }}}{{ ',' if not loop.last }}
+{% endfor %}
+];
+
+// Project numbers that already have a line item on this invoice (whether
+// pre-loaded server-side via "select multiple projects -> load to invoice",
+// or added earlier through this picker) ? used so the picker reflects what's
+// already on the invoice instead of overlapping/duplicating it.
+function getIncludedProjectNumbers() {
+  const set = new Set();
+  document.querySelectorAll('#lineItemsBody select[name="item_project[]"]').forEach(sel => {
+    if (sel.value) set.add(sel.value);
+  });
+  return set;
+}
+
+function findLineItemRowByProject(number) {
+  return [...document.querySelectorAll('#lineItemsBody tr.line-item-row')].find(row => {
+    const sel = row.querySelector('select[name="item_project[]"]');
+    return sel && sel.value === number;
+  });
+}
+
+function renderClientProjects() {
+  const wrap = document.getElementById('projectsPickerWrap');
+  if (!wrap) return;   // stage_idx mode — no multi-project panel
+
+  const client  = document.getElementById('clientSelect').value;
+  const mainNum = document.querySelector('#invoiceForm select[name="project_number"]').value;
+  const list    = document.getElementById('clientProjectsList');
+  list.innerHTML = '';
+
+  const matches = projectsData.filter(p =>
+    p.client === client &&
+    !['Completed', 'Cancelled'].includes(p.status)
+  );
+
+  // Only show the panel when there are 2+ active projects for this client
+  if (!client || matches.length < 2) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  const includedProjects = getIncludedProjectNumbers();
+
+  matches.forEach(p => {
+    const isMain   = p.number === mainNum;
+    const hasStage = p.stageName && p.stageAmount > 0;
+    const billable = hasStage ? p.stageAmount : (p.outstanding > 0 ? p.outstanding : p.contract);
+    const col = document.createElement('div');
+    col.className = 'col-md-6 col-lg-4';
+
+    if (isMain) {
+      // Primary project — always included, shown as a teal card (no checkbox)
+      col.innerHTML = `
+        <div class="d-flex align-items-center gap-2 p-2 border rounded"
+             style="background:#f0fdfa; border-color:#0D9488 !important;">
+          <i class="bi bi-check-circle-fill text-teal flex-shrink-0" style="font-size:1.1rem;"></i>
+          <div class="flex-fill min-width-0">
+            <div class="fw-bold small text-truncate">${p.number}</div>
+            <div class="text-muted text-truncate" style="font-size:0.72rem;">${p.name}</div>
+          </div>
+          <div class="text-end flex-shrink-0">
+            <div class="small fw-bold text-teal">${CURRENCY_SYMBOL}${billable.toFixed(2)}</div>
+            <div class="badge" style="font-size:0.6rem;background:#0D9488;color:#fff;">Primary</div>
+          </div>
+        </div>`;
+    } else {
+      // Additional project — checkbox to include/exclude. Pre-check it (and
+      // mark it "added") when it's already on the invoice as a line item,
+      // e.g. from the "select multiple projects -> load to invoice" flow.
+      const alreadyIncluded = includedProjects.has(p.number);
+      const cbId = 'cp_' + p.number.replace(/[^a-zA-Z0-9]/g, '_');
+      const badgeLabel = alreadyIncluded ? 'added' : (hasStage ? p.stageName : 'outstanding');
+      col.innerHTML = `
+        <label class="d-flex align-items-center gap-2 p-2 border rounded proj-pick-card"
+               for="${cbId}" style="cursor:pointer; transition:background .15s, border-color .15s;${alreadyIncluded ? ' background:#f0fdf4; border-color:#16A34A;' : ''}">
+          <input class="form-check-input flex-shrink-0 mt-0" type="checkbox" id="${cbId}"
+                 data-number="${p.number}" data-name="${p.name}" data-amount="${billable.toFixed(2)}"
+                 data-stage-idx="${p.stageIdx}" data-stage-name="${hasStage ? p.stageName : ''}"${alreadyIncluded ? ' checked' : ''}>
+          <div class="flex-fill min-width-0">
+            <div class="fw-bold small text-truncate">${p.number}</div>
+            <div class="text-muted text-truncate" style="font-size:0.72rem;">${p.name}</div>
+          </div>
+          <div class="text-end flex-shrink-0">
+            <div class="small fw-bold text-muted">${CURRENCY_SYMBOL}${billable.toFixed(2)}</div>
+            <div class="text-muted text-truncate" style="font-size:0.7rem;max-width:120px;">${badgeLabel}</div>
+          </div>
+        </label>`;
+      const cb  = col.querySelector('input[type="checkbox"]');
+      const lbl = col.querySelector('label');
+      cb.addEventListener('change', () => {
+        if (cb.checked) {
+          lbl.style.background     = '#f0fdf4';
+          lbl.style.borderColor    = '#16A34A';
+          addProjectLineItem(cb.dataset.number, cb.dataset.name, cb.dataset.amount, cb.dataset.stageIdx, cb.dataset.stageName);
+        } else {
+          lbl.style.background  = '';
+          lbl.style.borderColor = '';
+          removeProjectLineItem(cb.dataset.number);
+        }
+      });
+    }
+    list.appendChild(col);
+  });
+}
+
+function addProjectLineItem(number, name, amount, stageIdx, stageName) {
+  // Already on the invoice (e.g. pre-loaded via "select multiple projects ->
+  // load to invoice") ? don't add a second, duplicate line item.
+  if (findLineItemRowByProject(number)) return;
+
+  const tbody = document.getElementById('lineItemsBody');
+  const price = parseFloat(amount || 0) || 0;
+  const description = stageName ? `${name} — ${stageName}` : `${name} — ${number}`;
+  const row   = document.createElement('tr');
+  row.className = 'line-item-row';
+  row.dataset.autoProject = number;
+  row.innerHTML = `
+    <td><input type="text" name="item_description[]" class="form-control form-control-sm" value="${description}" required></td>
+    <td>
+      <select name="item_project[]" class="form-select form-select-sm">${projectOptionsHtml}</select>
+      <input type="hidden" name="item_stage_index[]" value="${stageIdx ?? ''}">
+      <input type="hidden" name="item_co_number[]" value="">
+      <input type="hidden" name="item_co_firebase_id[]" value="">
+      <input type="hidden" name="item_powo_number[]" value="">
+    </td>
+    <td><input type="number" name="item_quantity[]" class="form-control form-control-sm item-qty" value="1" min="0" step="any" oninput="calcRow(this)"></td>
+    <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm item-price" value="${price.toFixed(2)}" min="0" step="0.01" oninput="calcRow(this)"></td>
+    <td><input type="text" class="form-control form-control-sm item-total bg-light" value="${price.toFixed(2)}" readonly></td>
+    <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>`;
+  tbody.appendChild(row);
+  row.querySelector('select[name="item_project[]"]').value = number;
+  enhanceProjectSelect(row.querySelector('select[name="item_project[]"]'));
+  refreshInvoiceProjectChoices();
+
+  // If the only other row is still the untouched blank starter row, drop it
+  // so the picker doesn't leave a stray empty line item behind.
+  const rows = tbody.querySelectorAll('tr.line-item-row');
+  if (rows.length === 2) {
+    const other = [...rows].find(r => r !== row);
+    const desc  = other.querySelector('input[name="item_description[]"]');
+    if (other && !other.dataset.autoProject && desc && !desc.value.trim()) { cleanupRowSelects(other); other.remove(); }
+  }
+  calcTotals();
+}
+
+function removeProjectLineItem(number) {
+  const row = findLineItemRowByProject(number);
+  if (row && document.querySelectorAll('.line-item-row').length > 1) {
+    cleanupRowSelects(row);
+    row.remove();
+    calcTotals();
+  } else if (row) {
+    cleanupRowSelects(row);
+    row.remove();
+    addLineItem();
+  }
+}
+function fmt(n) { return CURRENCY_SYMBOL + parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+function calcRow(input) {
+  const row   = input.closest('tr');
+  const qty   = parseFloat(row.querySelector('.item-qty').value   || 0);
+  const price = parseFloat(row.querySelector('.item-price').value || 0);
+  row.querySelector('.item-total').value = (qty * price).toFixed(2);
+  calcTotals();
+}
+function calcTotals() {
+  refreshInvoiceProjectChoices();
+  let sub = 0;
+  document.querySelectorAll('.item-total').forEach(el => sub += parseFloat(el.value||0));
+  const tax   = sub * (parseFloat(document.getElementById('taxRate').value||0) / 100);
+  const total = sub + tax;
+  document.getElementById('subtotalDisplay').textContent = fmt(sub);
+  document.getElementById('taxDisplay').textContent      = fmt(tax);
+  document.getElementById('totalDisplay').textContent    = fmt(total);
+  document.getElementById('subtotalInput').value = sub.toFixed(2);
+  document.getElementById('taxInput').value      = tax.toFixed(2);
+  document.getElementById('totalInput').value    = total.toFixed(2);
+}
+function addLineItem() {
+  const tbody = document.getElementById('lineItemsBody');
+  const row   = document.createElement('tr');
+  row.className = 'line-item-row';
+  row.innerHTML = `
+    <td><input type="text" name="item_description[]" class="form-control form-control-sm" placeholder="Description" required></td>
+    <td>
+      <select name="item_project[]" class="form-select form-select-sm">${projectOptionsHtml}</select>
+      <input type="hidden" name="item_stage_index[]" value="">
+      <input type="hidden" name="item_co_number[]" value="">
+      <input type="hidden" name="item_co_firebase_id[]" value="">
+      <input type="hidden" name="item_powo_number[]" value="">
+    </td>
+    <td><input type="number" name="item_quantity[]" class="form-control form-control-sm item-qty" value="1" min="0" step="any" oninput="calcRow(this)"></td>
+    <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm item-price" value="0" min="0" step="0.01" oninput="calcRow(this)"></td>
+    <td><input type="text" class="form-control form-control-sm item-total bg-light" value="0.00" readonly></td>
+    <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>`;
+  tbody.appendChild(row);
+  enhanceProjectSelect(row.querySelector('select[name="item_project[]"]'));
+  refreshInvoiceProjectChoices();
+}
+function removeRow(btn) {
+  const tr = btn.closest('tr');
+  cleanupRowSelects(tr);
+  tr.remove();
+  if (!document.querySelector('#lineItemsBody .line-item-row')) addLineItem();
+  calcTotals();
+}
+
+function togglePaymentFields() {
+  const status = document.getElementById('invoiceStatus').value;
+  const show   = ['Paid', 'Partial'].includes(status);
+  document.getElementById('paymentMethodWrap').style.display = show ? '' : 'none';
+  document.getElementById('amountPaidWrap').style.display    = show ? '' : 'none';
+  document.getElementById('paymentDateWrap').style.display   = show ? '' : 'none';
+
+  // Set payment date to today only if not already set (preserve template default)
+  const paymentDateInput = document.querySelector('input[name="payment_date"]');
+  if (show && !paymentDateInput.value) {
+    paymentDateInput.value = TODAY_ISO;
+  }
+  // If payment date was set by template but is empty, set to today
+  if (show && paymentDateInput && !paymentDateInput.value) {
+    paymentDateInput.value = TODAY_ISO;
+  }
+
+  // For "Paid" status, auto-populate amount with total (including tax)
+  if (status === 'Paid') {
+    const totalDisplay = document.getElementById('totalDisplay')?.textContent || '';
+    const totalMatch = totalDisplay.match(/[\d,]+\.?\d*/);
+    if (totalMatch) {
+      const totalAmount = parseFloat(totalMatch[0].replace(/,/g, ''));
+      document.getElementById('paymentAmountField').value = totalAmount.toFixed(2);
+    }
+  } else if (status === 'Partial') {
+    // Clear amount for Partial so user enters custom amount
+    document.getElementById('paymentAmountField').value = '';
+  } else {
+    // Clear payment fields for non-payment statuses (Draft, Sent, Viewed, Overdue, Cancelled)
+    document.getElementById('paymentAmountField').value = '';
+    const methodSelect = document.querySelector('select[name="payment_method"]');
+    if (methodSelect) methodSelect.value = '';
+    if (paymentDateInput) paymentDateInput.value = '';
+    const referenceInput = document.querySelector('input[name="payment_reference"]');
+    if (referenceInput) referenceInput.value = '';
+  }
+}
+
+calcTotals();
+renderClientProjects();
+togglePaymentFields();
+enhanceAllProjectSelects();
+refreshInvoiceProjectChoices();
+
+function applyNetTerms() {
+  const days = parseInt(document.getElementById('netTerms').value, 10);
+  const invoiceDateVal = document.getElementById('invoiceDate').value;
+  if (!isNaN(days) && days >= 0 && invoiceDateVal) {
+    const base = new Date(invoiceDateVal + 'T00:00:00');
+    base.setDate(base.getDate() + days);
+    const yyyy = base.getFullYear();
+    const mm   = String(base.getMonth() + 1).padStart(2, '0');
+    const dd   = String(base.getDate()).padStart(2, '0');
+    document.getElementById('dueDate').value = `${yyyy}-${mm}-${dd}`;
+  }
+}
+// On load: if net_terms is already set, auto-fill due date for new invoices
+(function() {
+  const nt = document.getElementById('netTerms').value;
+  if (nt && !document.getElementById('dueDate').value) applyNetTerms();
+})();
+
+// Fetch and set the current invoice status and payment info from the API
+(function() {
+  const invoiceNum = document.querySelector('input[name="invoice_number"]');
+  if (invoiceNum && invoiceNum.value && invoiceNum.value.includes('-')) {
+    // Extract invoice ID from form data if available, or use invoice number
+    const invoiceId = '{{ invoice.firebase_id if invoice else '' }}';
+    if (invoiceId) {
+      fetch(`/api/invoices/${invoiceId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.meta && data.meta.status) {
+            const statusSelect = document.getElementById('invoiceStatus');
+            if (statusSelect) {
+              statusSelect.value = data.meta.status;
+              togglePaymentFields();
+            }
+          }
+          // Populate payment amount if invoice is being edited and has existing payment
+          if (data && data.meta) {
+            const amountPaid = parseFloat(data.meta.amount_paid || '0');
+            const taxPaid = parseFloat(data.meta.tax_paid || '0');
+            const totalPaid = amountPaid + taxPaid;
+            if (totalPaid > 0) {
+              const paymentAmountField = document.getElementById('paymentAmountField');
+              if (paymentAmountField) {
+                paymentAmountField.value = totalPaid.toFixed(2);
+              }
+            }
+          }
+          // Populate payment method if exists
+          if (data && data.meta && data.meta.payment_method) {
+            const methodSelect = document.querySelector('select[name="payment_method"]');
+            if (methodSelect) {
+              methodSelect.value = data.meta.payment_method;
+            }
+          }
+        })
+        .catch(e => console.log('Could not fetch invoice status:', e));
+    }
+  }
+})();
+
+// ── Stage picker: pick a project in a line item's "invoice project" select
+// and, if that project still has uninvoiced payment stages / approved COs,
+// offer to check which one(s) to bill — auto-filling description, amount and
+// the hidden stage/CO fields, same as the Projects tab's "Load to Invoice".
+let _stagePickerRow = null;
+let _stagePickerData = null;
+
+function escAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+document.getElementById('lineItemsBody').addEventListener('change', function(e) {
+  const sel = e.target.closest('select[name="item_project[]"]');
+  if (!sel) return;
+  onItemProjectChange(sel);
+});
+
+function onItemProjectChange(selectEl) {
+  const projNum = selectEl.value;
+  const row = selectEl.closest('tr');
+  // Changing projects releases the previous stage immediately.
+  ['item_stage_index[]', 'item_co_number[]', 'item_co_firebase_id[]', 'item_powo_number[]'].forEach(name => {
+    const input = row.querySelector(`[name="${name}"]`);
+    if (input) input.value = '';
+  });
+  refreshInvoiceProjectChoices();
+  if (!projNum) return;
+  const showChoices = data => {
+    if (!row.isConnected || selectEl.value !== projNum) return;
+    invoiceStageOptions[projNum] = data;
+    const available = availableStageChoices(data, row);
+    if (!available.all_pending_stages.length && !available.approved_pending_cos.length) {
+      if (!canSelectInvoiceProject(projNum, row)) {
+        selectEl.value = '';
+        const input = selectEl.closest('.ss-wrap')?.querySelector('input');
+        if (input) input.value = '';
+      }
+      refreshInvoiceProjectChoices();
+      return;
+    }
+    openStagePickerModal(selectEl, data);
+  };
+  if (invoiceStageOptions[projNum]) {
+    showChoices(invoiceStageOptions[projNum]);
+    return;
+  }
+  fetch(`/api/invoicing/project-pending?project_number=${encodeURIComponent(projNum)}&invoice_id=${encodeURIComponent(editingInvoiceId)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => { if (data) showChoices(data); })
+    .catch(() => {});
+}
+
+function openStagePickerModal(rowSelectEl, data) {
+  _stagePickerRow  = rowSelectEl.closest('tr');
+  _stagePickerData = data;
+
+  const available = availableStageChoices(data, _stagePickerRow);
+  const stages = available.all_pending_stages;
+  const cos    = available.approved_pending_cos;
+  const body   = document.getElementById('stagePickerBody');
+
+  let html = `<div style="margin-bottom:14px;">
+    <div style="font-size:13px;color:#64748b;">${data.project_number || ''} — ${data.project_name || ''}</div>
+    <p class="text-muted small mb-0 mt-1">Check the stage(s) / change order(s) to bill on this invoice.</p>
+  </div>`;
+
+  html += `<div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;background:white;">
+      <tr style="background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
+        <th style="padding:10px;width:36px;"></th>
+        <th style="padding:10px;text-align:left;font-weight:600;color:#334155;">Stage</th>
+        <th style="padding:10px;text-align:right;font-weight:600;color:#334155;width:110px;">Amount</th>
+        <th style="padding:10px;text-align:left;font-weight:600;color:#334155;">Status</th>
+      </tr>`;
+
+  stages.forEach(stage => {
+    const checkId = `sp_stage_${stage.stage_idx}`;
+    const statusTxt = stage.blocked ? '⚠ Prior stage not yet invoiced' : 'Ready to invoice';
+    const statusClr = stage.blocked ? '#b45309' : '#0f766e';
+    html += `<tr style="border-bottom:1px solid #f1f5f9;${stage.is_next ? 'background:#f0fdf4;' : ''}">
+      <td style="padding:8px 10px;">
+        <input type="checkbox" id="${checkId}" class="sp-stage-checkbox form-check-input"
+               data-stage-idx="${stage.stage_idx}" data-stage-name="${(stage.stage_name || '').replace(/"/g,'&quot;')}"
+               data-amount="${stage.amount || 0}" ${stage.is_next ? 'checked' : ''}
+               style="cursor:pointer;width:15px;height:15px;">
+      </td>
+      <td style="padding:8px 10px;color:#1e293b;">
+        <label for="${checkId}" style="cursor:pointer;margin:0;">${stage.stage_name || '—'}
+          ${stage.is_next ? '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600;">Next</span>' : ''}
+        </label>
+      </td>
+      <td style="padding:8px 10px;text-align:right;color:#1e293b;font-weight:600;">${CURRENCY_SYMBOL}${parseFloat(stage.amount||0).toFixed(2)}</td>
+      <td style="padding:8px 10px;color:${statusClr};font-size:11px;">${statusTxt}</td>
+    </tr>`;
+  });
+
+  cos.forEach(co => {
+    const checkId = `sp_co_${co.co_idx}`;
+    html += `<tr style="background:#fffbeb;border-bottom:1px solid #fef3c7;border-left:3px solid #f59e0b;">
+      <td style="padding:8px 10px;">
+        <input type="checkbox" id="${checkId}" class="sp-co-checkbox form-check-input"
+               data-co-number="${co.co_number || ''}" data-co-firebase-id="${co.co_firebase_id || ''}"
+               data-stage-idx="${co.stage_idx ?? ''}" data-powo="${co.powo_number || ''}"
+               data-title="${(co.title || '').replace(/"/g,'&quot;')}" data-amount="${co.amount || 0}"
+               checked style="cursor:pointer;width:15px;height:15px;">
+      </td>
+      <td style="padding:8px 10px;color:#78350f;">
+        <span style="font-size:10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px;">CO</span>
+        CO ${co.co_number || '—'}${co.title ? ' — ' + co.title : ''}
+      </td>
+      <td style="padding:8px 10px;text-align:right;color:#92400e;font-weight:600;">${CURRENCY_SYMBOL}${parseFloat(co.amount||0).toFixed(2)}</td>
+      <td style="padding:8px 10px;color:#0f766e;font-size:11px;">Ready to invoice</td>
+    </tr>`;
+  });
+
+  html += '</table></div>';
+  body.innerHTML = html;
+  const confirmButton = document.getElementById('stagePickerConfirmBtn');
+  const updateConfirm = () => { confirmButton.disabled = !body.querySelector('input[type="checkbox"]:checked'); };
+  body.onchange = updateConfirm;
+  updateConfirm();
+
+  const modal = new bootstrap.Modal(document.getElementById('stagePickerModal'));
+  modal.show();
+}
+
+// Any way of leaving the modal WITHOUT clicking "Load Selected" — the
+// footer's Cancel button, the header's × , the Esc key, or clicking the
+// backdrop — all fire Bootstrap's hidden.bs.modal, and all of them should
+// undo the project selection that opened the picker, not leave it half-set
+// with no stage attached. Only confirmStagePicker() sets the "confirmed"
+// flag first, so that path is the one exception.
+let _stagePickerConfirmed = false;
+document.getElementById('stagePickerModal').addEventListener('hidden.bs.modal', function() {
+  if (!_stagePickerConfirmed) {
+    resetStagePickerRow();
+  }
+  _stagePickerConfirmed = false;
+  _stagePickerRow = null;
+  _stagePickerData = null;
+  refreshInvoiceProjectChoices();
+});
+
+function resetStagePickerRow() {
+  if (!_stagePickerRow) return;
+  const sel = _stagePickerRow.querySelector('select[name="item_project[]"]');
+  if (sel) {
+    sel.value = '';
+    const wrap = sel.closest('.ss-wrap');
+    const visibleInput = wrap ? wrap.querySelector('input[type="text"]') : null;
+    if (visibleInput) visibleInput.value = '';
+  }
+  ['item_stage_index[]', 'item_co_number[]', 'item_co_firebase_id[]', 'item_powo_number[]'].forEach(name => {
+    const el = _stagePickerRow.querySelector(`input[name="${name}"]`);
+    if (el) el.value = '';
+  });
+}
+
+function confirmStagePicker() {
+  if (!_stagePickerRow || !_stagePickerData) {
+    bootstrap.Modal.getInstance(document.getElementById('stagePickerModal'))?.hide();
+    return;
+  }
+  const projNum = _stagePickerData.project_number || '';
+  const projName = _stagePickerData.project_name || '';
+
+  const picks = [];
+  document.querySelectorAll('#stagePickerBody .sp-stage-checkbox:checked').forEach(cb => {
+    picks.push({
+      description: cb.dataset.stageName ? `${projName} — ${cb.dataset.stageName}` : `${projName} — ${projNum}`,
+      amount: parseFloat(cb.dataset.amount || 0) || 0,
+      stageIdx: cb.dataset.stageIdx,
+      coNumber: '', coFirebaseId: '', powoNumber: ''
+    });
+  });
+  document.querySelectorAll('#stagePickerBody .sp-co-checkbox:checked').forEach(cb => {
+    picks.push({
+      description: cb.dataset.title ? `${cb.dataset.title} (${cb.dataset.coNumber})` : cb.dataset.coNumber,
+      amount: parseFloat(cb.dataset.amount || 0) || 0,
+      stageIdx: cb.dataset.stageIdx,
+      coNumber: cb.dataset.coNumber, coFirebaseId: cb.dataset.coFirebaseId, powoNumber: cb.dataset.powo
+    });
+  });
+
+  const used = usedStageKeys(projNum, _stagePickerRow);
+  const uniquePicks = picks.filter(pick => {
+    const keys = stageIdentityKeys(pick);
+    if (keys.some(key => used.has(key))) return false;
+    keys.forEach(key => used.add(key));
+    return true;
+  });
+  if (!uniquePicks.length) return;
+  if (uniquePicks.length > 0) {
+    // First pick fills the row whose project select triggered the picker.
+    setRowStageFields(_stagePickerRow, uniquePicks[0]);
+    // Any further picks each get their own new line item, same project.
+    for (let i = 1; i < uniquePicks.length; i++) {
+      appendStageRow(projNum, uniquePicks[i]);
+    }
+    calcTotals();
+  }
+
+  _stagePickerConfirmed = true;
+  bootstrap.Modal.getInstance(document.getElementById('stagePickerModal'))?.hide();
+}
+
+function setRowStageFields(row, info) {
+  const descInput  = row.querySelector('input[name="item_description[]"]');
+  const priceInput = row.querySelector('input[name="item_unit_price[]"]');
+  const stageInput = row.querySelector('input[name="item_stage_index[]"]');
+  const coNumInput = row.querySelector('input[name="item_co_number[]"]');
+  const coFbInput  = row.querySelector('input[name="item_co_firebase_id[]"]');
+  const powoInput  = row.querySelector('input[name="item_powo_number[]"]');
+  if (descInput)  descInput.value  = info.description;
+  if (priceInput) { priceInput.value = info.amount.toFixed(2); calcRow(priceInput); }
+  if (stageInput) stageInput.value = (info.stageIdx === undefined || info.stageIdx === null) ? '' : info.stageIdx;
+  if (coNumInput) coNumInput.value = info.coNumber || '';
+  if (coFbInput)  coFbInput.value  = info.coFirebaseId || '';
+  if (powoInput)  powoInput.value  = info.powoNumber || '';
+  refreshInvoiceProjectChoices();
+}
+
+function appendStageRow(projectNumber, info) {
+  const tbody = document.getElementById('lineItemsBody');
+  const row   = document.createElement('tr');
+  row.className = 'line-item-row';
+  row.innerHTML = `
+    <td><input type="text" name="item_description[]" class="form-control form-control-sm" value="${escAttr(info.description)}" required></td>
+    <td>
+      <select name="item_project[]" class="form-select form-select-sm">${projectOptionsHtml}</select>
+      <input type="hidden" name="item_stage_index[]" value="${(info.stageIdx === undefined || info.stageIdx === null) ? '' : info.stageIdx}">
+      <input type="hidden" name="item_co_number[]" value="${escAttr(info.coNumber || '')}">
+      <input type="hidden" name="item_co_firebase_id[]" value="${escAttr(info.coFirebaseId || '')}">
+      <input type="hidden" name="item_powo_number[]" value="${escAttr(info.powoNumber || '')}">
+    </td>
+    <td><input type="number" name="item_quantity[]" class="form-control form-control-sm item-qty" value="1" min="0" step="any" oninput="calcRow(this)"></td>
+    <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm item-price" value="${info.amount.toFixed(2)}" min="0" step="0.01" oninput="calcRow(this)"></td>
+    <td><input type="text" class="form-control form-control-sm item-total bg-light" value="${info.amount.toFixed(2)}" readonly></td>
+    <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>`;
+  tbody.appendChild(row);
+  row.querySelector('select[name="item_project[]"]').value = projectNumber;
+  enhanceProjectSelect(row.querySelector('select[name="item_project[]"]'));
+  refreshInvoiceProjectChoices();
+}
+</script>
+{% endblock %}

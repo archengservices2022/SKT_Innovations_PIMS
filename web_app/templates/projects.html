@@ -1,0 +1,1076 @@
+﻿{% extends "base.html" %}
+{% block title %}Projects{% endblock %}
+{% block page_title %}Projects{% endblock %}
+
+{% block content %}
+<style>
+  /* Prevent date wrapping in projects table */
+  #projectsTable td:nth-child(5) {
+    white-space: nowrap;
+    min-width: 110px;
+  }
+  /* Ensure proper spacing between filters and content */
+  #projFilterForm {
+    margin-bottom: 15px;
+  }
+  /* Disable pointer events on inactive tab panes */
+  .tab-pane:not(.show) {
+    pointer-events: none;
+  }
+</style>
+
+<!-- ?? Projects Overview ?????????????????????????????????????????????????????? -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl">
+    <div class="kpi-card" style="border-left:4px solid #7C3AED;">
+      <div class="kpi-top"><span class="kpi-label">Total Projects</span><i class="bi bi-kanban kpi-icon-sm" style="color:#7C3AED;"></i></div>
+      <div class="kpi-value" style="color:#7C3AED;">{{ p_total_count }}</div>
+      <div class="kpi-sub">{{ 'including ' ~ p_cancelled_count ~ ' cancelled' if p_cancelled_count else 'all time' }}</div>
+    </div>
+  </div>
+  {% if 'financial' in allowed_pages %}
+  <div class="col-6 col-xl">
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-top"><span class="kpi-label">Portfolio Value</span><i class="bi bi-briefcase-fill kpi-icon-sm"></i></div>
+      <div class="kpi-value">{{ currency_symbol }}{{ "{:,.2f}".format(p_active_cv) }}</div>
+      <div class="kpi-sub">{{ 'total contract value (cancelled)' if status_filter == 'Cancelled' else 'total contract value of active projects' }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="kpi-card kpi-green">
+      <div class="kpi-top"><span class="kpi-label">Total Paid</span><i class="bi bi-check-circle-fill kpi-icon-sm"></i></div>
+      <div class="kpi-value">{{ currency_symbol }}{{ "{:,.2f}".format(p_total_paid) }}</div>
+      <div class="kpi-sub">payments received</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="kpi-card kpi-red">
+      <div class="kpi-top"><span class="kpi-label">Outstanding</span><i class="bi bi-hourglass-split kpi-icon-sm"></i></div>
+      <div class="kpi-value">{{ currency_symbol }}{{ "{:,.2f}".format(p_outstanding) }}</div>
+      <div class="kpi-sub">{{ 'remaining to collect (cancelled)' if status_filter == 'Cancelled' else 'remaining to collect from active projects' }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ?? Tab nav -->
+<ul class="nav nav-tabs mb-4" id="projectTabs">
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab in ('all-projects', 'all') else '' }}" data-bs-toggle="tab" href="#tab-all-projects">
+      <i class="bi bi-kanban me-1"></i>All Projects
+      <span class="badge bg-secondary ms-1">{{ projects|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('project_new') }}">
+      <i class="bi bi-plus-square me-1"></i>New Project
+    </a>
+  </li>
+  {% if user_role == 'admin' %}
+  <li class="nav-item">
+    <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#importExcelModal">
+      <i class="bi bi-file-earmark-excel me-1"></i>Import Excel
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link text-danger" href="#" data-bs-toggle="modal" data-bs-target="#clearAllModal">
+      <i class="bi bi-trash3 me-1"></i>Clear All
+    </a>
+  </li>
+  {% endif %}
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'export' else '' }}" data-bs-toggle="tab" href="#tab-export">
+      <i class="bi bi-download me-1"></i>Export
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab in ('archived', 'archived-projects') else '' }}" data-bs-toggle="tab" href="#tab-archived-projects">
+      <i class="bi bi-archive me-1"></i>Archived
+      {% if deleted_projects %}<span class="badge bg-secondary ms-1">{{ deleted_projects|length }}</span>{% endif %}
+    </a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- ?? Tab 1: All Projects ??????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab in ('all-projects', 'all') else '' }}" id="tab-all-projects">
+    {% set status_styles = {
+      'Not Started':           ('bi-hourglass-split',     'bg-slate'),
+      'Active':                ('bi-lightning-charge',    'bg-blue'),
+      'In Progress':           ('bi-arrow-repeat',        'bg-blue'),
+      'On Hold':               ('bi-pause-circle',        'bg-amber'),
+      'Not Started':           ('bi-hourglass-start',     'bg-slate'),
+      'In Progress':           ('bi-arrow-repeat',        'bg-blue'),
+      'Completed':             ('bi-check-circle-fill',   'bg-green'),
+      'Cancelled':             ('bi-x-circle',            'bg-red'),
+      'Ready to Sent':         ('bi-send',                'bg-amber'),
+      'Sent out_Invoiced':     ('bi-receipt-cutoff',      'bg-green'),
+      'Sent out_Not Invoiced': ('bi-envelope-check',      'bg-blue'),
+      'Fully Invoiced_Not paid':   ('bi-hourglass-split',     'bg-amber'),
+      'Fully Invoiced_Partially paid': ('bi-pie-chart-fill',      'bg-amber'),
+      'Fully Invoiced_Fully paid':     ('bi-check-circle-fill',   'bg-green'),
+      'Partially Invoiced_Not paid':       ('bi-hourglass-split', 'bg-purple'),
+      'Partially Invoiced_paid': ('bi-pie-chart-fill',  'bg-purple'),
+      'Scope Disagreement':      ('bi-chat-dots',           'bg-cyan'),
+      'Project Completion Issue':('bi-tools',                'bg-green'),
+    } %}
+    {% set _status_labels = {
+      'Fully Invoiced_Not paid':        'Fully Invoiced – Not Paid',
+      'Fully Invoiced_Partially paid':  'Fully Invoiced – Partially Paid',
+      'Fully Invoiced_Fully paid':      'Fully Invoiced – Fully Paid',
+      'Partially Invoiced_Not paid':    'Partially Invoiced – Not Paid',
+      'Partially Invoiced_paid':        'Partially Invoiced – Paid',
+      'Sent out_Invoiced':              'Sent Out – Invoiced',
+      'Sent out_Not Invoiced':          'Sent Out – Not Invoiced',
+    } %}
+    {% if status_counts %}
+    {% set _ordered_statuses = [] %}
+    {% for st in statuses %}{% if st in status_counts %}{% set _ = _ordered_statuses.append(st) %}{% endif %}{% endfor %}
+    {% for st in status_counts %}{% if st not in _ordered_statuses %}{% set _ = _ordered_statuses.append(st) %}{% endif %}{% endfor %}
+    <div class="row g-2 mb-3">
+      {% for st in _ordered_statuses %}
+      {% set count = status_counts[st] %}
+      {% set icon, color = status_styles.get(st, ('bi-kanban', 'bg-slate')) %}
+      {% set label = _status_labels.get(st, st) %}
+      <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('projects', status=st, tab='all-projects', q=search, client=client_filter, plant=plant_filter, from=date_from, to=date_to) }}" class="text-decoration-none">
+          <div class="stat-card py-2 px-3" style="gap:10px;{{ 'border-color:var(--slate-400);box-shadow:0 0 0 1px var(--slate-300);' if status_filter == st }}">
+            <div class="stat-icon {{ color }}" style="width:36px;height:36px;font-size:16px;border-radius:8px;">
+              <i class="bi {{ icon }}"></i>
+            </div>
+            <div style="min-width:0;flex:1;">
+              <div class="stat-value" style="font-size:18px;">{{ count }}</div>
+              <div class="stat-label" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;{{ 'font-size:9px;' if label|length > 14 }}" title="{{ label }}">{{ label }}</div>
+            </div>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+      {% if overdue_count %}
+      <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('projects', overdue=1, tab='all-projects', q=search, status=status_filter, client=client_filter, plant=plant_filter, from=date_from, to=date_to) }}" class="text-decoration-none">
+          <div class="stat-card py-2 px-3" style="gap:10px;{{ 'border-color:var(--slate-400);box-shadow:0 0 0 1px var(--slate-300);' if overdue_filter }}">
+            <div class="stat-icon bg-red" style="width:36px;height:36px;font-size:16px;border-radius:8px;">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div>
+              <div class="stat-value" style="font-size:18px;">{{ overdue_count }}</div>
+              <div class="stat-label">Overdue Payment{{ 's' if overdue_count != 1 }}</div>
+            </div>
+          </div>
+        </a>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    <form method="GET" id="projFilterForm">
+      <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <input type="text" name="q" value="{{ search }}" class="form-control form-control-sm"
+                 placeholder="Search projects" style="width:200px;">
+          <select name="status" class="form-select form-select-sm" style="width:150px;">
+            <option value="">All Statuses</option>
+            {% for s in statuses %}
+            <option value="{{ s }}" {{ 'selected' if status_filter == s }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+          <select name="client" class="form-select form-select-sm" style="width:190px;">
+            <option value="">All Clients</option>
+            {% for c in clients %}
+            <option value="{{ c }}" {{ 'selected' if client_filter == c }}>{{ c }}</option>
+            {% endfor %}
+          </select>
+          {% if all_plants %}
+          <select name="plant" class="form-select form-select-sm" style="width:140px;">
+            <option value="">All Plants</option>
+            {% for pl in all_plants %}
+            <option value="{{ pl }}" {{ 'selected' if plant_filter == pl }}>{{ pl }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" id="loadBtn" style="display:none;white-space:nowrap;padding:0.5rem 1rem;" onclick="openLoadModal()"></button>
+      </div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <span class="text-muted small" style="min-width:75px;">Start date:</span>
+        <input type="date" name="from" value="{{ date_from }}" class="form-control form-control-sm" style="width:160px;"
+               title="Matches a project whose Received Date OR any Change Order Date falls in this range">
+        <span class="text-muted small">to</span>
+        <input type="date" name="to" value="{{ date_to }}" class="form-control form-control-sm" style="width:160px;"
+               title="Matches a project whose Received Date OR any Change Order Date falls in this range">
+        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setProjRange('month')">This Month</button>
+        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setProjRange('year')">This Year</button>
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-search me-1"></i>Apply
+        </button>
+        {% if search or status_filter or overdue_filter or date_from or date_to or client_filter or plant_filter %}
+        <a href="{{ url_for('projects') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+    </form>
+        {% if search or status_filter or overdue_filter or date_from or date_to or client_filter or plant_filter %}
+        <div class="alert alert-light py-1 px-3 mt-2 small d-flex align-items-center gap-2"
+             style="border-left:3px solid #0D9488;">
+          <i class="bi bi-funnel text-teal"></i>
+          <span>
+            {% if date_from and date_to %}{{ date_from }} to {{ date_to }}{% elif date_from %}From {{ date_from }}{% elif date_to %}Up to {{ date_to }}{% endif %}
+            {% if status_filter %} — Status: <strong>{{ status_filter }}</strong>{% endif %}
+            {% if overdue_filter %} — <strong class="text-danger">Overdue payments only</strong>{% endif %}
+            {% if client_filter %} — Client: <strong>{{ client_filter }}</strong>{% endif %}
+            {% if plant_filter %} — Plant: <strong>{{ plant_filter }}</strong>{% endif %}
+            — {{ projects|length }} result{{ 's' if projects|length != 1 else '' }}
+          </span>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card-panel">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle" id="projectsTable">
+          <thead>
+            <tr>
+              <th>Project #</th>
+              <th>PO/WO #</th>
+              <th>Client</th>
+              <th>Plant</th>
+              <th>Received Date</th>
+              <th class="text-end">Contract Value</th>
+              <th class="text-end">Paid</th>
+              <th class="text-end">Outstanding</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="projectsTableBody">
+            {% for p in projects %}
+            <tr class="project-row" data-project-id="{{ p.firebase_id }}" data-project="{{ p | tojson }}"
+                onmousedown="startDragSelect(event, '{{ p.firebase_id }}')"
+                onmouseup="endDragSelect(event)"
+                onmouseover="continueDragSelect(event, '{{ p.firebase_id }}')"
+                onclick="selectProject(event, '{{ p.firebase_id }}')"
+                style="cursor:pointer;user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">
+              <td>
+                <a href="javascript:void(0);" onclick="event.stopPropagation(); location.href=getProjectDetailUrl('{{ p.firebase_id }}');" class="text-teal fw-bold" style="text-decoration:none;">{{ p.get('project_number','—') }}</a>
+                {% if p.get('_has_co') %}
+                <span title="Has Change Order(s)" style="display:inline-flex;align-items:center;gap:2px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:4px;font-size:.6rem;font-weight:700;padding:1px 5px;margin-left:4px;vertical-align:middle;letter-spacing:.03em;">
+                  <i class="bi bi-arrow-repeat"></i> CO
+                </span>
+                {% endif %}
+              </td>
+              <td class="fw-500">
+                {{ p.get('po_wo_number') or '—' }}
+                {% set _co_powos = [] %}
+                {% for _co in (p.get('change_orders') or []) %}
+                  {% if _co.get('po_wo_number') %}{% set _ = _co_powos.append(_co.get('po_wo_number')) %}{% endif %}
+                {% endfor %}
+                {% if _co_powos %}
+                <div class="text-muted" style="margin-top:2px;font-size:.8rem;font-weight:600;letter-spacing:.02em;">
+                  CO_{{ _co_powos | join(', ') }}
+                </div>
+                {% endif %}
+              </td>
+              <td class="text-muted">{{ p.get('company_name') or p.get('client_name','—') }}</td>
+              <td>
+                {% if p.get('_plant_display') %}
+                <span class="badge" style="background:#0D9488;color:#fff;font-size:11px;font-weight:700;letter-spacing:.04em;">{{ p._plant_display }}</span>
+                {% else %}<span class="text-muted">-</span>{% endif %}
+              </td>
+              <td>{{ p.get('date_received','—') | format_date }}</td>
+              <td class="text-end fw-bold">{{ currency_symbol }}{{ "{:,.2f}".format(p.get('contract_value',0)|float) }}</td>
+              <td class="text-end text-success">{{ currency_symbol }}{{ "{:,.2f}".format(p.get('amount_paid',0)|float) }}</td>
+              {% set _owed = [p.get('contract_value',0)|float - p.get('amount_paid',0)|float, 0]|max %}
+              <td class="text-end {{ 'text-danger' if _owed > 0 else 'text-muted' }}">{{ currency_symbol }}{{ "{:,.2f}".format(_owed) }}</td>
+              <td>
+                <span class="badge status-{{ p.get('status','Not Started')|lower|replace(' ','-') }}">
+                  {{ p.get('status','Not Started') }}
+                </span>
+                {% if p.get('_has_overdue') %}
+                <span class="badge status-overdue" title="A payment stage is past its invoice due date">
+                  <i class="bi bi-exclamation-triangle-fill"></i> Overdue
+                </span>
+                {% endif %}
+              </td>
+              <td onclick="event.stopPropagation();">
+                <a href="javascript:void(0);"
+                   class="btn btn-xs btn-outline-secondary" onclick="event.stopPropagation(); location.href=getProjectDetailUrl('{{ p.firebase_id }}');">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="9" class="text-center text-muted py-5">
+                <i class="bi bi-kanban fs-2 d-block mb-2"></i>
+                No projects found.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          {% if projects %}
+          <tfoot>
+            <tr class="fw-bold table-light border-top" style="border-top:2px solid #dee2e6!important;">
+              <td colspan="5" class="text-end text-muted small pe-3">Totals ({{ projects|length }} project{{ 's' if projects|length != 1 }})</td>
+              <td class="text-end">{{ currency_symbol }}{{ "{:,.2f}".format(p_total_cv) }}</td>
+              <td class="text-end text-success">{{ currency_symbol }}{{ "{:,.2f}".format(p_total_paid) }}</td>
+              <td class="text-end text-danger">{{ currency_symbol }}{{ "{:,.2f}".format(p_outstanding) }}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      <div id="projectsPager_pager"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? Tab 3: Export ????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'export' else '' }}" id="tab-export">
+    <div class="card-panel mb-4">
+      <h6 class="section-heading mb-3">Filter Export</h6>
+      <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
+        <select id="exportStatus" class="form-select form-select-sm" style="width:170px;"
+                onchange="buildExportLinks()">
+          <option value="">All Statuses</option>
+          {% for s in statuses %}
+          <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+        <select id="exportClient" class="form-select form-select-sm" style="width:200px;"
+                onchange="buildExportLinks()">
+          <option value="">All Clients</option>
+          {% for c in clients %}
+          <option value="{{ c }}">{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        <span class="text-muted small" style="min-width:75px;">Start date:</span>
+        <input type="date" id="exportFrom" class="form-control form-control-sm" style="width:160px;" oninput="buildExportLinks()">
+        <span class="text-muted small">to</span>
+        <input type="date" id="exportTo" class="form-control form-control-sm" style="width:160px;" oninput="buildExportLinks()">
+        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setExportRange('month')">This Month</button>
+        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setExportRange('year')">This Year</button>
+        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setExportRange('last30')">Last 30 Days</button>
+        <button type="button" class="btn btn-xs btn-outline-danger" onclick="clearExportFilters()"><i class="bi bi-x me-1"></i>Clear</button>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="export-card">
+          <div style="font-size:2.5rem;color:#DC2626;margin-bottom:12px;">
+            <i class="bi bi-file-earmark-pdf-fill"></i>
+          </div>
+          <h6 class="fw-bold mb-1">PDF Report</h6>
+          <p class="text-muted small mb-3">Professional PDF with all project data</p>
+          <a id="exportPdfLink" href="{{ url_for('projects_export_pdf') }}"
+             class="btn btn-sm btn-danger w-100">
+            <i class="bi bi-download me-1"></i>Download PDF
+          </a>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="export-card">
+          <div style="font-size:2.5rem;color:#16A34A;margin-bottom:12px;">
+            <i class="bi bi-file-earmark-spreadsheet-fill"></i>
+          </div>
+          <h6 class="fw-bold mb-1">Excel Spreadsheet</h6>
+          <p class="text-muted small mb-3">Styled .xlsx with all project details</p>
+          <a id="exportExcelLink" href="{{ url_for('projects_export_excel') }}"
+             class="btn btn-sm btn-success w-100">
+            <i class="bi bi-download me-1"></i>Download Excel
+          </a>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="export-card">
+          <div style="font-size:2.5rem;color:#2563EB;margin-bottom:12px;">
+            <i class="bi bi-file-earmark-text-fill"></i>
+          </div>
+          <h6 class="fw-bold mb-1">CSV Export</h6>
+          <p class="text-muted small mb-3">Comma-separated values file</p>
+          <a id="exportCsvLink" href="{{ url_for('projects_export_csv') }}"
+             class="btn btn-sm btn-primary w-100">
+            <i class="bi bi-download me-1"></i>Download CSV
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ?? Tab: Archived Projects -->
+  <div class="tab-pane fade {{ 'show active' if active_tab in ('archived', 'archived-projects') else '' }}" id="tab-archived-projects" style="margin-top:-350px; padding-top:0; padding:0;">
+    <div class="card-panel" style="margin:0;">
+      <h6 class="section-heading mb-2" style="margin-top:0;"><i class="bi bi-archive me-2"></i>Archived Projects</h6>
+      {% if deleted_projects %}
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle mb-0">
+          <thead style="background:#1e293b;">
+            <tr>
+              <th style="color:#fff;">Project #</th>
+              <th style="color:#fff;">Client</th>
+              <th style="color:#fff;">Status</th>
+              <th style="color:#fff;">Contract Value</th>
+              <th style="color:#fff;">Deleted By</th>
+              <th style="color:#fff;">Deleted At</th>
+              <th style="color:#fff;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in deleted_projects %}
+            <tr>
+              <td class="fw-bold">{{ p.get('project_number','—') }}</td>
+              <td>{{ p.get('company_name') or p.get('client_name','—') }}</td>
+              <td><span class="badge" style="background:#64748b;">Archived</span></td>
+              <td>{{ currency_symbol }}{{ "{:,.2f}".format(p.get('contract_value',0)|float) }}</td>
+              <td class="text-muted small">{{ p.get('deleted_by','—') }}</td>
+              <td class="text-muted small">{{ p.get('deleted_at','')[:10] }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('project_restore', project_id=p.firebase_id) }}"
+                      onsubmit="return confirm('Restore project {{ p.get('project_number','') }}?');">
+                  <button type="submit" class="btn btn-xs btn-outline-success">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Restore
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-archive" style="font-size:2rem;"></i>
+        <p class="mt-2 mb-0">No archived projects.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div><!-- /tab-archived-projects -->
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ?? Project filter quick-range ???????????????????????????????????????????????
+function localDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function setProjRange(type) {
+  const form = document.getElementById('projFilterForm');
+  const fromEl = form.querySelector('[name="from"]');
+  const toEl   = form.querySelector('[name="to"]');
+  const now = new Date();
+  if (type === 'month') {
+    fromEl.value = localDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    toEl.value   = localDate(new Date(now.getFullYear(), now.getMonth()+1, 0));
+  } else if (type === 'year') {
+    fromEl.value = `${now.getFullYear()}-01-01`;
+    toEl.value   = `${now.getFullYear()}-12-31`;
+  } else if (type === 'last30') {
+    const f = new Date(now); f.setDate(f.getDate()-30);
+    fromEl.value = localDate(f);
+    toEl.value   = localDate(now);
+  }
+  form.submit();
+}
+
+const PDF_BASE   = "{{ url_for('projects_export_pdf') }}";
+const EXCEL_BASE = "{{ url_for('projects_export_excel') }}";
+const CSV_BASE   = "{{ url_for('projects_export_csv') }}";
+
+function buildExportLinks() {
+  const params = new URLSearchParams();
+  const s  = document.getElementById('exportStatus').value;
+  const c  = document.getElementById('exportClient').value;
+  const f  = document.getElementById('exportFrom').value;
+  const t  = document.getElementById('exportTo').value;
+  if (s) params.set('status', s);
+  if (c) params.set('client', c);
+  if (f) params.set('from', f);
+  if (t) params.set('to', t);
+  const q = params.toString() ? '?' + params.toString() : '';
+  document.getElementById('exportPdfLink').href   = PDF_BASE   + q;
+  document.getElementById('exportExcelLink').href = EXCEL_BASE + q;
+  document.getElementById('exportCsvLink').href   = CSV_BASE   + q;
+}
+function clearExportFilters() {
+  document.getElementById('exportStatus').value = '';
+  document.getElementById('exportClient').value = '';
+  document.getElementById('exportFrom').value   = '';
+  document.getElementById('exportTo').value     = '';
+  buildExportLinks();
+}
+function setExportRange(type) {
+  const now = new Date();
+  if (type === 'month') {
+    document.getElementById('exportFrom').value = localDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    document.getElementById('exportTo').value   = localDate(new Date(now.getFullYear(), now.getMonth()+1, 0));
+  } else if (type === 'year') {
+    document.getElementById('exportFrom').value = `${now.getFullYear()}-01-01`;
+    document.getElementById('exportTo').value   = `${now.getFullYear()}-12-31`;
+  } else if (type === 'last30') {
+    const f = new Date(now); f.setDate(f.getDate()-30);
+    document.getElementById('exportFrom').value = localDate(f);
+    document.getElementById('exportTo').value   = localDate(now);
+  }
+  buildExportLinks();
+}
+
+// Hide table when export or archived tab is active, show when all-projects tab is active
+document.addEventListener('DOMContentLoaded', function() {
+  const projectsTable = document.getElementById('projectsTable');
+  const tableCardPanel = projectsTable ? projectsTable.closest('.card-panel') : null;
+
+  if (!tableCardPanel) {
+    buildExportLinks();
+    return;
+  }
+
+  // Hide table initially if export or archived tab is active
+  const exportTab = document.getElementById('tab-export');
+  const archivedTab = document.getElementById('tab-archived-projects');
+  if ((exportTab && exportTab.classList.contains('active')) || (archivedTab && archivedTab.classList.contains('active'))) {
+    tableCardPanel.style.display = 'none';
+  }
+
+  // Handle tab switching - hide table when export tab is shown
+  document.querySelectorAll('[href="#tab-export"]').forEach(link => {
+    link.addEventListener('shown.bs.tab', function() {
+      if (tableCardPanel) tableCardPanel.style.display = 'none';
+    });
+  });
+
+  // Handle tab switching - hide table when archived tab is shown
+  document.querySelectorAll('[href="#tab-archived-projects"]').forEach(link => {
+    link.addEventListener('shown.bs.tab', function() {
+      if (tableCardPanel) tableCardPanel.style.display = 'none';
+    });
+  });
+
+  // Handle tab switching - show table when all-projects tab is shown
+  document.querySelectorAll('[href="#tab-all-projects"]').forEach(link => {
+    link.addEventListener('shown.bs.tab', function() {
+      if (tableCardPanel) tableCardPanel.style.display = '';
+    });
+  });
+
+  // Initialize export links with current filter values
+  buildExportLinks();
+});
+
+// Shift+Click and Shift+Drag multi-select
+let lastSelectedRow = null;
+window.selectedProjects = [];
+let dragStartRow = null;
+let isDragging = false;
+
+function startDragSelect(event, projectId) {
+  if (event.buttons === 1) {  // Left mouse button
+    isDragging = true;
+    dragStartRow = event.currentTarget;
+  }
+}
+
+function updateRangeSelection(event) {
+  if (!isDragging || !dragStartRow) return;
+
+  const table = document.getElementById('projectsTable');
+  const rows = Array.from(table.querySelectorAll('tbody .project-row'));
+  const startIdx = rows.indexOf(dragStartRow);
+
+  if (startIdx === -1) return;
+
+  // Find which row is currently under cursor
+  const hoveredRow = document.elementFromPoint(event.clientX, event.clientY)?.closest('.project-row');
+  if (!hoveredRow || !rows.includes(hoveredRow)) return;
+
+  const currentIdx = rows.indexOf(hoveredRow);
+  const start = Math.min(startIdx, currentIdx);
+  const end = Math.max(startIdx, currentIdx);
+
+  // Clear and select range
+  rows.forEach(r => r.classList.remove('table-active'));
+  window.selectedProjects = [];
+
+  rows.slice(start, end + 1).forEach(r => {
+    r.classList.add('table-active');
+    const id = r.dataset.projectId;
+    if (!window.selectedProjects.includes(id)) {
+      window.selectedProjects.push(id);
+    }
+  });
+
+  updateLoadButton();
+}
+
+// Global mousemove listener for drag selection
+document.addEventListener('mousemove', (event) => {
+  if (isDragging) {
+    updateRangeSelection(event);
+  }
+});
+
+function endDragSelect(event) {
+  isDragging = false;
+}
+
+function selectProject(event, projectId) {
+  const row = event.currentTarget;
+
+  if (event.shiftKey && lastSelectedRow) {
+    // Shift+Click: select range
+    const table = document.getElementById('projectsTable');
+    const rows = Array.from(table.querySelectorAll('tbody .project-row'));
+    const lastIdx = rows.indexOf(lastSelectedRow);
+    const currentIdx = rows.indexOf(row);
+    const start = Math.min(lastIdx, currentIdx);
+    const end = Math.max(lastIdx, currentIdx);
+
+    rows.slice(start, end + 1).forEach(r => {
+      r.classList.add('table-active');
+      const id = r.dataset.projectId;
+      if (!window.selectedProjects.includes(id)) {
+        window.selectedProjects.push(id);
+      }
+    });
+  } else if (event.ctrlKey || event.metaKey) {
+    // Ctrl/Cmd+Click: toggle individual
+    if (row.classList.contains('table-active')) {
+      row.classList.remove('table-active');
+      window.selectedProjects = window.selectedProjects.filter(id => id !== projectId);
+    } else {
+      row.classList.add('table-active');
+      if (!window.selectedProjects.includes(projectId)) {
+        window.selectedProjects.push(projectId);
+      }
+    }
+  } else {
+    // Single click: select only this
+    document.querySelectorAll('.project-row.table-active').forEach(r => r.classList.remove('table-active'));
+    row.classList.add('table-active');
+    window.selectedProjects = [projectId];
+  }
+
+  lastSelectedRow = row;
+  updateLoadButton();
+}
+
+function updateLoadButton() {
+  const btn = document.getElementById('loadBtn');
+  if (window.selectedProjects.length > 0) {
+    btn.style.display = 'block';
+    btn.innerHTML = `<i class="bi bi-upload me-1"></i>Load ${window.selectedProjects.length} Project(s) to Invoice`;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function getCurrentPage() {
+  return _PAGERS['projectsPager'] ? _PAGERS['projectsPager'].page : 1;
+}
+
+function getProjectDetailUrl(projectId) {
+  const page = getCurrentPage();
+  return `{{ url_for('project_detail', project_id='') }}${projectId}?page=${page}`;
+}
+
+function openLoadModal() {
+  try {
+    if (window.selectedProjects.length === 0) {
+      alert('Please select at least one project');
+      return;
+    }
+
+    // Fetch project data from server
+    const projectIds = window.selectedProjects.join(',');
+    fetch(`{{ url_for('api_get_projects', project_ids='') }}${projectIds}`)
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch projects');
+        return response.json();
+      })
+      .then(selectedProjects => {
+        if (!selectedProjects || selectedProjects.length === 0) {
+          alert('Could not load project data. Please try again.');
+          return;
+        }
+
+        window.selectedProjectsForInvoice = selectedProjects;
+
+        // Build modal content - show only NEXT stage to invoice
+        const modalBody = document.getElementById('loadModalBody');
+
+        // Title
+        let html = `<div style="margin-bottom:20px;">
+          <h6 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 8px 0;">Auto-Detected Payment Stages</h6>
+          <p style="font-size:12px;color:#64748b;margin:0;">System auto-detected the next invoice stage for each project. Review then confirm.</p>
+        </div>`;
+
+        // Table
+        html += `<div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;margin-bottom:16px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;background:white;">
+            <tr style="background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
+              <th style="padding:12px;width:36px;"></th>
+              <th style="padding:12px;text-align:left;font-weight:600;color:#334155;">Stage</th>
+              <th style="padding:12px;text-align:right;font-weight:600;color:#334155;width:110px;">Amount</th>
+              <th style="padding:12px;text-align:left;font-weight:600;color:#334155;" colspan="2">Status</th>
+            </tr>`;
+
+        let blockedCount = 0;
+        selectedProjects.forEach((proj) => {
+          const pendingStages = proj.all_pending_stages || [];
+          const pendingCOs = proj.approved_pending_cos || [];
+          // A project is only fully invoiced once BOTH its regular stages and its
+          // approved change orders are billed — pendingStages alone excludes COs
+          // (they're listed separately below), so checking it in isolation used
+          // to hide a project's CO entirely once its base stage was invoiced.
+          const isFullyInvoiced = pendingStages.length === 0 && pendingCOs.length === 0;
+
+          if (isFullyInvoiced) {
+            // Fully invoiced — single greyed row
+            html += `<tr style="border-bottom:1px solid #f1f5f9;background:#f8fafc;opacity:.6;">
+              <td style="padding:12px;color:#1e293b;"><strong>${proj.project_number || '—'}</strong></td>
+              <td style="padding:12px;color:#64748b;" colspan="3">${proj.project_name || '—'} — All stages invoiced</td>
+              <td style="padding:12px;color:#64748b;font-size:11px;">Fully Invoiced</td>
+            </tr>`;
+            return;
+          }
+
+          // Project header row (no checkbox — just the project identity)
+          html += `<tr style="background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
+            <td style="padding:10px 12px;color:#0f172a;font-weight:700;" colspan="5">
+              <i class="bi bi-folder2-open me-1" style="color:#7C3AED;"></i>
+              ${proj.project_number || '—'} &nbsp;·&nbsp; ${proj.project_name || '—'}
+            </td>
+          </tr>`;
+
+          // One checkbox row per pending stage
+          pendingStages.forEach((stage) => {
+            const isNext    = stage.is_next;
+            const isBlocked = stage.blocked;
+            if (isBlocked) blockedCount++;
+
+            const rowBg     = isNext ? '#f0fdf4' : '#ffffff';
+            const checkId   = `stageCheck_${proj.firebase_id}_${stage.stage_idx}`;
+            const statusTxt = isBlocked ? '⚠ Prior stage not yet invoiced' : 'Ready to invoice';
+            const statusClr = isBlocked ? '#b45309' : '#0f766e';
+
+            html += `<tr style="border-bottom:1px solid #f1f5f9;background:${rowBg};" data-proj="${proj.firebase_id}">
+              <td style="padding:8px 12px 8px 20px;">
+                <input type="checkbox" id="${checkId}"
+                       class="stage-checkbox form-check-input"
+                       data-proj="${proj.firebase_id}"
+                       data-stage="${stage.stage_idx}"
+                       ${isNext ? 'checked' : ''}
+                       style="cursor:pointer;width:15px;height:15px;">
+              </td>
+              <td style="padding:8px 12px;color:#1e293b;font-size:12px;">
+                <label for="${checkId}" style="cursor:pointer;margin:0;">
+                  ${stage.stage_name || '—'}
+                  ${isNext ? '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600;">Next</span>' : ''}
+                </label>
+              </td>
+              <td style="padding:8px 12px;text-align:right;color:#1e293b;font-weight:600;">
+                ${CURRENCY_SYMBOL}${parseFloat(stage.amount||0).toFixed(2)}
+              </td>
+              <td style="padding:8px 12px;color:${statusClr};font-size:11px;" colspan="2">${statusTxt}</td>
+            </tr>`;
+          });
+
+          // Approved CO sub-rows
+          if (proj.approved_pending_cos && proj.approved_pending_cos.length > 0) {
+            proj.approved_pending_cos.forEach(co => {
+              html += `<tr style="background:#fffbeb;border-bottom:1px solid #fef3c7;border-left:3px solid #f59e0b;">
+                <td style="padding:8px 12px 8px 20px;">
+                  <input type="checkbox" class="co-checkbox form-check-input"
+                         data-proj="${proj.firebase_id}" data-co="${co.co_idx}"
+                         checked style="cursor:pointer;width:15px;height:15px;">
+                </td>
+                <td style="padding:8px 12px;color:#78350f;font-size:12px;">
+                  <span style="font-size:10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px;">CO</span>
+                  CO ${co.co_number || '—'}${co.title ? ' — ' + co.title : ''}
+                </td>
+                <td style="padding:8px 12px;text-align:right;color:#92400e;font-weight:600;">
+                  ${CURRENCY_SYMBOL}${parseFloat(co.amount||0).toFixed(2)}
+                </td>
+                <td style="padding:8px 12px;color:#0f766e;font-size:11px;" colspan="2">Ready to invoice</td>
+              </tr>`;
+            });
+          }
+        });
+
+        html += `</table></div>`;
+
+        // Info note
+        html += `<div style="background:#eff6ff;border-radius:6px;padding:10px 12px;margin-bottom:16px;border-left:4px solid #3b82f6;">
+          <div style="color:#1d4ed8;font-size:12px;">
+            <strong>Tip:</strong> Check multiple stages to combine them into one invoice. Stages marked ⚠ have a prior uninvoiced stage — confirm with client before sending.
+          </div>
+        </div>`;
+
+        html += '</div>';
+        modalBody.innerHTML = html;
+
+        // Check if all projects are fully invoiced (same rule as above: stages AND COs)
+        const allFullyInvoiced = selectedProjects.every(proj =>
+          (proj.all_pending_stages || []).length === 0 && (proj.approved_pending_cos || []).length === 0);
+        const loadBtn = document.getElementById('loadToInvoiceBtn');
+
+        if (allFullyInvoiced) {
+          loadBtn.disabled = true;
+          loadBtn.setAttribute('title', 'All selected projects are fully invoiced');
+          loadBtn.style.opacity = '0.5';
+          loadBtn.style.cursor = 'not-allowed';
+        } else {
+          loadBtn.disabled = false;
+          loadBtn.removeAttribute('title');
+          loadBtn.style.opacity = '1';
+          loadBtn.style.cursor = 'pointer';
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('loadModal'));
+        modal.show();
+      })
+      .catch(error => {
+        console.error('Error fetching projects:', error);
+        alert('Error loading project data. Please try again.');
+      });
+  } catch(error) {
+    console.error('Error opening modal:', error);
+    alert('Error opening modal. Check console for details.');
+  }
+}
+
+function loadToInvoice() {
+  const projects = window.selectedProjectsForInvoice || [];
+  if (projects.length === 0) return;
+
+  // The checkboxes rendered in the modal are the single source of truth.
+  // Don't pre-filter by p.next_stage — a project whose regular payment stages
+  // are all invoiced can still have a checked Change Order, and that CO must be
+  // carried through. A truly fully-invoiced project renders no checkbox rows,
+  // so it naturally contributes nothing below.
+  const params = new URLSearchParams();
+  const projectsToLoad = [];
+
+  projects.forEach(p => {
+    // Gather checked payment stage indices for this project
+    const checkedStages = [];
+    document.querySelectorAll(`.stage-checkbox[data-proj="${p.firebase_id}"]:checked`).forEach(cb => {
+      checkedStages.push(cb.getAttribute('data-stage'));
+    });
+
+    // Gather checked CO indices for this project
+    const checkedCOs = [];
+    document.querySelectorAll(`.co-checkbox[data-proj="${p.firebase_id}"]:checked`).forEach(cb => {
+      checkedCOs.push(cb.getAttribute('data-co'));
+    });
+
+    // Only include project if it has checked stages or checked COs
+    if (checkedStages.length > 0 || checkedCOs.length > 0) {
+      projectsToLoad.push(p.firebase_id);
+      if (checkedStages.length > 0) {
+        params.append(`stages_${p.firebase_id}`, checkedStages.join(','));
+      }
+      if (checkedCOs.length > 0) {
+        params.append(`co_${p.firebase_id}`, checkedCOs.join(','));
+      }
+    }
+  });
+
+  if (projectsToLoad.length === 0) {
+    alert('Please check at least one stage or change order to load.');
+    return;
+  }
+
+  params.append('projects', projectsToLoad.join(','));
+  window.location.href = `{{ url_for('invoice_new') }}?${params.toString()}`;
+}
+
+// Activate tab from URL param or server active_tab
+document.addEventListener('DOMContentLoaded', function () {
+  const tabParam = "{{ active_tab }}";
+  const allTabs  = ["all-projects", "export", "archived-projects"];
+  const target   = allTabs.includes(tabParam) ? tabParam : "all-projects";
+  const el = document.querySelector('[href="#tab-' + target + '"]');
+  if (el) new bootstrap.Tab(el).show();
+
+  // Sync URL when tab changes
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function(link) {
+    link.addEventListener('shown.bs.tab', function(e) {
+      const id = e.target.getAttribute('href').replace('#tab-', '');
+      const url = new URL(window.location);
+      url.searchParams.set('tab', id);
+      window.history.replaceState({}, '', url);
+    });
+  });
+});
+
+// ?? Projects table pager ??????????????????????????????????????????????????????
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('projectsTableBody')) {
+    // Get page from URL only - don't persist across section navigation
+    const urlParams = new URLSearchParams(window.location.search);
+    let pageNum = urlParams.get('page');
+
+    new TablePager('projectsPager', '#projectsTableBody', 'tr.project-row', 15);
+    _PAGERS['projectsPager'].refresh();
+
+    // Apply page number after pager is initialized
+    if (pageNum && !isNaN(pageNum)) {
+      const pager = _PAGERS['projectsPager'];
+      const pageInt = parseInt(pageNum);
+      if (pageInt >= 1) {
+        pager.page = pageInt;
+        pager._paginate();
+      }
+    }
+
+  }
+
+  // Close select dropdowns when clicking outside filter form
+  const filterForm = document.getElementById('projFilterForm');
+  if (filterForm) {
+    const selects = filterForm.querySelectorAll('select');
+
+    // Only blur selects when clicking OUTSIDE the filter form
+    document.addEventListener('click', function(e) {
+      // If click is outside filter form, close any open selects
+      if (!filterForm.contains(e.target)) {
+        selects.forEach(select => {
+          select.blur();
+        });
+      }
+    });
+  }
+});
+</script>
+
+<!-- Load to Invoice Modal -->
+<div class="modal fade" id="loadModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Load Projects to Invoice</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="loadModalBody">
+        <p class="text-muted">Loading...</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="loadToInvoiceBtn" onclick="loadToInvoice()"
+                data-bs-toggle="tooltip" data-bs-placement="top" title="">
+          <i class="bi bi-upload me-1"></i>Load to Invoice
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ?? Clear All Projects Modal ????????????????????????????????????????????? -->
+{% if user_role == 'admin' %}
+<div class="modal fade" id="clearAllModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-trash3 me-2"></i>Clear All Projects</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('projects_clear_all') }}">
+        <div class="modal-body">
+          <div class="alert alert-danger">
+            <strong>Warning:</strong> This will permanently delete ALL {{ projects|length }} projects from this system. This cannot be undone.
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Type <code>DELETE ALL</code> to confirm:</label>
+            <input type="text" name="confirm_text" class="form-control" placeholder="DELETE ALL" required autocomplete="off">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash3 me-1"></i>Delete All Projects
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ?? Import Excel Modal ??????????????????????????????????????????????????? -->
+<div class="modal fade" id="importExcelModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Import Projects from Excel</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('projects_import_excel') }}" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="alert alert-info" style="font-size:13px;">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            <strong>How it works:</strong> Upload your Excel file (.xlsx). Each sheet (Dec 25, Jan 26, etc.) is read automatically.
+            Projects with existing job numbers are skipped to avoid duplicates.
+          </div>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="update_existing" id="updateExistingCheck" value="1">
+              <label class="form-check-label fw-semibold" for="updateExistingCheck">
+                Update existing projects
+              </label>
+            </div>
+            <div class="form-text mb-2">When enabled, projects that already exist will have their <strong>empty fields filled in</strong> from Excel (e.g. PO/WO, Plant). Fields you've already filled manually will not be overwritten.</div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="force_overwrite" id="forceOverwriteCheck" value="1">
+              <label class="form-check-label fw-semibold text-warning" for="forceOverwriteCheck">
+                Force overwrite all fields
+              </label>
+            </div>
+            <div class="form-text text-warning-emphasis">Overwrites <strong>all</strong> fields on existing projects with the Excel values — use this to fix data that was imported incorrectly (e.g. wrong Plant/State values from old import). Implies "Update existing".</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Expected columns in each sheet:</label>
+            <ul class="small text-muted mb-2" style="padding-left:18px;">
+              <li><strong>Project Number</strong> — original job number (e.g. SKT-202601101)</li>
+              <li><strong>Clients</strong> — client/company name</li>
+              <li><strong>D/VO Number</strong> — PO / work order number</li>
+              <li><strong>Site Address</strong> — project site</li>
+              <li><strong>Mail Address</strong> — mailing address</li>
+              <li><strong>Date</strong> — date received</li>
+              <li><strong>PI</strong> — state abbreviation</li>
+              <li><strong>Price</strong> — contract value</li>
+              <li><strong>Notes / Additional Notes</strong> — any remarks</li>
+            </ul>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Select Excel file <span class="text-danger">*</span></label>
+            <input type="file" name="excel_file" class="form-control" accept=".xlsx,.xls" required>
+            <div class="form-text">Supports .xlsx and .xls formats.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Sheet Name <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="text" name="sheet_name" class="form-control" placeholder="e.g. Dec 25 — leave blank to import ALL sheets">
+            <div class="form-text">Type the exact sheet tab name to import just one month. Leave blank to import all sheets at once.</div>
+          </div>
+          <div class="alert alert-warning" style="font-size:12px;">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+            Importing all sheets (~354 projects) takes 30–60 seconds. One sheet at a time is faster and easier to verify.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success" id="importSubmitBtn"
+                  onclick="this.disabled=true; this.innerHTML='<span class=&quot;spinner-border spinner-border-sm me-1&quot;></span> Importing...'; this.form.submit();">
+            <i class="bi bi-file-earmark-arrow-up me-1"></i>Import All Projects
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

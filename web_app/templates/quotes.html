@@ -1,0 +1,1466 @@
+﻿{% extends "base.html" %}
+{% block title %}Quote Forms{% endblock %}
+{% block page_title %}Quote Forms{% endblock %}
+
+{% block content %}
+
+<!-- ?? Quotes Overview ?????????????????????????????????????????????????????????? -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl">
+    <div class="kpi-card" style="border-left:4px solid #7C3AED;">
+      <div class="kpi-top"><span class="kpi-label">Total Quotes</span><i class="bi bi-file-earmark-text kpi-icon-sm" style="color:#7C3AED;"></i></div>
+      <div class="kpi-value" style="color:#7C3AED;" id="card-total-quotes">{{ q_total }}</div>
+      <div class="kpi-sub">{{ 'all time' if not (search or status_filter or year_filter or month_filter or date_from or date_to) else 'filtered' }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-top"><span class="kpi-label">Open</span><i class="bi bi-hourglass-split kpi-icon-sm"></i></div>
+      <div class="kpi-value" id="card-open">{{ q_open }}</div>
+      <div class="kpi-sub">awaiting response</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="kpi-card kpi-green">
+      <div class="kpi-top"><span class="kpi-label">Approved</span><i class="bi bi-check-circle-fill kpi-icon-sm"></i></div>
+      <div class="kpi-value" id="card-approved">{{ q_approved }}</div>
+      <div class="kpi-sub">ready to convert</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="kpi-card kpi-teal">
+      <div class="kpi-top"><span class="kpi-label">Converted</span><i class="bi bi-arrow-right-circle-fill kpi-icon-sm"></i></div>
+      <div class="kpi-value" id="card-converted">{{ q_converted }}</div>
+      <div class="kpi-sub"><span id="card-conv-rate">{{ q_conv_rate }}</span>% win rate</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:{{ q_conv_rate }}%" id="card-conv-bar"></div></div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="kpi-card kpi-amber">
+      <div class="kpi-top"><span class="kpi-label">Pipeline Value</span><i class="bi bi-cash-stack kpi-icon-sm"></i></div>
+      <div class="kpi-value" id="card-pipeline">{{ currency_symbol }}{{ "{:,.0f}".format(q_pipeline) }}</div>
+      <div class="kpi-sub">open + approved</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="kpi-card kpi-purple">
+      <div class="kpi-top"><span class="kpi-label">Won Value</span><i class="bi bi-graph-up-arrow kpi-icon-sm"></i></div>
+      <div class="kpi-value" id="card-won-value">{{ currency_symbol }}{{ "{:,.0f}".format(q_won_val) }}</div>
+      <div class="kpi-sub">converted quotes</div>
+    </div>
+  </div>
+</div>
+
+<!-- ?? Tab Navigation ?????????????????????????????????????????????????????????? -->
+<ul class="nav nav-tabs mb-4" id="quoteTabs">
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-all" id="nav-all">
+      <i class="bi bi-file-earmark-text me-1"></i>All Quotes
+      <span class="badge bg-secondary ms-1">{{ quotes|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('quotes_new') }}" id="nav-new">
+      <i class="bi bi-file-earmark-plus me-1"></i>New Quote
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-salespeople" id="nav-salespeople">
+      <i class="bi bi-people me-1"></i>Sales People
+      {% if session.get('user_role','') in ('admin','finance') %}
+      <span class="badge bg-secondary ms-1">{{ sales_people|length }}</span>
+      {% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-followups" id="nav-followups">
+      <i class="bi bi-bell me-1"></i>Follow-ups
+      {% if follow_ups %}
+      <span class="badge ms-1" style="background:#DC2626;">{{ follow_ups|length }}</span>
+      {% elif upcoming_followups %}
+      <span class="badge ms-1 bg-secondary">{{ upcoming_followups|length }}</span>
+      {% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-export" id="nav-export">
+      <i class="bi bi-download me-1"></i>Export
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab in ('archived', 'archived-quotes') else '' }}" data-bs-toggle="tab" href="#tab-archived-quotes" id="nav-archived-quotes">
+      <i class="bi bi-archive me-1"></i>Archived
+      {% if deleted_quotes %}<span class="badge bg-secondary ms-1">{{ deleted_quotes|length }}</span>{% endif %}
+    </a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- ?? TAB 1 ? ALL QUOTES ?????????????????????????????????????????????????? -->
+  <div class="tab-pane fade" id="tab-all">
+
+    <form class="mb-3" method="GET" id="listFilterForm">
+      <!-- Row 1: text search + status + year + month -->
+      <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
+        <input type="text" name="q" class="form-control form-control-sm" style="max-width:200px;"
+               placeholder="Search quotes" value="{{ search }}">
+        <select name="status" class="form-select form-select-sm" style="max-width:155px;">
+          <option value="">All Statuses</option>
+          {% for s in statuses %}
+          <option value="{{ s }}" {{ 'selected' if status_filter == s }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <select name="year" class="form-select form-select-sm" style="max-width:105px;">
+          <option value="">All Years</option>
+          {% for y in available_years %}
+          <option value="{{ y }}" {{ 'selected' if year_filter == y }}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Row 2: date range -->
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        <span class="text-muted small" style="min-width:70px;">Date range:</span>
+        <input type="date" name="from" class="form-control form-control-sm" style="max-width:160px;"
+               value="{{ date_from }}" placeholder="From">
+        <span class="text-muted small">to</span>
+        <input type="date" name="to" class="form-control form-control-sm" style="max-width:160px;"
+               value="{{ date_to }}" placeholder="To">
+        <button type="button" class="btn btn-xs btn-outline-secondary"
+                onclick="setListRange('month')">This Month</button>
+        <button type="button" class="btn btn-xs btn-outline-secondary"
+                onclick="setListRange('year')">This Year</button>
+        <button type="button" class="btn btn-xs btn-outline-secondary"
+                onclick="setListRange('last30')">Last 30 Days</button>
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-search me-1"></i>Apply
+        </button>
+        {% if search or status_filter or year_filter or month_filter or date_from or date_to %}
+        <a href="{{ url_for('quotes') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+    </form>
+
+    <div id="quoteFilterAlert" class="alert alert-light py-1 px-3 mb-3 small d-flex align-items-center gap-2"
+         style="border-left:3px solid #0D9488;{% if not (year_filter or month_filter or date_from or date_to) %}display:none;{% endif %}">
+      <i class="bi bi-funnel text-teal"></i>
+      <span id="quoteFilterText">
+        {% if date_from and date_to %}
+          Date range: <strong>{{ date_from }}</strong> to <strong>{{ date_to }}</strong>
+        {% elif date_from %}
+          From <strong>{{ date_from }}</strong>
+        {% elif date_to %}
+          Up to <strong>{{ date_to }}</strong>
+        {% elif month_filter %}
+          {% set month_names = ['January','February','March','April','May','June',
+                                'July','August','September','October','November','December'] %}
+          <strong>{{ month_names[month_filter|int - 1] }} {{ year_filter }}</strong>
+        {% else %}
+          Year: <strong>{{ year_filter }}</strong>
+        {% endif %}
+        &nbsp;&mdash;&nbsp; <span id="quoteFilterCount">{{ quotes|length }}</span> result{{ 's' if quotes|length != 1 else '' }}
+      </span>
+    </div>
+
+    <div class="card-panel mb-0 pb-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Quote #</th>
+              <th>Client</th>
+              <th>Project / Scope</th>
+              <th>Salesperson</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th class="text-end">Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="quotesTableBody">
+            {% for q in quotes %}
+            <tr class="quote-row"
+                data-date="{{ q.get('date','') }}"
+                data-status="{{ q.get('status','Not Started') }}"
+                data-total="{{ q.get('total',0)|float }}"
+                data-search="{{ q.get('client_name','')|lower }} {{ q.get('job_number','')|lower }} {{ q.get('project_name','')|lower }}"
+                onclick="location.href=getQuoteDetailUrl('{{ q.firebase_id }}')"
+                style="cursor:pointer;">
+              <td><span class="fw-bold text-teal">{{ q.get('job_number','—') }}</span></td>
+              <td>{{ q.get('company_name') or q.get('client_name','—') }}</td>
+              <td class="text-muted">{{ (q.get('project_name','—') or '—')[:40] }}</td>
+              <td>{{ q.get('salesperson','—') }}</td>
+              <td>{{ q.get('date','—') | format_date }}</td>
+              <td>
+                <span class="badge status-{{ q.get('status','Not Started')|lower|replace(' ','-') }}">
+                  {{ q.get('status','Not Started') }}
+                </span>
+                {% set exp_days = q.get('_days_until_expiry') %}
+                {% if exp_days is not none %}
+                  {% if exp_days <= 0 %}
+                    <span class="badge ms-1" style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;" title="Expired">
+                      <i class="bi bi-clock-history me-1"></i>Expired
+                    </span>
+                  {% elif exp_days <= 3 %}
+                    <span class="badge ms-1" style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;" title="Expires in {{ exp_days }} day(s)">
+                      <i class="bi bi-exclamation-circle me-1"></i>{{ exp_days }}d left
+                    </span>
+                  {% elif exp_days <= 7 %}
+                    <span class="badge ms-1" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;" title="Expires in {{ exp_days }} days">
+                      <i class="bi bi-clock me-1"></i>{{ exp_days }}d left
+                    </span>
+                  {% endif %}
+                {% endif %}
+              </td>
+              <td class="text-end fw-bold">{{ currency_symbol }}{{ "{:,.2f}".format(q.get('total',0)|float) }}</td>
+              <td onclick="event.stopPropagation();" class="text-end">
+                <a href="{{ url_for('quote_edit', quote_id=q.firebase_id) }}"
+                   class="btn btn-xs btn-outline-primary">
+                  <i class="bi bi-pencil"></i>
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-5">
+                <i class="bi bi-file-earmark-text fs-2 d-block mb-2"></i>
+                No quotes found.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      <div id="quotesPager_pager" style="padding:0;margin:0;"></div>
+      </div>
+    </div>
+  </div><!-- /tab-all -->
+
+
+  <!-- ?? TAB 2 ? NEW QUOTE ??????????????????????????????????????????????????? -->
+  <div class="tab-pane fade" id="tab-new">
+    <form method="POST" action="{{ url_for('quotes_new') }}">
+      <div class="row g-3">
+
+        <div class="col-lg-8">
+          <div class="card-panel mb-3">
+            <h6 class="section-heading">Quote Details</h6>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Quote Number</label>
+                <input type="text" name="job_number" class="form-control"
+                       value="{{ next_num or '' }}" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" class="form-control"
+                       value="{{ today_date }}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Valid Until</label>
+                <input type="date" name="valid_until" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Client</label>
+                <select name="client_name" class="form-select">
+                  <option value="">— Select Client —</option>
+                  {% for c in clients %}
+                  <option value="{{ c }}">{{ c }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Salesperson</label>
+                <select name="salesperson" class="form-select">
+                  <option value="">— Select Salesperson —</option>
+                  {% for sp in sales_people %}
+                  <option value="{{ sp.get('name','') }}">{{ sp.get('name','') }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Project / Scope</label>
+                <input type="text" name="project_name" class="form-control"
+                       placeholder="Project name or scope description">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-control" rows="2"
+                          placeholder="Brief description"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Service Details -->
+          <div class="card-panel mb-3">
+            <h6 class="section-heading">Service Details</h6>
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Service Types <span class="text-muted small fw-normal">— select all that apply; each adds a line item</span></label>
+                <div class="row g-2">
+                  {% for st in ['Mechanical','Electrical','Civil','Structural','Plumbing','HVAC','Fire Protection','Geotechnical','Environmental','Other'] %}
+                  <div class="col-6 col-md-4 col-lg-3">
+                    <div class="form-check border rounded px-3 py-2 border-light svc-box" id="nsvBox_{{ loop.index }}">
+                      <input class="form-check-input svc-cb" type="checkbox"
+                             name="service_types[]" value="{{ st }}"
+                             id="nsv_{{ loop.index }}"
+                             {% if st == 'Other' %}data-other="true"{% endif %}>
+                      <label class="form-check-label small fw-semibold" for="nsv_{{ loop.index }}">{{ st }}</label>
+                    </div>
+                  </div>
+                  {% endfor %}
+                  <!-- Other specify — shown when Other is ticked -->
+                  <div class="col-12" id="otherSpecifyRowNew" style="display:none;">
+                    <div class="d-flex align-items-center gap-2 p-2 rounded border border-warning bg-warning bg-opacity-10">
+                      <i class="bi bi-pencil-square text-warning"></i>
+                      <label class="form-label mb-0 small fw-semibold text-nowrap">Please specify:</label>
+                      <input type="text" name="other_specify" id="otherSpecifyInputNew"
+                             class="form-control form-control-sm"
+                             placeholder="e.g. Surveying, Site Inspection, Consulting?"
+                             maxlength="80">
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Priority</label>
+                <select name="priority" class="form-select">
+                  {% for pv in ['Low','Normal','High','Urgent'] %}
+                  <option value="{{ pv }}" {{ 'selected' if pv == 'Normal' }}>{{ pv }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Expected Completion</label>
+                <input type="date" name="expected_completion" class="form-control">
+              </div>
+              <div class="col-12">
+                <div class="p-3 rounded border border-light bg-light" id="expBoxNew">
+                  <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <div class="form-check mb-0">
+                      <input class="form-check-input" type="checkbox" name="is_expedited"
+                             id="expCheckNew" onchange="toggleExpNew(this)">
+                      <label class="form-check-label fw-bold" for="expCheckNew">
+                        <i class="bi bi-lightning-charge-fill text-warning me-1"></i>Expedited / Rush Order
+                      </label>
+                    </div>
+                    <div class="d-flex align-items-center gap-2" id="rushFieldNew" style="display:none!important;">
+                      <label class="form-label mb-0 small">Rush Surcharge (%)</label>
+                      <input type="number" name="rush_rate" id="rushRateNew"
+                             class="form-control form-control-sm text-end" style="width:90px;"
+                             min="0" max="100" step="0.5" value="50" oninput="calcTotals()">
+                      <input type="hidden" name="rush_fee" id="rushFeeInpNew">
+                      <span class="text-warning small fw-bold" id="rushFeeDispNew">$0.00</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-panel mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="section-heading mb-0">Line Items</h6>
+              <button type="button" class="btn btn-sm btn-outline-teal" onclick="addRow()">
+                <i class="bi bi-plus-lg"></i> Add Item
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm" id="liTable">
+                <thead>
+                  <tr>
+                    <th style="width:50%">Description</th>
+                    <th style="width:12%">Qty</th>
+                    <th style="width:18%">Unit Price</th>
+                    <th style="width:15%">Total</th>
+                    <th style="width:5%"></th>
+                  </tr>
+                </thead>
+                <tbody id="liBody">
+                  <tr class="li-row">
+                    <td><input type="text" name="item_description[]" class="form-control form-control-sm" placeholder="Description" required></td>
+                    <td><input type="number" name="item_quantity[]"   class="form-control form-control-sm li-qty"   value="1" min="0" step="any"  oninput="calcRow(this)"></td>
+                    <td><input type="number" name="item_unit_price[]" class="form-control form-control-sm li-price" value="0" min="0" step="0.01" oninput="calcRow(this)"></td>
+                    <td><input type="text" class="form-control form-control-sm li-total bg-light" value="0.00" readonly></td>
+                    <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="delRow(this)"><i class="bi bi-trash"></i></button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card-panel mb-3">
+            <h6 class="section-heading">Status &amp; Notes</h6>
+            <div class="mb-3">
+              <label class="form-label">Status</label>
+              <select name="status" class="form-select">
+                {% for s in ['Not Started','In Progress','Sent','Approved','Converted','Rejected','Expired','Cancelled'] %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Notes</label>
+              <textarea name="notes" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Terms &amp; Conditions</label>
+              <textarea name="terms" class="form-control" rows="3">Thank you for your business!</textarea>
+            </div>
+            <div class="mb-0">
+              <label class="form-label">
+                <i class="bi bi-bell me-1 text-teal"></i>Follow-up Date
+                <span class="text-muted small fw-normal">— remind to follow up with client</span>
+              </label>
+              <input type="date" name="follow_up_date" class="form-control">
+            </div>
+          </div>
+
+          <div class="card-panel mb-3">
+            <h6 class="section-heading">Totals</h6>
+            <div class="d-flex justify-content-between mb-2">
+              <span class="text-muted">Subtotal</span>
+              <strong id="subDisp">$0.00</strong>
+              <input type="hidden" name="subtotal" id="subInp" value="0">
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="text-muted">Tax Rate (%)</span>
+              <input type="number" name="tax_rate" id="taxRate"
+                     class="form-control form-control-sm text-end" style="width:80px;"
+                     value="0" min="0" max="100" step="0.01" oninput="calcTotals()">
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+              <span class="text-muted">Tax Amount</span>
+              <strong id="taxDisp">$0.00</strong>
+              <input type="hidden" name="tax_amount" id="taxInp">
+            </div>
+            <div class="d-flex justify-content-between mb-2 text-warning" id="rushFeeRowNew" style="display:none;">
+              <span><i class="bi bi-lightning-charge-fill me-1"></i>Rush Fee</span>
+              <strong id="rushFeeRowAmtNew">$0.00</strong>
+            </div>
+            <hr class="my-2">
+            <div class="d-flex justify-content-between">
+              <strong>Total</strong>
+              <strong id="totDisp" class="text-teal" style="font-size:16px;">$0.00</strong>
+              <input type="hidden" name="total" id="totInp">
+            </div>
+          </div>
+
+          <div class="d-grid">
+            <button type="submit" class="btn btn-teal">
+              <i class="bi bi-check-lg me-1"></i>Create Quote
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </form>
+  </div><!-- /tab-new -->
+
+
+  <!-- ?? TAB 3 ? SALES PEOPLE ???????????????????????????????????????????????? -->
+  <div class="tab-pane fade" id="tab-salespeople">
+    <div class="card-panel">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h6 class="panel-title mb-0">
+          <i class="bi bi-people me-1" style="color:#0D9488;"></i>
+          Sales People
+          <span class="badge bg-secondary ms-1">{{ sales_people|length }}</span>
+        </h6>
+        {% if 'settings' in allowed_pages %}
+        <a href="{{ url_for('settings') }}?tab=users" class="btn btn-xs btn-outline-secondary">
+          <i class="bi bi-gear me-1"></i>Manage in Settings
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="alert py-2 mb-3" style="background:#F0FDF4;border:1px solid #86EFAC;font-size:13px;">
+        <i class="bi bi-info-circle me-1" style="color:#16A34A;"></i>
+        Sales people are pulled from <strong>Settings — Users</strong> (Sales &amp; Admin roles).
+        Add or remove people there to update this list.
+      </div>
+
+      {% set _viewer_role = session.get('user_role','') %}
+      {% set _viewer_name = session.get('user_name','') %}
+      {% set _viewer_is_admin = _viewer_role in ('admin','finance') %}
+
+      {% if sales_people %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle" style="font-size:13px;">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th class="text-center">Quotes</th>
+              <th class="text-center">Converted</th>
+              <th class="text-center">Win Rate</th>
+              <th class="text-end">Revenue Generated</th>
+              <th class="text-end" style="color:white;">Commission Earned</th>
+              <th class="text-end" style="color:white;">Advance Adjusted</th>
+              <th class="text-end" style="color:white;">Commission Paid</th>
+              <th class="text-end" style="color:white;">Remaining Due</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sp in sales_people %}
+            {% if _viewer_is_admin or sp.name == _viewer_name %}
+            {% set sp_stat = salesperson_stats | selectattr('name', 'equalto', sp.name) | first | default(none) %}
+            {% set sp_commissions = project_commissions | selectattr('salesperson', 'equalto', sp.name) | list %}
+            {% set sp_total_commission = sp_commissions | sum(attribute='commission_amount') %}
+            {% set sp_total_adjusted = sp_commissions | sum(attribute='adjusted_amount') %}
+            {% set sp_total_paid = sp_commissions | sum(attribute='paid_amount') %}
+            {% set sp_total_remaining = sp_commissions | sum(attribute='remaining_due') %}
+            <tr style="cursor:pointer;" onclick="toggleCommissionDetails('{{ sp.name | replace(' ', '_') }}')">
+              <td class="fw-semibold">{{ sp.name }}</td>
+              <td>
+                {% set _etype = sp_stat.employee_type if sp_stat else sp.employee_type %}
+                {% if _etype == 'full_time' %}
+                <span class="badge" style="background:#0D9488;color:#fff;font-size:11px;">Full Time</span>
+                {% elif _etype == 'contractor' %}
+                <span class="badge" style="background:#7C3AED;color:#fff;font-size:11px;">Contractor</span>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+              <td class="text-center">{{ sp_stat.quotes_total if sp_stat else 0 }}</td>
+              <td class="text-center text-success fw-semibold">{{ sp_stat.quotes_converted if sp_stat else 0 }}</td>
+              <td class="text-center">
+                {% set _wr = sp_stat.win_rate if sp_stat else 0 %}
+                <span class="badge {{ 'bg-success' if _wr >= 50 else 'bg-secondary' }}">{{ _wr }}%</span>
+              </td>
+              <td class="text-end fw-semibold">{{ currency_symbol }}{{ "{:,.2f}".format(sp_stat.revenue_generated if sp_stat else 0) }}</td>
+              <td class="text-end fw-bold" style="color:#7C3AED;">{{ currency_symbol }}{{ "{:,.2f}".format(sp_total_commission) }}</td>
+              <td class="text-end fw-semibold" style="color:#D97706;">{{ currency_symbol }}{{ "{:,.2f}".format(sp_total_adjusted) }}</td>
+              <td class="text-end fw-semibold" style="color:#059669;">{{ currency_symbol }}{{ "{:,.2f}".format(sp_total_paid) }}</td>
+              <td class="text-end fw-semibold" style="color:#DC2626;">{{ currency_symbol }}{{ "{:,.2f}".format(sp_total_remaining) }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+          {% if _viewer_is_admin and salesperson_stats %}
+          <tfoot>
+            <tr class="fw-bold table-light" style="border-top:2px solid #dee2e6;">
+              <td colspan="6" class="text-end text-muted small">Totals</td>
+              <td class="text-end" style="color:#7C3AED;">{{ currency_symbol }}{{ "{:,.2f}".format(project_commissions | sum(attribute='commission_amount')) }}</td>
+              <td class="text-end" style="color:#D97706;">{{ currency_symbol }}{{ "{:,.2f}".format(project_commissions | sum(attribute='adjusted_amount')) }}</td>
+              <td class="text-end" style="color:#059669;">{{ currency_symbol }}{{ "{:,.2f}".format(project_commissions | sum(attribute='paid_amount')) }}</td>
+              <td class="text-end" style="color:#DC2626;">{{ currency_symbol }}{{ "{:,.2f}".format(project_commissions | sum(attribute='remaining_due')) }}</td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-people" style="font-size:40px;opacity:.3;"></i>
+        <div class="mt-2">No sales people found.
+          {% if 'settings' in allowed_pages %}
+          <a href="{{ url_for('settings') }}?tab=users">Add employees in Settings ?</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Commission Details Container (Below Table) -->
+    <div id="commissionDetailsContainer" style="margin-top:20px;display:none;">
+      <div class="card-panel" style="border-top:3px solid #059669;overflow:visible;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="panel-title mb-0" id="detailsTitle">
+            <i class="bi bi-graph-up me-2" style="color:#059669;"></i>Commission Details
+          </h6>
+          <button type="button" class="btn btn-xs btn-outline-secondary" onclick="closeCommissionDetails()">
+            <i class="bi bi-x me-1"></i>Close
+          </button>
+        </div>
+        <div id="commissionDetailsContent" style="display:block;visibility:visible;overflow:visible;"></div>
+      </div>
+    </div>
+
+    <!-- Embedded Commission Data -->
+    <script>
+      const commissionData = {
+        {% set valid_salespeople = [] %}
+        {% for sp in sales_people %}
+          {% if _viewer_is_admin or sp.name == _viewer_name %}
+            {% set _ = valid_salespeople.append(sp) %}
+          {% endif %}
+        {% endfor %}
+        {% for sp in valid_salespeople %}
+        {# Match project commissions by salesperson name (case-insensitive, underscore/space flexible) #}
+        {% set sp_commissions = [] %}
+        {% set sp_name_normalized = (sp.name | trim).lower().replace('_', ' ') %}
+        {% for pc in project_commissions %}
+          {% set pc_name_normalized = (pc.get('salesperson', '') or '').strip().lower().replace('_', ' ') %}
+          {% if pc_name_normalized == sp_name_normalized %}
+            {% set _ = sp_commissions.append(pc) %}
+          {% endif %}
+        {% endfor %}
+        '{{ sp.name | trim }}': [
+          {% for pc in sp_commissions %}
+          {
+            project_number: {{ pc.get('project_number','—')|tojson }},
+            company_name: {{ pc.get('company_name','—')|tojson }},
+            contract_value: {{ pc.get('contract_value',0)|float }},
+            rate_display: {{ pc.get('rate_display','—')|tojson }},
+            commission_amount: {{ pc.get('commission_amount',0)|float }},
+            adjusted_amount: {{ pc.get('adjusted_amount',0)|float }},
+            paid_amount: {{ pc.get('paid_amount',0)|float }},
+            remaining_due: {{ pc.get('remaining_due',0)|float }},
+            status: {{ pc.get('status','Pending')|tojson }},
+            deduction_status: {{ pc.get('deduction_status','not_covered')|tojson }},
+            firebase_id: {{ pc.firebase_id|tojson }}
+          }{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]{% if not loop.last %},{% endif %}
+        {% endfor %}
+      };
+      console.log('=== CommissionData Loaded ===');
+      console.log('Total keys:', Object.keys(commissionData).length);
+      Object.keys(commissionData).forEach(key => {
+        console.log(`  Key: "${key}" (${commissionData[key].length} projects)`);
+      });
+      console.log('============================');
+
+      function toggleCommissionDetails(employeeNameSanitized) {
+        const container = document.getElementById('commissionDetailsContainer');
+        if (container.style.display === 'none') {
+          // Normalize: replace underscores+spaces with single space, collapse multiple spaces
+          const normalizeForMatch = (str) => str.toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+          const searchFor = normalizeForMatch(employeeNameSanitized);
+
+          console.log('🔍 Looking for (normalized):', `"${searchFor}"`);
+          console.log('Available keys:', Object.keys(commissionData).map(k => `"${k}"`).join(', '));
+
+          let employeeName = Object.keys(commissionData).find(name => {
+            const normalized = normalizeForMatch(name);
+            console.log(`  Testing "${name}" → "${normalized}"`);
+            return normalized === searchFor;
+          });
+
+          console.log('✓ Final employee name:', employeeName);
+          console.log('Data rows:', commissionData[employeeName] ? commissionData[employeeName].length : 'N/A');
+          showCommissionDetails(employeeName);
+        } else {
+          closeCommissionDetails();
+        }
+      }
+
+      function showCommissionDetails(employeeName) {
+        const data = commissionData[employeeName] || [];
+        console.log('Showing details for:', employeeName, 'Data length:', data.length);
+        const currencySymbol = '{{ currency_symbol }}';
+        const container = document.getElementById('commissionDetailsContainer');
+        const contentDiv = document.getElementById('commissionDetailsContent');
+
+        let html = '';
+
+        const filteredData = data.filter(pc => pc.commission_amount > 0);
+
+        // Sort by project number: descending by year-month, descending by sequence
+        filteredData.sort((a, b) => {
+          const sortKey = (projNum) => {
+            const num = projNum.trim().replace(/^[A-Za-z]+-/, '');
+            if (num.length >= 6) {
+              const yearMonth = num.substring(0, 6);
+              const sequence = num.substring(6);
+              return [-parseInt(yearMonth), -parseInt(sequence || 0)];
+            }
+            return [-parseInt(num || 0), 0];
+          };
+          const aKey = sortKey(a.project_number || '');
+          const bKey = sortKey(b.project_number || '');
+          return aKey[0] !== bKey[0] ? aKey[0] - bKey[0] : aKey[1] - bKey[1];
+        });
+
+        if (filteredData.length > 0) {
+          console.log('Building table for', filteredData.length, 'items (filtered from', data.length, ')');
+          html += '<div class="table-responsive" style="width:100%;display:block;">';
+          html += '<table class="table table-hover align-middle mb-0" style="font-size:13px;width:100%;">';
+          html += '<thead>';
+          html += '<tr>';
+          html += '<th>Project</th>';
+          html += '<th>Client</th>';
+          html += '<th class="text-end">Contract Value</th>';
+          html += '<th class="text-center">Rate / Type</th>';
+          html += '<th class="text-end" style="color:white;">Commission Earned</th>';
+          html += '<th class="text-end" style="color:white;">Advance Adjusted</th>';
+          html += '<th class="text-end" style="color:white;">Commission Paid</th>';
+          html += '<th class="text-end" style="color:white;">Remaining Due</th>';
+          html += '<th>Status</th>';
+          html += '</tr>';
+          html += '</thead>';
+          html += '<tbody>';
+
+          let totalCommission = 0, totalAdjusted = 0, totalPaid = 0, totalRemaining = 0;
+
+          filteredData.forEach((pc, idx) => {
+            console.log('Processing row', idx, ':', pc.project_number, pc.commission_amount);
+            totalCommission += pc.commission_amount;
+            totalAdjusted += pc.adjusted_amount;
+            totalPaid += pc.paid_amount;
+            totalRemaining += pc.remaining_due;
+
+            const remaining = pc.commission_amount - pc.adjusted_amount - pc.paid_amount;
+            let statusBadge = '';
+            if (remaining <= 0.01) {
+              statusBadge = '<span class="badge bg-success" style="font-size:10px;"><i class="bi bi-check-circle me-1"></i>Paid</span>';
+            } else {
+              statusBadge = '<span class="badge bg-warning text-dark" style="font-size:10px;">Pending</span>';
+            }
+
+            html += '<tr>';
+            html += `<td class="fw-semibold"><a href="/projects/${pc.firebase_id}" class="text-decoration-none">${pc.project_number}</a></td>`;
+            html += `<td>${pc.company_name}</td>`;
+            html += `<td class="text-end">${currencySymbol}${(pc.contract_value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+            html += `<td class="text-center"><span class="text-muted small">${pc.rate_display || '—'}</span></td>`;
+            html += `<td class="text-end fw-bold" style="color:#7C3AED;">${currencySymbol}${pc.commission_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+            html += `<td class="text-end fw-semibold" style="color:#D97706;">${currencySymbol}${pc.adjusted_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+            html += `<td class="text-end fw-semibold" style="color:#059669;">${currencySymbol}${pc.paid_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+            html += `<td class="text-end fw-semibold" style="color:#DC2626;">${currencySymbol}${pc.remaining_due.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+            html += `<td>${statusBadge}</td>`;
+            html += '</tr>';
+          });
+          console.log('Rows added. Total HTML so far length:', html.length);
+
+          html += '</tbody>';
+          html += '<tfoot>';
+          html += '<tr class="fw-bold table-light" style="border-top:2px solid #dee2e6;">';
+          html += '<td colspan="4" class="text-end text-muted small">Totals</td>';
+          html += `<td class="text-end" style="color:#7C3AED;">${currencySymbol}${totalCommission.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+          html += `<td class="text-end" style="color:#D97706;">${currencySymbol}${totalAdjusted.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+          html += `<td class="text-end" style="color:#059669;">${currencySymbol}${totalPaid.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+          html += `<td class="text-end" style="color:#DC2626;">${currencySymbol}${totalRemaining.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+          html += '<td></td>';
+          html += '</tr>';
+          html += '</tfoot>';
+          html += '</table>';
+          html += '</div>';
+        } else {
+          html += '<div class="text-center text-muted py-5">';
+          html += '<i class="bi bi-graph-up" style="font-size:32px;opacity:.3;"></i>';
+          html += '<div class="mt-2">No commission details available for this employee.</div>';
+          html += '</div>';
+        }
+
+        const escapedName = employeeName.replace(/[&<>"']/g, c => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+        document.getElementById('detailsTitle').innerHTML = '<i class="bi bi-graph-up me-2" style="color:#059669;"></i>Commission Details — ' + escapedName + ' — per-project commission tracking';
+        console.log('Setting innerHTML, html length:', html.length);
+        console.log('First 200 chars of html:', html.substring(0, 200));
+        contentDiv.innerHTML = html;
+        console.log('innerHTML set, contentDiv content:', contentDiv.innerHTML.substring(0, 200));
+        container.style.display = 'block';
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      function closeCommissionDetails() {
+        document.getElementById('commissionDetailsContainer').style.display = 'none';
+      }
+    </script>
+
+</div><!-- /tab-salespeople -->
+
+
+  <!-- ?? TAB 4 ? FOLLOW-UPS ???????????????????????????????????????????????? -->
+  <div class="tab-pane fade" id="tab-followups">
+
+    {% if follow_ups %}
+    <div class="alert py-2 px-3 mb-3 small d-flex align-items-center gap-2"
+         style="background:#FEF3C7;border-left:4px solid #F59E0B;color:#92400E;">
+      <i class="bi bi-bell-fill"></i>
+      <strong>{{ follow_ups|length }} quote{{ 's' if follow_ups|length != 1 else '' }}</strong>
+      need{{ '' if follow_ups|length != 1 else 's' }} follow-up today or are overdue.
+    </div>
+
+    <div class="card-panel">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Quote #</th>
+              <th>Client</th>
+              <th>Project / Scope</th>
+              <th>Salesperson</th>
+              <th>Follow-up Date</th>
+              <th>Status</th>
+              <th class="text-end">Total</th>
+              <th style="min-width:180px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in follow_ups %}
+            <tr>
+              <td>
+                <a href="javascript:location.href=getQuoteDetailUrl('{{ q.firebase_id }}');"
+                   class="fw-bold text-teal text-decoration-none">
+                  {{ q.get('job_number','—') }}
+                </a>
+              </td>
+              <td>{{ q.get('client_name','—') }}</td>
+              <td class="text-muted small">{{ (q.get('project_name','') or '—')[:40] }}</td>
+              <td class="text-muted small">{{ q.get('salesperson','—') }}</td>
+              <td>
+                {% set fu = q.get('follow_up_date','') %}
+                {% set od = q.get('_fu_days_overdue', 0) %}
+                {% if od == 0 %}
+                  <span class="badge" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;">
+                    <i class="bi bi-bell me-1"></i>Today
+                  </span>
+                {% else %}
+                  <span class="badge" style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;">
+                    <i class="bi bi-exclamation-circle me-1"></i>{{ od }}d overdue
+                  </span>
+                {% endif %}
+                <div class="text-muted small mt-1">
+                  {% if fu %}
+                    {% set parts = fu.split('-') %}
+                    {% if parts|length == 3 %}
+                      {{ parts[1] }}-{{ parts[2] }}-{{ parts[0] }}
+                    {% else %}
+                      {{ fu }}
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </td>
+              <td>
+                <span class="badge status-{{ q.get('status','Not Started')|lower|replace(' ','-') }}">
+                  {{ q.get('status','Not Started') }}
+                </span>
+              </td>
+              <td class="text-end fw-bold">{{ currency_symbol }}{{ "{:,.2f}".format(q.get('total',0)|float) }}</td>
+              <td class="text-end">
+                <div class="d-flex gap-1 justify-content-end flex-wrap">
+                  <!-- Done -->
+                  <form method="POST"
+                        action="{{ url_for('quote_followup_done', quote_id=q.firebase_id) }}">
+                    <button type="submit" class="btn btn-xs btn-teal"
+                            title="Mark follow-up done — clears the reminder">
+                      <i class="bi bi-check-lg me-1"></i>Done
+                    </button>
+                  </form>
+                  <!-- Snooze -->
+                  <form method="POST"
+                        action="{{ url_for('quote_followup_snooze', quote_id=q.firebase_id) }}">
+                    <input type="hidden" name="days" value="7">
+                    <button type="submit" class="btn btn-xs btn-outline-secondary"
+                            title="Snooze — reschedule follow-up by 7 days">
+                      <i class="bi bi-alarm me-1"></i>+7d
+                    </button>
+                  </form>
+                  <!-- Open -->
+                  <a href="javascript:location.href=getQuoteDetailUrl('{{ q.firebase_id }}');"
+                     class="btn btn-xs btn-outline-primary" title="Open quote">
+                    <i class="bi bi-arrow-right"></i>
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="card-panel mb-3">
+      <div class="empty-state py-4">
+        <i class="bi bi-bell-slash fs-1 d-block mb-2 text-muted"></i>
+        <div class="fw-semibold mb-1">No follow-ups due today</div>
+        <div class="text-muted small">
+          Set a follow-up date on any quote to get reminded here.<br>
+          Open a quote — Edit — Follow-up Date field.
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ?? Upcoming section ???????????????????????????????????????????????? -->
+    {% if upcoming_followups %}
+    <div class="d-flex align-items-center gap-2 mb-2 mt-2">
+      <span class="fw-semibold text-muted small text-uppercase" style="letter-spacing:.05em;">
+        <i class="bi bi-calendar-event me-1"></i>Upcoming — Next 14 Days
+      </span>
+      <span class="badge bg-secondary">{{ upcoming_followups|length }}</span>
+    </div>
+    <div class="card-panel">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Quote #</th>
+              <th>Client</th>
+              <th>Project / Scope</th>
+              <th>Salesperson</th>
+              <th>Follow-up Date</th>
+              <th>Status</th>
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in upcoming_followups %}
+            {% set days_ahead = q.get('_fu_days_ahead', 0) %}
+            <tr>
+              <td>
+                <a href="javascript:location.href=getQuoteDetailUrl('{{ q.firebase_id }}');"
+                   class="fw-bold text-teal text-decoration-none">
+                  {{ q.get('job_number','—') }}
+                </a>
+              </td>
+              <td>{{ q.get('client_name','—') }}</td>
+              <td class="text-muted small">{{ (q.get('project_name','') or '—')[:40] }}</td>
+              <td class="text-muted small">{{ q.get('salesperson','—') }}</td>
+              <td>
+                {% if days_ahead == 1 %}
+                  <span class="badge" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;">
+                    <i class="bi bi-calendar me-1"></i>Tomorrow
+                  </span>
+                {% else %}
+                  <span class="badge" style="background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;">
+                    <i class="bi bi-calendar me-1"></i>In {{ days_ahead }} days
+                  </span>
+                {% endif %}
+                <div class="text-muted small mt-1">
+                  {% set fu = q.get('follow_up_date','') %}
+                  {% if fu %}
+                    {% set parts = fu.split('-') %}
+                    {% if parts|length == 3 %}
+                      {{ parts[1] }}-{{ parts[2] }}-{{ parts[0] }}
+                    {% else %}
+                      {{ fu }}
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </td>
+              <td>
+                <span class="badge status-{{ q.get('status','Not Started')|lower|replace(' ','-') }}">
+                  {{ q.get('status','Not Started') }}
+                </span>
+              </td>
+              <td class="text-end fw-bold">{{ currency_symbol }}{{ "{:,.2f}".format(q.get('total',0)|float) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+  </div><!-- /tab-followups -->
+
+  <!-- ?? TAB 5 ? EXPORT ?????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade" id="tab-export">
+
+    <!-- Filter row -->
+    <div class="card-panel mb-3 mt-0">
+      <h6 class="section-heading mb-3">Export Filters <span class="text-muted fw-normal small">(optional)</span></h6>
+      <div class="row g-3 align-items-end">
+        <div class="col-sm-6 col-md-3">
+          <label class="form-label form-label-sm">Status</label>
+          <select id="exportStatus" class="form-select form-select-sm">
+            <option value="">All Statuses</option>
+            {% for s in statuses %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <label class="form-label form-label-sm">From Date</label>
+          <input type="date" id="exportFrom" class="form-control form-control-sm">
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <label class="form-label form-label-sm">To Date</label>
+          <input type="date" id="exportTo" class="form-control form-control-sm">
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickRange('month')">This Month</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickRange('year')">This Year</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearExportFilters()"><i class="bi bi-x-lg"></i> Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="mt-2 text-muted small" id="exportFilterSummary">
+        Leave blank to export all records.
+      </div>
+    </div>
+
+    <!-- Export format cards -->
+    <div class="row g-3">
+
+      <!-- PDF -->
+      <div class="col-md-4">
+        <div class="export-card">
+          <div class="export-card-icon" style="background:#FFF1F2; color:#E11D48;">
+            <i class="bi bi-file-earmark-pdf-fill" style="font-size:28px;"></i>
+          </div>
+          <div class="fw-bold mb-1">PDF Export</div>
+          <div class="text-muted small mb-3">
+            Professional report layout. Print-ready, landscape A4 with company header and styled table.
+          </div>
+          <a id="pdfLink" href="{{ url_for('quotes_export_pdf') }}"
+             class="btn btn-sm w-100" style="background:#E11D48;color:white;border:none;">
+            <i class="bi bi-download me-1"></i>Download PDF
+          </a>
+        </div>
+      </div>
+
+      <!-- Excel -->
+      <div class="col-md-4">
+        <div class="export-card">
+          <div class="export-card-icon" style="background:#DCFCE7; color:#15803D;">
+            <i class="bi bi-file-earmark-excel-fill" style="font-size:28px;"></i>
+          </div>
+          <div class="fw-bold mb-1">Excel Export</div>
+          <div class="text-muted small mb-3">
+            Styled .xlsx file with formatted currency columns, frozen header row, and alternating row colors.
+          </div>
+          <a id="excelLink" href="{{ url_for('quotes_export_excel') }}"
+             class="btn btn-sm w-100" style="background:#15803D;color:white;border:none;">
+            <i class="bi bi-download me-1"></i>Download Excel
+          </a>
+        </div>
+      </div>
+
+      <!-- CSV -->
+      <div class="col-md-4">
+        <div class="export-card">
+          <div class="export-card-icon" style="background:#EFF6FF; color:#2563EB;">
+            <i class="bi bi-filetype-csv" style="font-size:28px;"></i>
+          </div>
+          <div class="fw-bold mb-1">CSV Export</div>
+          <div class="text-muted small mb-3">
+            Plain comma-separated values. Compatible with any spreadsheet app or data tool.
+          </div>
+          <a id="csvLink" href="{{ url_for('quotes_export') }}"
+             class="btn btn-sm w-100" style="background:#2563EB;color:white;border:none;">
+            <i class="bi bi-download me-1"></i>Download CSV
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /tab-export -->
+
+
+  <!-- ?? TAB: ARCHIVED QUOTES -->
+  <div class="tab-pane fade {{ 'show active' if active_tab in ('archived', 'archived-quotes') else '' }}" id="tab-archived-quotes">
+    <div class="card-panel">
+      <h6 class="section-heading mb-3"><i class="bi bi-archive me-2"></i>Archived Quotes</h6>
+      {% if deleted_quotes %}
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle mb-0">
+          <thead style="background:#1e293b;">
+            <tr>
+              <th style="color:#fff;">Quote #</th>
+              <th style="color:#fff;">Client</th>
+              <th style="color:#fff;">Total</th>
+              <th style="color:#fff;">Status</th>
+              <th style="color:#fff;">Deleted By</th>
+              <th style="color:#fff;">Deleted At</th>
+              <th style="color:#fff;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in deleted_quotes %}
+            <tr>
+              <td class="fw-bold">{{ q.get('job_number','—') }}</td>
+              <td>{{ q.get('company_name') or q.get('client_name','—') }}</td>
+              <td>{{ currency_symbol }}{{ "{:,.2f}".format(q.get('total',0)|float) }}</td>
+              <td><span class="badge" style="background:#64748b;">Archived</span></td>
+              <td class="text-muted small">{{ q.get('deleted_by','—') }}</td>
+              <td class="text-muted small">{{ q.get('deleted_at','')[:10] }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('quote_restore', quote_id=q.firebase_id) }}"
+                      onsubmit="return confirm('Restore quote {{ q.get('job_number','') }}?');">
+                  <button type="submit" class="btn btn-xs btn-outline-success">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Restore
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-archive" style="font-size:2rem;"></i>
+        <p class="mt-2 mb-0">No archived quotes.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div><!-- /tab-archived-quotes -->
+
+</div><!-- /tab-content -->
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+// ?? Pagination state helpers ?????????????????????????????????????????????????
+function getCurrentQuotePage() {
+  return _PAGERS['quotesPager'] ? _PAGERS['quotesPager'].page : 1;
+}
+
+function getQuoteDetailUrl(quoteId) {
+  const page = getCurrentQuotePage();
+  return `{{ url_for('quote_detail', quote_id='') }}${quoteId}?page=${page}`;
+}
+
+// ?? Activate correct tab from ?tab= URL param ?????????????????????????????????
+(function() {
+  const map = { all:'#tab-all', new:'#tab-new', salespeople:'#tab-salespeople', followups:'#tab-followups', export:'#tab-export', archived:'#tab-archived-quotes', 'archived-quotes':'#tab-archived-quotes' };
+  const key    = new URLSearchParams(location.search).get('tab') || 'all';
+  if (key === 'new') {
+    window.location.replace('{{ url_for("quotes_new") }}');
+    return;
+  }
+  const target = map[key] || '#tab-all';
+  document.querySelectorAll('#quoteTabs .nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show','active'));
+  const link = document.querySelector(`#quoteTabs a[href="${target}"]`);
+  const pane = document.querySelector(target);
+  if (link) link.classList.add('active');
+  if (pane) pane.classList.add('show','active');
+})();
+
+document.getElementById('nav-new').addEventListener('click', function(e) {
+  e.preventDefault();
+  window.location.assign('{{ url_for("quotes_new") }}');
+});
+
+// ?? Local date helper — avoids UTC offset shifting the date ??????????????????
+function localDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ?? List date range quick-set ????????????????????????????????????????????????
+function setListRange(type) {
+  const form = document.getElementById('listFilterForm');
+  const fromEl = form.querySelector('[name="from"]');
+  const toEl   = form.querySelector('[name="to"]');
+  const now = new Date();
+  if (type === 'month') {
+    const y = now.getFullYear(), m = now.getMonth();
+    fromEl.value = localDate(new Date(y, m, 1));
+    toEl.value   = localDate(new Date(y, m + 1, 0));
+  } else if (type === 'year') {
+    const y = now.getFullYear();
+    fromEl.value = `${y}-01-01`;
+    toEl.value   = `${y}-12-31`;
+  } else if (type === 'last30') {
+    const from30 = new Date(now); from30.setDate(from30.getDate() - 30);
+    fromEl.value = localDate(from30);
+    toEl.value   = localDate(now);
+  }
+  form.submit();
+}
+
+// ?? Export links — rebuild whenever any filter changes ???????????????????????
+function buildExportLinks() {
+  const status = document.getElementById('exportStatus').value;
+  const from   = document.getElementById('exportFrom').value;
+  const to     = document.getElementById('exportTo').value;
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (from)   params.set('from', from);
+  if (to)     params.set('to', to);
+  const qs = params.toString() ? '?' + params.toString() : '';
+  document.getElementById('pdfLink').href   = '{{ url_for("quotes_export_pdf") }}'   + qs;
+  document.getElementById('excelLink').href = '{{ url_for("quotes_export_excel") }}' + qs;
+  document.getElementById('csvLink').href   = '{{ url_for("quotes_export") }}'       + qs;
+
+  // Update summary text
+  const parts = [];
+  if (status) parts.push(`status: <strong>${status}</strong>`);
+  if (from)   parts.push(`from: <strong>${from}</strong>`);
+  if (to)     parts.push(`to: <strong>${to}</strong>`);
+  document.getElementById('exportFilterSummary').innerHTML =
+    parts.length ? '<i class="bi bi-funnel me-1"></i>Filtering by ' + parts.join(' — ') :
+                   'Leave blank to export all records.';
+}
+
+function setQuickRange(type) {
+  const now = new Date();
+  if (type === 'month') {
+    const y = now.getFullYear(), m = now.getMonth();
+    document.getElementById('exportFrom').value = localDate(new Date(y, m, 1));
+    document.getElementById('exportTo').value   = localDate(new Date(y, m + 1, 0));
+  } else if (type === 'year') {
+    const y = now.getFullYear();
+    document.getElementById('exportFrom').value = `${y}-01-01`;
+    document.getElementById('exportTo').value   = `${y}-12-31`;
+  }
+  buildExportLinks();
+}
+
+function clearExportFilters() {
+  document.getElementById('exportStatus').value = '';
+  document.getElementById('exportFrom').value   = '';
+  document.getElementById('exportTo').value     = '';
+  buildExportLinks();
+}
+
+['exportStatus','exportFrom','exportTo'].forEach(id =>
+  document.getElementById(id).addEventListener('change', buildExportLinks)
+);
+
+// ?? Line item calculations (New Quote tab) ????????????????????????????????????
+function fmt(n) { return CURRENCY_SYMBOL + parseFloat(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+function calcRow(inp) {
+  const row   = inp.closest('tr');
+  const qty   = parseFloat(row.querySelector('.li-qty').value   || 0);
+  const price = parseFloat(row.querySelector('.li-price').value || 0);
+  row.querySelector('.li-total').value = (qty * price).toFixed(2);
+  calcTotals();
+}
+
+function calcTotals() {
+  let sub = 0;
+  document.querySelectorAll('.li-total').forEach(el => sub += parseFloat(el.value||0));
+  const tax        = sub * parseFloat(document.getElementById('taxRate').value||0) / 100;
+  const expedited  = document.getElementById('expCheckNew').checked;
+  const rushRate   = expedited ? parseFloat(document.getElementById('rushRateNew').value||0) : 0;
+  const rushFee    = sub * rushRate / 100;
+  const total      = sub + tax + rushFee;
+
+  document.getElementById('subDisp').textContent         = fmt(sub);
+  document.getElementById('taxDisp').textContent         = fmt(tax);
+  document.getElementById('totDisp').textContent         = fmt(total);
+  document.getElementById('subInp').value                = sub.toFixed(2);
+  document.getElementById('taxInp').value                = tax.toFixed(2);
+  document.getElementById('totInp').value                = total.toFixed(2);
+  document.getElementById('rushFeeInpNew').value         = rushFee.toFixed(2);
+  document.getElementById('rushFeeDispNew').textContent  = fmt(rushFee);
+  document.getElementById('rushFeeRowAmtNew').textContent= fmt(rushFee);
+  document.getElementById('rushFeeRowNew').style.display = expedited ? '' : 'none';
+}
+
+function toggleExpNew(chk) {
+  const field       = document.getElementById('rushFieldNew');
+  const box         = document.getElementById('expBoxNew');
+  const prioritySel = document.querySelector('#tab-new [name="priority"]');
+  if (chk.checked) {
+    field.style.removeProperty('display');
+    box.classList.replace('border-light','border-warning');
+    box.classList.add('bg-warning','bg-opacity-10');
+    if (prioritySel) prioritySel.value = 'Urgent';
+  } else {
+    field.style.display = 'none';
+    box.classList.replace('border-warning','border-light');
+    box.classList.remove('bg-warning','bg-opacity-10');
+  }
+  calcTotals();
+}
+
+function addRow(description) {
+  const tbody = document.getElementById('liBody');
+  const row   = document.createElement('tr');
+  row.className = 'li-row';
+  if (description) row.dataset.service = description;
+  row.innerHTML = `
+    <td><input type="text"   name="item_description[]" class="form-control form-control-sm" value="${description || ''}" placeholder="Description" required></td>
+    <td><input type="number" name="item_quantity[]"     class="form-control form-control-sm li-qty"   value="1" min="0" step="any"  oninput="calcRow(this)"></td>
+    <td><input type="number" name="item_unit_price[]"   class="form-control form-control-sm li-price" value="0" min="0" step="0.01" oninput="calcRow(this)"></td>
+    <td><input type="text" class="form-control form-control-sm li-total bg-light" value="0.00" readonly></td>
+    <td><button type="button" class="btn btn-xs btn-outline-danger" onclick="delRow(this)"><i class="bi bi-trash"></i></button></td>`;
+  tbody.appendChild(row);
+  calcTotals();
+}
+
+function delRow(btn) {
+  if (document.querySelectorAll('.li-row').length > 1) {
+    btn.closest('tr').remove();
+    calcTotals();
+  }
+}
+
+function toggleSvcNew(cb) {
+  const serviceName = cb.value;
+  const box = cb.closest('.svc-box');
+
+  // Show/hide "Other — please specify" row
+  if (cb.dataset.other) {
+    const specRow = document.getElementById('otherSpecifyRowNew');
+    const specInp = document.getElementById('otherSpecifyInputNew');
+    specRow.style.display = cb.checked ? '' : 'none';
+    if (!cb.checked) specInp.value = '';
+  }
+
+  if (cb.checked) {
+    if (box) { box.classList.add('svc-selected'); box.classList.remove('border-light'); }
+    const rows = document.querySelectorAll('.li-row');
+    if (rows.length === 1) {
+      const desc = rows[0].querySelector('input[name="item_description[]"]');
+      if (desc && desc.value.trim() === '') rows[0].remove();
+    }
+    addRow(serviceName);
+  } else {
+    if (box) { box.classList.remove('svc-selected'); box.classList.add('border-light'); }
+    document.querySelectorAll('.li-row').forEach(function(row) {
+      if (row.dataset.service === serviceName) row.remove();
+    });
+    if (document.querySelectorAll('.li-row').length === 0) addRow();
+    calcTotals();
+  }
+}
+
+// Delegated listener — survives tab switching and bfcache restores
+document.addEventListener('change', function(e) {
+  if (e.target.classList.contains('svc-cb')) toggleSvcNew(e.target);
+});
+
+// Re-run totals when New Quote tab becomes visible
+document.getElementById('nav-new').addEventListener('shown.bs.tab', calcTotals);
+
+// Re-init on bfcache page restore (browser back/forward)
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) calcTotals();
+});
+
+// ?? Update summary cards when filters change ????????????????????????????????
+function updateQuoteSummaryCards() {
+  const searchInput = document.querySelector('input[name="q"]');
+  const statusSelect = document.querySelector('select[name="status"]');
+  const yearSelect = document.querySelector('select[name="year"]');
+  const monthSelect = document.querySelector('select[name="month"]');
+  const dateFromInput = document.querySelector('input[name="from"]');
+  const dateToInput = document.querySelector('input[name="to"]');
+
+  const search = searchInput?.value?.toLowerCase() || '';
+  const status = statusSelect?.value || '';
+  let dateFrom = dateFromInput?.value || '';
+  let dateTo = dateToInput?.value || '';
+
+  // Status groups (must match backend definitions in app.py)
+  const OPEN_STATUSES = new Set(['Not Started', 'In Progress']);
+  const APPROVED_STATUSES = new Set(['Approved', 'Completed']);
+  const CONVERTED_STATUSES = new Set(['Converted', 'Invoiced']);
+
+  // If year/month filters are set, calculate date range from them
+  const year = yearSelect?.value || '';
+  const month = monthSelect?.value || '';
+
+  // Apply year/month filters if they're set (takes precedence over manual date range)
+  if (year && month) {
+    // Year and month both selected - filter to that month
+    dateFrom = year + '-' + month + '-01';
+    dateTo = year + '-' + month + '-31'; // Day 31 works for all months in string comparison
+  } else if (year) {
+    // Only year selected - filter to that year
+    dateFrom = year + '-01-01';
+    dateTo = year + '-12-31';
+  }
+  // If neither year nor month selected, use manual date range inputs (already set above)
+
+  const rows = document.querySelectorAll('.quote-row');
+  let totalCount = 0;
+  let openCount = 0;
+  let approvedCount = 0;
+  let convertedCount = 0;
+  let pipelineValue = 0;
+  let wonValue = 0;
+
+  rows.forEach(row => {
+    const rowDate = row.dataset.date || '';
+    const rowStatus = row.dataset.status || '';
+    const rowTotal = parseFloat(row.dataset.total) || 0;
+    const rowSearch = row.dataset.search || '';
+
+    const matchSearch = !search || rowSearch.includes(search);
+    const matchStatus = !status || rowStatus === status;
+    const matchDateFrom = !dateFrom || rowDate >= dateFrom;
+    const matchDateTo = !dateTo || rowDate <= dateTo;
+
+    const isVisible = matchSearch && matchStatus && matchDateFrom && matchDateTo;
+    row.style.display = isVisible ? '' : 'none';
+
+    if (isVisible) {
+      totalCount++;
+
+      if (OPEN_STATUSES.has(rowStatus)) {
+        openCount++;
+        pipelineValue += rowTotal;
+      } else if (APPROVED_STATUSES.has(rowStatus)) {
+        approvedCount++;
+        pipelineValue += rowTotal;
+      } else if (CONVERTED_STATUSES.has(rowStatus)) {
+        convertedCount++;
+        wonValue += rowTotal;
+      }
+    }
+  });
+
+  const convRate = totalCount > 0 ? Math.round((convertedCount / totalCount) * 100) : 0;
+
+  document.getElementById('card-total-quotes').textContent = totalCount;
+  document.getElementById('card-open').textContent = openCount;
+  document.getElementById('card-approved').textContent = approvedCount;
+  document.getElementById('card-converted').textContent = convertedCount;
+  document.getElementById('card-conv-rate').textContent = convRate;
+  document.getElementById('card-conv-bar').style.width = convRate + '%';
+  document.getElementById('card-pipeline').textContent = CURRENCY_SYMBOL + pipelineValue.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+  document.getElementById('card-won-value').textContent = CURRENCY_SYMBOL + wonValue.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+
+  // Update filter result display - show only when year is explicitly selected
+  const filterAlert = document.getElementById('quoteFilterAlert');
+  const filterCount = document.getElementById('quoteFilterCount');
+  if (filterAlert && filterCount) {
+    // Only show when year is explicitly selected (not from automatic date range)
+    if (year) {
+      // Build filter description
+      let filterDesc = '';
+      if (year && month) {
+        const monthNames = ['January','February','March','April','May','June',
+                           'July','August','September','October','November','December'];
+        filterDesc = monthNames[parseInt(month) - 1] + ' ' + year;
+      } else if (year) {
+        filterDesc = 'Year: ' + year;
+      }
+
+      // Show filter alert and update it
+      filterAlert.style.display = '';
+      filterCount.textContent = totalCount;
+      document.getElementById('quoteFilterText').innerHTML =
+        '<strong>' + filterDesc + '</strong>&nbsp;—&nbsp; <span id="quoteFilterCount">' + totalCount + '</span> result' + (totalCount !== 1 ? 's' : '');
+    } else {
+      // Hide when year is not selected (ignore auto-generated date ranges)
+      filterAlert.style.display = 'none';
+    }
+  }
+}
+
+// Filter form now submits via GET to handle server-side filtering
+// Cards are recalculated by backend based on filtered quotes
+
+// ?? Quotes table pager ????????????????????????????????????????????????????????
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('quotesTableBody')) {
+    new TablePager('quotesPager', '#quotesTableBody', 'tr.quote-row', 15);
+    _PAGERS['quotesPager'].refresh();
+  }
+});
+
+async function commissionAction(action, period, spName, amount) {
+  var label = action === 'pay' ? 'Mark as Paid' : 'Undo payment';
+  if (!confirm(label + ' for ' + spName + ' — ' + period + '?')) return;
+  try {
+    var res = await fetch('/api/commission/mark-paid', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: action, period: period, salesperson: spName, amount: amount})
+    });
+    var data = await res.json();
+    if (!res.ok || data.error) { alert('Error: ' + (data.error || 'Unknown')); return; }
+    location.reload();
+  } catch(e) { alert('Request failed.'); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,1649 @@
+﻿{% extends "base.html" %}
+{% block title %}Submit Timesheet{% endblock %}
+{% block page_title %}Submit Timesheet{% endblock %}
+
+{% block head %}
+<style>
+/* ?? Global crisp rendering ???????????????????????????????????? */
+.tsub * {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  box-sizing: border-box;
+}
+
+/* ?? Outer card ???????????????????????????????????????????????? */
+.ts-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06), 0 6px 20px rgba(0,0,0,.07);
+  overflow: hidden;
+}
+
+/* ?? Hero header ??????????????????????????????????????????????? */
+.ts-header {
+  background: linear-gradient(120deg, #0D9488 0%, #0369a1 100%);
+  color: #fff;
+  padding: 22px 28px;
+}
+.ts-header h5 {
+  margin: 0;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -.2px;
+}
+.ts-header .sub { font-size: 13px; opacity: .8; margin-top: 4px; font-weight: 400; }
+
+/* ?? Week picker inside header ????????????????????????????????? */
+#weekPicker {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+  background: rgba(255,255,255,.92);
+}
+
+/* ?? Summary bar ??????????????????????????????????????????????? */
+.ts-summary {
+  display: flex;
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+.ts-summary-item {
+  flex: 1;
+  text-align: center;
+  padding: 14px 8px 12px;
+  border-right: 1px solid #e2e8f0;
+  position: relative;
+}
+.ts-summary-item:last-child { border-right: none; }
+.ts-summary-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+.ts-summary-val {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -.5px;
+  line-height: 1;
+}
+.ts-summary-val.reg  { color: #0D9488; }
+.ts-summary-val.ot   { color: #D97706; }
+.ts-summary-val.tot  { color: #1d4ed8; }
+.ts-summary-val.days { color: #7C3AED; }
+
+/* ?? Day block ????????????????????????????????????????????????? */
+.ts-day-block {
+  margin-bottom: 10px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.ts-day-block-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.ts-day-badge {
+  background: #0D9488;
+  color: #fff;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ts-day-badge.weekend { background: #64748b; }
+.ts-day-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  letter-spacing: -.1px;
+}
+.ts-day-lock {
+  font-size: 12px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-weight: 500;
+}
+
+/* ?? Entry table ??????????????????????????????????????????????? */
+.ts-table { width: 100%; border-collapse: collapse; }
+.ts-table th {
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 9px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+  text-align: center;
+}
+.ts-table th.left { text-align: left; }
+.ts-table td {
+  padding: 8px 8px;
+  border-bottom: 1px solid #f8fafc;
+  vertical-align: middle;
+}
+.ts-table tbody tr:last-child td { border-bottom: none; }
+
+/* inputs & selects */
+.ts-table td input,
+.ts-table td select {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  width: 100%;
+  background: #fff;
+  color: #1e293b;
+  transition: border-color .15s, box-shadow .15s;
+  height: 36px;
+}
+.ts-table td input:focus,
+.ts-table td select:focus {
+  border-color: #0D9488;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13,148,136,.12);
+}
+.ts-table td input:disabled,
+.ts-table td select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #f1f5f9;
+  cursor: not-allowed;
+}
+
+/* hour cells */
+.ts-table td .hrs {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+.ts-table td .hrs.reg-val { color: #0D9488; }
+.ts-table td .hrs.ot-val  { color: #D97706; }
+.ts-table td .hrs.tot-val { color: #1d4ed8; font-weight: 800; }
+
+/* ?? Add row / Add day buttons ????????????????????????????????? */
+.add-proj-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1.5px dashed #cbd5e1;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s;
+  margin: 7px 12px 10px;
+}
+.add-proj-btn:hover {
+  border-color: #0D9488;
+  color: #0D9488;
+  background: #f0fdfa;
+}
+.add-day-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: none;
+  border: 2px dashed #cbd5e1;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  width: 100%;
+}
+.add-day-btn:hover {
+  border-color: #0D9488;
+  color: #0D9488;
+  background: #f0fdfa;
+}
+
+/* ?? Searchable project dropdown ?????????????????????????????????????? */
+.proj-wrap { position: relative; width: 100%; }
+.proj-input {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 7px 28px 7px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  width: 100%;
+  background: #fff;
+  color: #1e293b;
+  transition: border-color .15s, box-shadow .15s;
+  height: 36px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.proj-input:focus {
+  border-color: #0D9488;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13,148,136,.12);
+}
+.proj-input:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #f1f5f9;
+  cursor: not-allowed;
+}
+.proj-input::placeholder { color: #94a3b8; }
+.proj-caret {
+  position: absolute; right: 8px; top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none; color: #94a3b8; font-size: 10px;
+}
+.proj-dropdown {
+  display: none;
+  position: absolute; /* top/left/width set by JS portal */
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.12);
+  z-index: 99999;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.proj-dropdown.open { display: block; }
+.proj-dd-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+  cursor: pointer;
+  border-bottom: 1px solid #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.proj-dd-item:last-child { border-bottom: none; }
+.proj-dd-item:hover { background: #f0fdfa; color: #0D9488; }
+.proj-dd-item.general  { color: #64748b; font-style: italic; }
+.proj-dd-item.internal { color: #7c3aed; }
+.proj-dd-none { padding: 10px 12px; font-size: 12px; color: #94a3b8; text-align: center; }
+
+/* ?? Delete row button ????????????????????????????????????????? */
+.del-btn {
+  background: none;
+  border: none;
+  color: #cbd5e1;
+  cursor: pointer;
+  padding: 5px 7px;
+  border-radius: 7px;
+  font-size: 13px;
+  transition: all .15s;
+  line-height: 1;
+}
+.del-btn:hover { color: #dc2626; background: #fee2e2; }
+
+/* ?? Status alerts ????????????????????????????????????????????? */
+.ts-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 14px;
+  border: 1px solid;
+}
+.ts-alert-info    { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.ts-alert-success { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+.ts-alert-danger  { background: #fff1f2; border-color: #fecdd3; color: #b91c1c; }
+.ts-alert-prev    { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+
+/* ?? Action buttons ???????????????????????????????????????????? */
+.ts-action-bar {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+.ts-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all .15s;
+  text-decoration: none;
+}
+.ts-btn.cancel  { background: #f8fafc; border-color: #e2e8f0; color: #64748b; }
+.ts-btn.cancel:hover  { background: #f1f5f9; color: #334155; }
+.ts-btn.draft   { background: #f8fafc; border-color: #e2e8f0; color: #334155; }
+.ts-btn.draft:hover   { background: #f1f5f9; border-color: #cbd5e1; }
+.ts-btn.submit  { background: #0D9488; color: #fff; }
+.ts-btn.submit:hover  { background: #0b8075; }
+.ts-btn:disabled { opacity: .6; cursor: not-allowed; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tsub">
+
+<div class="mb-3">
+  <a href="{{ url_for('timesheets') }}" style="font-size:13px;font-weight:500;color:#64748b;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+    <i class="bi bi-arrow-left"></i> Back to Timesheets
+  </a>
+</div>
+
+<div class="ts-card">
+
+  <!-- Hero Header -->
+  <div class="ts-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <h5><i class="bi bi-calendar-week me-2"></i>{% if existing_sheet %}Edit{% else %}New{% endif %} Timesheet</h5>
+        <div class="sub">{{ week_label }}{% if existing_sheet and existing_sheet.employee_name %} — {{ existing_sheet.employee_name }}{% endif %}</div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <label style="font-size:12px;opacity:.8;white-space:nowrap;font-weight:500;">Week:</label>
+        <input type="week" id="weekPicker">
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Bar -->
+  <div class="ts-summary">
+    <div class="ts-summary-item">
+      <div class="ts-summary-label">Regular Hrs</div>
+      <div class="ts-summary-val reg" id="sumReg">0.00</div>
+    </div>
+    <div class="ts-summary-item">
+      <div class="ts-summary-label">Overtime Hrs</div>
+      <div class="ts-summary-val ot" id="sumOT">0.00</div>
+    </div>
+    <div class="ts-summary-item">
+      <div class="ts-summary-label">Total Hrs</div>
+      <div class="ts-summary-val tot" id="sumTotal">0.00</div>
+    </div>
+    <div class="ts-summary-item">
+      <div class="ts-summary-label">Days Logged</div>
+      <div class="ts-summary-val days" id="sumDays">0</div>
+    </div>
+  </div>
+
+  <div class="p-3 p-md-4">
+
+    {% if existing_sheet and existing_sheet.status == 'Submitted' %}
+    <div class="ts-alert ts-alert-info">
+      <i class="bi bi-info-circle-fill"></i> Already submitted — re-submit to overwrite.
+    </div>
+    {% elif existing_sheet and existing_sheet.status == 'Approved' %}
+    <div class="ts-alert ts-alert-success">
+      <i class="bi bi-check-circle-fill"></i>
+      {% if is_admin %}
+      Approved. You have admin access to edit this timesheet.
+      {% else %}
+      Approved. Contact your manager to make changes.
+      {% endif %}
+    </div>
+    {% elif existing_sheet and existing_sheet.status == 'Rejected' %}
+    <div class="ts-alert ts-alert-danger">
+      <i class="bi bi-exclamation-circle-fill"></i> Rejected — please update and resubmit.
+    </div>
+    {% endif %}
+
+    <!-- Copy prev-week banner -->
+    <div id="prevWeekBanner" class="ts-alert ts-alert-prev" style="display:none;">
+      <i class="bi bi-arrow-counterclockwise"></i>
+      <span>Previous week had entries — <strong id="prevWeekLabel"></strong></span>
+      <div class="d-flex gap-2 ms-auto">
+        <button type="button" onclick="copyPrevWeek()"
+                style="background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:4px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+          Copy Projects
+        </button>
+        <button type="button" onclick="document.getElementById('prevWeekBanner').style.display='none';"
+                style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:7px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;">
+          Dismiss
+        </button>
+      </div>
+    </div>
+
+    <!-- Day blocks -->
+    <div id="dayBlocksContainer"></div>
+
+    <!-- Add Day -->
+    <button type="button" class="add-day-btn mb-4" onclick="addNewDay()" id="addDayBtn">
+      <i class="bi bi-calendar-plus"></i> Add Day
+    </button>
+
+    <!-- Action buttons -->
+    <div class="ts-action-bar">
+      <a href="{{ url_for('timesheets') }}" class="ts-btn cancel">Cancel</a>
+      {% if not existing_sheet or (existing_sheet.status not in ('Approved', 'Submitted') or is_admin) %}
+      <button type="button" onclick="saveSheet('draft')" class="ts-btn draft">
+        <i class="bi bi-floppy"></i> Save Draft
+      </button>
+      <button type="button" onclick="saveSheet('submit')" class="ts-btn submit">
+        <i class="bi bi-send"></i> Submit Timesheet
+      </button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+</div><!-- /tsub -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+const WEEK_OF   = {{ week_of | tojson }};
+const WEEK_DAYS = {{ week_days | tojson }};
+const PROJECTS  = {{ active_projects | tojson }};
+const EXISTING  = {{ (existing_sheet.entries if existing_sheet else []) | tojson }};
+const IS_APPROVED = {{ 'true' if (existing_sheet and existing_sheet.status == 'Approved') else 'false' }};
+const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+const EDITED_USER_UID = {{ (existing_sheet.employee_uid if existing_sheet else '') | tojson }};
+const CURRENT_USER_UID = {{ current_uid | tojson }};
+const EMPLOYEE_NAME = {{ (existing_sheet.employee_name if existing_sheet else '') | tojson }};
+
+// Get current date in user's LOCAL timezone for reference
+function getUserLocalToday() {
+  const today = new Date();
+  return today.toISOString().split('T')[0];  // Returns YYYY-MM-DD in local time concept
+}
+const TODAY_LOCAL = getUserLocalToday();
+
+// Get current time in user's LOCAL timezone (not server/company timezone)
+function getUserLocalNow() {
+  return new Date();  // Browser's local time
+}
+
+const WEEKDAYS = WEEK_DAYS; // All 7 days allowed
+
+const ENTRY_TYPES = [
+  { value: 'work',    label: 'Work' },
+  { value: 'holiday', label: 'Holiday' },
+  { value: 'sick',    label: 'Sick Leave' },
+  { value: 'pto',     label: 'PTO' },
+];
+
+// Helper: Convert week string (YYYY-Www) to Monday date (YYYY-MM-DD)
+function weekToMonday(weekStr) {
+  if (!weekStr) return null;
+  const [yearStr, weekStr2] = weekStr.split('-W');
+  const year = parseInt(yearStr);
+  const week = parseInt(weekStr2);
+
+  // ISO 8601: Jan 4 is always in week 1 - use UTC to avoid time zone issues
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Dow = jan4.getUTCDay();
+
+  // Days to subtract to get Monday of Week 1
+  const daysBack = jan4Dow === 0 ? 6 : jan4Dow - 1;
+
+  // Use UTC arithmetic to avoid time zone shifts
+  const week1MondayMs = jan4.getTime() - daysBack * 24 * 60 * 60 * 1000;
+
+  // Add (week-1)*7 days to get target Monday
+  const targetMondayMs = week1MondayMs + (week - 1) * 7 * 24 * 60 * 60 * 1000;
+
+  return new Date(targetMondayMs);
+}
+
+// Helper: Format date as YYYY-MM-DD using UTC
+function dateToString(d) {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+// Handle week selection - navigate to the selected week
+function changeWeek(weekStr) {
+  if (!weekStr) return;
+
+  const selectedMonday = weekToMonday(weekStr);
+  const today = new Date();
+
+  console.log('=== Week Selection Debug ===');
+  console.log('Raw week value from input:', weekStr);
+  console.log('Calculated Monday:', selectedMonday.toDateString());
+  console.log('Today:', today.toDateString());
+
+  // Prevent selecting future weeks
+  if (selectedMonday > today) {
+    console.log('Week is in future, preventing navigation');
+    alert('Cannot select future weeks');
+    return;
+  }
+
+  const weekDate = dateToString(selectedMonday);
+  console.log('Final navigation to:', weekDate);
+  console.log('Current URL week param:', WEEK_OF);
+  console.log('=== End Debug ===');
+
+  // Only navigate if week changed
+  if (WEEK_OF !== weekDate) {
+    console.log('Week changed, navigating to:', weekDate);
+    window.location = `/timesheets/submit?week=${weekDate}`;
+  } else {
+    console.log('Week unchanged, not navigating');
+  }
+}
+
+// Initialize week picker
+(function initWeekPicker() {
+  const weekPicker = document.getElementById('weekPicker');
+  // Parse WEEK_OF as UTC date
+  const dateStr = WEEK_OF;
+  const [y, m, day] = dateStr.split('-');
+  const d = new Date(Date.UTC(y, parseInt(m) - 1, day));
+
+  // Use same logic as weekToMonday for consistent UTC calculations
+  function dateToWeek(date) {
+    const year = date.getUTCFullYear();
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const jan4DayOfWeek = jan4.getUTCDay();
+    const daysToSubtract = jan4DayOfWeek === 0 ? 6 : jan4DayOfWeek - 1;
+    const week1MondayMs = jan4.getTime() - daysToSubtract * 24 * 60 * 60 * 1000;
+
+    // Use floor division to calculate week number
+    const weeksDiff = Math.floor((date.getTime() - week1MondayMs) / (7 * 24 * 60 * 60 * 1000));
+    return weeksDiff + 1;
+  }
+
+  const weekNum = dateToWeek(d);
+  weekPicker.value = `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+
+  // Set max week to current week (in UTC)
+  const today = new Date();
+  const currentWeekNum = dateToWeek(today);
+  const maxWeek = `${today.getUTCFullYear()}-W${String(currentWeekNum).padStart(2, '0')}`;
+
+  weekPicker.max = maxWeek;
+  console.log('Week picker initialized to:', weekPicker.value, 'Max:', maxWeek);
+
+  // Add change event listener
+  weekPicker.addEventListener('change', function(e) {
+    console.log('=== WEEK CHANGE EVENT ===');
+    console.log('Raw input value:', this.value);
+    const mondayDate = weekToMonday(this.value);
+    console.log('Monday date calculated:', mondayDate ? mondayDate.toDateString() : 'null');
+    console.log('========================');
+    changeWeek(this.value);
+  });
+})();
+
+const INTERNAL_ACTIVITIES = [
+  'General / Admin',
+  'Ext/Int Relationship Buildup',
+  'Business Dev/Project Meeting',
+  'Engineering Research/Study',
+  'Design Review/Internal Meeting',
+  'Accounts/Finance/Research',
+];
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function parseTime(val) {
+  if (!val) return null;
+  val = val.trim().toUpperCase().replace(/\./g, ':');
+  let m = val.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (m) {
+    let h = parseInt(m[1]), min = parseInt(m[2]||'0');
+    if (m[3]==='AM' && h===12) h=0;
+    if (m[3]==='PM' && h!==12) h+=12;
+    return {h, min};
+  }
+  m = val.match(/^(\d{1,2}):(\d{2})$/);
+  if (m) return {h:parseInt(m[1]), min:parseInt(m[2])};
+  m = val.match(/^(\d{1,2})$/);
+  if (m) return {h:parseInt(m[1]), min:0};
+  return null;
+}
+
+function formatTimeDisplay(s) {
+  if (!s) return '';
+  const parts = s.split(':');
+  const h = parseInt(parts[0]), mn = parseInt(parts[1]||'0');
+  return `${h%12||12}:${String(mn).padStart(2,'0')} ${h>=12?'PM':'AM'}`;
+}
+
+function timeToStorage(val) {
+  const t = parseTime(val);
+  if (!t) return '';
+  return `${String(t.h).padStart(2,'0')}:${String(t.min).padStart(2,'0')}`;
+}
+
+let rowId = 0;
+const dayOrder = []; // dates currently rendered
+
+function getDayInfo(date) {
+  return WEEK_DAYS.find(d => d.date === date) || null;
+}
+
+function isWeekend(date) {
+  const day = new Date(date + 'T00:00:00').getDay();
+  return day === 0 || day === 6;
+}
+
+// ?? Searchable project dropdown (body-portal to escape overflow:hidden) ?????????
+function initProjSearch(id) {
+  const wrap  = document.getElementById('proj-wrap-' + id);
+  if (!wrap) return;
+  const input = wrap.querySelector('.proj-input');
+  const sel   = wrap.querySelector('.entry-proj');
+  if (!input || !sel) return;
+
+  // Append dropdown to <body> so it escapes all overflow:hidden parents
+  const dd = document.createElement('div');
+  dd.className = 'proj-dropdown';
+  document.body.appendChild(dd);
+  wrap._projDd = dd;
+
+  function positionDd() {
+    const r = input.getBoundingClientRect();
+    dd.style.top   = (r.bottom + window.scrollY + 2) + 'px';
+    dd.style.left  = (r.left  + window.scrollX) + 'px';
+    dd.style.width = r.width + 'px';
+  }
+
+  const allItems = INTERNAL_ACTIVITIES.map(function(name) {
+      return { value: '|' + name + '|', label: name, general: false, internal: true };
+    })
+    .concat(PROJECTS.map(function(p) {
+      return {
+        value: (p.project_number||'') + '|' + (p.project_name||'') + '|' + (p.firebase_id||''),
+        label: p.project_number ? p.project_number + ' — ' + (p.project_name||'') : (p.project_name||'Unnamed'),
+        general: false, internal: false
+      };
+    }));
+
+  function syncInput() {
+    const opt = sel.options[sel.selectedIndex];
+    input.value = (opt && opt.value) ? opt.text : '';
+  }
+
+  function buildList(q) {
+    q = (q||'').toLowerCase().trim();
+    const filtered = q ? allItems.filter(function(i){ return i.label.toLowerCase().includes(q); }) : allItems;
+    dd.innerHTML = filtered.length ? filtered.map(function(i) {
+      var cls = i.general ? ' general' : (i.internal ? ' internal' : '');
+      return '<div class="proj-dd-item' + cls + '" data-val="' + escHtml(i.value) + '">' + escHtml(i.label) + '</div>';
+    }).join('') : '<div class="proj-dd-none">No matching projects</div>';
+    dd.querySelectorAll('.proj-dd-item').forEach(function(item) {
+      item.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        sel.value = this.dataset.val;
+        input.value = this.dataset.val ? this.textContent : '';
+        dd.classList.remove('open');
+      });
+    });
+  }
+
+  function openDd() {
+    if (input.disabled) return;
+    positionDd();
+    buildList('');
+    dd.classList.add('open');
+  }
+
+  syncInput();
+
+  input.addEventListener('focus',  function()   { openDd(); });
+  input.addEventListener('click',  function()   { if (!dd.classList.contains('open')) openDd(); });
+  input.addEventListener('input',  function()   { if (!this.disabled) { positionDd(); buildList(this.value); dd.classList.add('open'); } });
+  input.addEventListener('blur',   function()   { setTimeout(function(){ dd.classList.remove('open'); }, 150); syncInput(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { dd.classList.remove('open'); syncInput(); }
+    if (e.key === 'Enter') {
+      var first = dd.querySelector('.proj-dd-item');
+      if (first) first.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+      e.preventDefault();
+    }
+  });
+}
+
+// ?? Build one entry row ???????????????????????????????????????????????????????
+function buildEntryRow(id, date, entry, locked) {
+  entry = entry || {};
+  const entryType = entry.entry_type || 'work';
+  const isWork = entryType === 'work';
+
+  // Check if date is in the future (disable time inputs for future dates)
+  // Both date and TODAY_LOCAL are in YYYY-MM-DD format, so string comparison works
+  const isFutureDate = date > TODAY_LOCAL;
+
+  // Disable time inputs if: locked OR non-work type OR future date
+  const dis = (locked || !isWork || isFutureDate) ? 'disabled' : '';
+  const disDirect = locked ? 'disabled' : '';
+
+  const typeOpts = ENTRY_TYPES.map(t =>
+    `<option value="${t.value}"${entryType===t.value?' selected':''}>${t.label}</option>`
+  ).join('');
+
+  const internalOpts = INTERNAL_ACTIVITIES.map(name => {
+    const val = `|${escHtml(name)}|`;
+    // Internal activity stored as project_name with no project_number/id
+    const isSel = (!entry.project_id && !entry.project_number && entry.project_name === name) ? 'selected' : '';
+    return `<option value="${val}" ${isSel}>${escHtml(name)}</option>`;
+  }).join('');
+
+  const projOpts = PROJECTS.map(p => {
+    const val = `${escHtml(p.project_number||'')}|${escHtml(p.project_name||'')}|${escHtml(p.firebase_id||'')}`;
+    const lbl = p.project_number ? `${p.project_number} — ${p.project_name||''}` : (p.project_name||'Unnamed');
+    const sel = (entry.project_id && entry.project_id===p.firebase_id) ||
+                (entry.project_number && entry.project_number===p.project_number) ? 'selected':'';
+    return `<option value="${val}" ${sel}>${escHtml(lbl)}</option>`;
+  }).join('');
+
+  const tr = document.createElement('tr');
+  tr.id = `row-${id}`;
+  tr.dataset.rowId = id;
+  tr.dataset.date = date;
+
+  tr.innerHTML = `
+    <td style="min-width:100px;">
+      <select class="entry-type" onchange="onTypeChange(${id})" ${disDirect}>
+        ${typeOpts}
+      </select>
+    </td>
+    <td style="min-width:200px;">
+      <div class="proj-wrap" id="proj-wrap-${id}">
+        <input type="text" class="proj-input" id="proj-input-${id}"
+               placeholder="— General / Admin —" autocomplete="off"
+               ${dis ? 'disabled' : ''}>
+        <i class="bi bi-chevron-down proj-caret"></i>
+        <select class="entry-proj" style="display:none">
+          ${internalOpts}
+          ${projOpts}
+        </select>
+      </div>
+    </td>
+    <td style="min-width:88px;">
+      <input type="text" class="entry-start"
+        value="${escHtml(entry.start_time ? formatTimeDisplay(entry.start_time) : '')}"
+        oninput="calcRow(${id})" placeholder="9:00 AM"
+        style="text-align:center;" ${dis}>
+    </td>
+    <td style="min-width:88px;">
+      <input type="text" class="entry-end"
+        value="${escHtml(entry.end_time ? formatTimeDisplay(entry.end_time) : '')}"
+        oninput="calcRow(${id})" placeholder="5:00 PM"
+        style="text-align:center;" ${dis}>
+    </td>
+    <td><div class="hrs reg-val" id="reg-${id}">—</div></td>
+    <td><div class="hrs ot-val"  id="ot-${id}">—</div></td>
+    <td><div class="hrs tot-val" id="tot-${id}">—</div></td>
+    <td style="min-width:130px;">
+      <input type="text" class="entry-notes"
+        value="${escHtml(entry.notes||'')}" placeholder="Notes" ${disDirect}>
+    </td>
+    <td>${locked ? '' : `<button type="button" class="del-btn" onclick="delRow(${id},'${date}')" title="Remove"><i class="bi bi-trash3"></i></button>`}</td>
+  `;
+  return tr;
+}
+
+// ?? Type changed — toggle time/project fields ????????????????????????????????
+function onTypeChange(id) {
+  const tr = document.getElementById(`row-${id}`);
+  if (!tr) return;
+  const type = tr.querySelector('.entry-type').value;
+  const isWork = type === 'work';
+  tr.querySelectorAll('.proj-input, .entry-start, .entry-end').forEach(el => {
+    el.disabled = !isWork;
+    el.style.background = isWork ? '' : '#f8fafc';
+    el.style.color = isWork ? '' : '#94a3b8';
+  });
+  if (!isWork) {
+    tr.querySelector('.entry-start').value = '';
+    tr.querySelector('.entry-end').value = '';
+    delete tr.dataset.worked;
+    ['reg','ot','tot'].forEach(k => {
+      const el = document.getElementById(`${k}-${id}`);
+      if (el) { el.textContent = '0.00'; }
+    });
+    recalcWeek();
+  } else {
+    tr.querySelector('.entry-start').value = '';
+    tr.querySelector('.entry-end').value = '';
+    calcRow(id);
+  }
+}
+
+// ?? Day block ????????????????????????????????????????????????????????????????
+function renderDayBlock(date, entries) {
+  const container = document.getElementById('dayBlocksContainer');
+  // Note: No longer locking future dates. Time validation prevents future start/end times.
+  const locked = false;  // Allow adding entries for any date
+  const info = getDayInfo(date);
+  const dayName = info ? info.name : date;
+  const dayAbbr = info ? info.abbr : date.slice(5);
+  const dateLabel = date.slice(5).replace('-', '/');
+
+  dayOrder.push(date);
+
+  const block = document.createElement('div');
+  block.className = 'ts-day-block mb-3';
+  block.id = `day-block-${date}`;
+  block.dataset.dayBlock = date;
+
+  const lockHtml = '';
+
+  block.innerHTML = `
+    <div class="ts-day-block-header">
+      <span class="ts-day-badge">${escHtml(dayAbbr)}</span>
+      <span class="ts-day-date">${escHtml(dayName)} — ${dateLabel}</span>
+      ${lockHtml}
+    </div>
+    <div class="table-responsive">
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th class="left" style="min-width:100px;">Type</th>
+            <th class="left" style="min-width:180px;">Project</th>
+            <th style="min-width:88px;">Start</th>
+            <th style="min-width:88px;">End</th>
+            <th style="min-width:60px;">Reg Hrs</th>
+            <th style="min-width:55px;">OT Hrs</th>
+            <th style="min-width:60px;">Total</th>
+            <th class="left" style="min-width:130px;">Notes</th>
+            <th style="width:36px;"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-${date}"></tbody>
+      </table>
+    </div>
+    ${locked ? '' : `<button type="button" class="add-proj-btn" onclick="addProjectForDay('${date}')">
+      <i class="bi bi-plus-circle me-1"></i>Add row for ${escHtml(dayAbbr)} ${dateLabel}
+    </button>`}
+  `;
+
+  container.appendChild(block);
+
+  const tbody = document.getElementById(`tbody-${date}`);
+  (entries && entries.length ? entries : [{}]).forEach(e => {
+    const id = ++rowId;
+    tbody.appendChild(buildEntryRow(id, date, e, locked));
+    initProjSearch(id);
+    calcRow(id);
+  });
+}
+
+function addProjectForDay(date) {
+  // Allow adding entries for any date (time validation prevents future times)
+  const tbody = document.getElementById(`tbody-${date}`);
+  if (!tbody) return;
+  const id = ++rowId;
+  tbody.appendChild(buildEntryRow(id, date, {}, false));
+  initProjSearch(id);
+  calcRow(id);
+}
+
+function addNewDay() {
+  const used = new Set(dayOrder);
+  const available = WEEKDAYS.filter(d => !used.has(d.date));
+  if (available.length === 0) {
+    if (dayOrder.length > 0) addProjectForDay(dayOrder[dayOrder.length - 1]);
+    return;
+  }
+  renderDayBlock(available[0].date, [{}]);
+  updateAddDayBtn();
+}
+
+function updateAddDayBtn() {
+  const used = new Set(dayOrder);
+  const remaining = WEEKDAYS.filter(d => !used.has(d.date));
+  const btn = document.getElementById('addDayBtn');
+  if (btn) btn.style.display = remaining.length === 0 ? 'none' : '';
+}
+
+function delRow(id, date) {
+  // Show confirmation dialog before deleting
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  `;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-width: 450px;
+    width: 90%;
+    overflow: hidden;
+  `;
+
+  const header = document.createElement('div');
+  header.style.cssText = `
+    background: #dc2626;
+    color: white;
+    padding: 18px 24px;
+    font-weight: 700;
+    font-size: 16px;
+  `;
+  header.textContent = 'Delete Entry';
+
+  const body = document.createElement('div');
+  body.style.cssText = `
+    padding: 24px;
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.6;
+  `;
+  body.innerHTML = '<p><strong>Are you sure you want to delete this entry?</strong></p><p style="margin-top: 12px; color: #64748b;">This action cannot be undone.</p>';
+
+  const footer = document.createElement('div');
+  footer.style.cssText = `
+    padding: 18px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid #e2e8f0;
+  `;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = `
+    padding: 9px 18px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: white;
+    color: #334155;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  `;
+  cancelBtn.onclick = () => overlay.remove();
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.style.cssText = `
+    padding: 9px 18px;
+    border: none;
+    border-radius: 6px;
+    background: #dc2626;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  `;
+  deleteBtn.onclick = () => {
+    overlay.remove();
+    deleteRowAction(id, date);
+  };
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(deleteBtn);
+
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function deleteRowAction(id, date) {
+  const wrap = document.getElementById('proj-wrap-' + id);
+  if (wrap && wrap._projDd) wrap._projDd.remove();
+  const tr = document.getElementById(`row-${id}`);
+  if (tr) tr.remove();
+  recalcWeek();
+  const tbody = document.getElementById(`tbody-${date}`);
+  if (tbody && tbody.querySelectorAll('tr').length === 0) {
+    const block = document.getElementById(`day-block-${date}`);
+    if (block) block.remove();
+    const idx = dayOrder.indexOf(date);
+    if (idx > -1) dayOrder.splice(idx, 1);
+    updateAddDayBtn();
+  }
+}
+
+// ?? Hour calculation ?????????????????????????????????????????????????????????
+// A row's own Total is just the worked hours from its start/end time.
+// Whether those hours count as Regular or Overtime depends on the whole week
+// (weekend = all OT; weekday hours are Regular up to a running 40hr cap), so
+// that classification happens in recalcWeek(), not here.
+function calcRow(id) {
+  const tr = document.getElementById(`row-${id}`);
+  if (!tr) return;
+
+  const type = tr.querySelector('.entry-type') ? tr.querySelector('.entry-type').value : 'work';
+  const date = tr.dataset.date;  // Define date early so it can be used for validation
+
+  if (type !== 'work') {
+    delete tr.dataset.worked;
+    ['reg','ot','tot'].forEach(k => {
+      const el = document.getElementById(`${k}-${id}`);
+      if (el) el.textContent = '0.00';
+    });
+    recalcWeek();
+    return;
+  }
+
+  let s = parseTime(tr.querySelector('.entry-start').value);
+  let e = parseTime(tr.querySelector('.entry-end').value);
+  const startInput = tr.querySelector('.entry-start');
+
+  // Validate start time is not in the future
+  if (s && date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const now = getUserLocalNow();
+    let startDateTime = new Date(date + 'T' + String(s.h).padStart(2,'0') + ':' + String(s.min).padStart(2,'0') + ':00');
+
+    if (startDateTime > now) {
+      startInput.style.borderColor = '#dc2626';
+      startInput.style.backgroundColor = '#fee2e2';
+      startInput.title = 'Start time cannot be in the future (based on your local time)';
+    } else {
+      startInput.style.borderColor = '';
+      startInput.style.backgroundColor = '';
+      startInput.title = '';
+    }
+  } else {
+    startInput.style.borderColor = '';
+    startInput.style.backgroundColor = '';
+    startInput.title = '';
+  }
+
+  if (s && e && e.h < 12) {
+    const raw = tr.querySelector('.entry-end').value.trim().toUpperCase();
+    if (!/AM|PM/.test(raw) && (e.h*60+e.min) <= (s.h*60+s.min)) {
+      e = {h: e.h+12, min: e.min};
+    }
+  }
+
+  if (!s || !e) {
+    delete tr.dataset.worked;
+    tr.querySelector('.entry-end').style.borderColor = '';
+    tr.querySelector('.entry-end').style.backgroundColor = '';
+    tr.querySelector('.entry-end').title = '';
+    ['reg','ot','tot'].forEach(k => {
+      const el = document.getElementById(`${k}-${id}`);
+      if (el) el.textContent = '—';
+    });
+    recalcWeek();
+    return;
+  }
+
+  // Calculate minutes difference (needed for both validation and hour calculation)
+  let mins = (e.h*60+e.min) - (s.h*60+s.min);
+
+  // Validate that end time is not in the future (using USER'S LOCAL TIME)
+  const endInput = tr.querySelector('.entry-end');
+
+  // Only validate if date is valid
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const now = getUserLocalNow();  // User's current local time
+    // Create datetime in user's local timezone (without 'Z' means local time)
+    let entryDateTime = new Date(date + 'T' + String(e.h).padStart(2,'0') + ':' + String(e.min).padStart(2,'0') + ':00');
+
+    // If this is an overnight shift, add 1 day to the end time
+    if (mins < 0) {
+      entryDateTime = new Date(entryDateTime.getTime() + 24 * 60 * 60 * 1000);
+    }
+
+    if (entryDateTime > now) {
+      endInput.style.borderColor = '#dc2626';
+      endInput.style.backgroundColor = '#fee2e2';
+      endInput.title = 'End time cannot be in the future (based on your local time)';
+    } else {
+      endInput.style.borderColor = '';
+      endInput.style.backgroundColor = '';
+      endInput.title = '';
+    }
+  } else {
+    endInput.style.borderColor = '';
+    endInput.style.backgroundColor = '';
+    endInput.title = '';
+  }
+
+  // Overnight shift: treat an end time earlier than the start time as next day.
+  // Example: 6 PM -> 12 AM should calculate as 6 hours, not 0.
+  if (mins < 0) mins += 24 * 60;
+  const worked = mins / 60;
+  tr.dataset.worked = worked;
+  document.getElementById(`tot-${id}`).textContent = worked.toFixed(2);
+  recalcWeek();
+}
+
+// Classifies every work row's hours as Regular/Overtime across the whole
+// week: Sat/Sun rows are always 100% overtime; Mon-Fri rows are regular up
+// to a running weekly total of 40 hours (in date order), with anything
+// beyond that counted as overtime. Then refreshes the weekly summary totals.
+function recalcWeek() {
+  const byDate = {};
+  document.querySelectorAll('[data-row-id]').forEach(tr => {
+    const date = tr.dataset.date;
+    if (!date || tr.dataset.worked === undefined) return;
+    (byDate[date] = byDate[date] || []).push(tr);
+  });
+
+  let runningWeekdayTotal = 0;
+  Object.keys(byDate).sort().forEach(date => {
+    const rows = byDate[date];
+    if (isWeekend(date)) {
+      rows.forEach(tr => {
+        const id = tr.dataset.rowId;
+        const worked = parseFloat(tr.dataset.worked) || 0;
+        document.getElementById(`reg-${id}`).textContent = '0.00';
+        document.getElementById(`ot-${id}`).textContent  = worked > 0 ? worked.toFixed(2) : '—';
+      });
+    } else {
+      let remainingReg = Math.max(0, 40 - runningWeekdayTotal);
+      let dayWorked = 0;
+      rows.forEach(tr => {
+        const id = tr.dataset.rowId;
+        const worked = parseFloat(tr.dataset.worked) || 0;
+        dayWorked += worked;
+        const rowReg = Math.min(worked, remainingReg);
+        const rowOt  = worked - rowReg;
+        remainingReg -= rowReg;
+        document.getElementById(`reg-${id}`).textContent = rowReg.toFixed(2);
+        document.getElementById(`ot-${id}`).textContent  = rowOt > 0 ? rowOt.toFixed(2) : '—';
+      });
+      runningWeekdayTotal += dayWorked;
+    }
+  });
+
+  let totalReg = 0, totalOT = 0;
+  const activeDays = new Set();
+  document.querySelectorAll('[data-row-id]').forEach(tr => {
+    const id = tr.dataset.rowId;
+    const regEl = document.getElementById(`reg-${id}`);
+    const otEl  = document.getElementById(`ot-${id}`);
+    if (regEl && regEl.textContent !== '—') totalReg += parseFloat(regEl.textContent)||0;
+    if (otEl  && otEl.textContent  !== '—') totalOT  += parseFloat(otEl.textContent)||0;
+    if (tr.dataset.date) activeDays.add(tr.dataset.date);
+  });
+  document.getElementById('sumReg').textContent   = totalReg.toFixed(2);
+  document.getElementById('sumOT').textContent    = totalOT.toFixed(2);
+  document.getElementById('sumTotal').textContent = (totalReg+totalOT).toFixed(2);
+  document.getElementById('sumDays').textContent  = activeDays.size;
+}
+
+// ?? Collect & save ????????????????????????????????????????????????????????????
+function collectEntries() {
+  const entries = [];
+  document.querySelectorAll('[data-row-id]').forEach(tr => {
+    const id   = tr.dataset.rowId;
+    const date = tr.dataset.date;
+    if (!date) return;
+    const type  = tr.querySelector('.entry-type') ? tr.querySelector('.entry-type').value : 'work';
+    const proj  = tr.querySelector('.entry-proj').value || '';
+    let start = '', end = '';
+    if (type === 'work') {
+      const startVal = tr.querySelector('.entry-start').value;
+      const endVal   = tr.querySelector('.entry-end').value;
+      start = timeToStorage(startVal);
+      // Apply the same PM auto-correction as calcRow so stored end_time matches
+      // the displayed hours (e.g. "3:00" after "7:00 AM" → stored as "15:00" not "03:00")
+      let s = parseTime(startVal);
+      let e = parseTime(endVal);
+      if (s && e && e.h < 12) {
+        const rawEnd = endVal.trim().toUpperCase();
+        if (!/AM|PM/.test(rawEnd) && (e.h*60+e.min) <= (s.h*60+s.min)) {
+          e = {h: e.h+12, min: e.min};
+        }
+      }
+      end = e ? `${String(e.h).padStart(2,'0')}:${String(e.min).padStart(2,'0')}` : '';
+    }
+    const notes = tr.querySelector('.entry-notes').value.trim();
+    const reg   = type==='work' ? (parseFloat(document.getElementById(`reg-${id}`)?.textContent)||0) : 0;
+    const ot    = type==='work' ? (parseFloat(document.getElementById(`ot-${id}`)?.textContent)||0)  : 0;
+    const tot   = type==='work' ? (parseFloat(document.getElementById(`tot-${id}`)?.textContent)||0) : 0;
+    const [projNum, projName, projId] = proj.split('|');
+    entries.push({
+      date, entry_type: type,
+      project_number: projNum||'', project_name: projName||'', project_id: projId||'',
+      start_time: start, end_time: end,
+      regular_hours: reg, overtime_hours: ot, total_hours: tot,
+      notes,
+    });
+  });
+  return entries;
+}
+
+function showValidationError(message) {
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'validation-modal-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  `;
+
+  // Create modal
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-width: 500px;
+    width: 90%;
+    overflow: hidden;
+  `;
+
+  // Create header
+  const header = document.createElement('div');
+  header.style.cssText = `
+    background: #dc2626;
+    color: white;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 16px;
+  `;
+  header.innerHTML = `<i class="bi bi-exclamation-circle-fill"></i>Please Review`;
+
+  // Create body
+  const body = document.createElement('div');
+  body.style.cssText = `
+    padding: 24px;
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.6;
+  `;
+  body.textContent = message;
+
+  // Create footer with buttons
+  const footer = document.createElement('div');
+  footer.style.cssText = `
+    padding: 18px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid #e2e8f0;
+  `;
+
+  const okBtn = document.createElement('button');
+  okBtn.textContent = 'OK';
+  okBtn.style.cssText = `
+    background: #dc2626;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+  `;
+  okBtn.onmouseover = () => okBtn.style.background = '#b91c1c';
+  okBtn.onmouseout = () => okBtn.style.background = '#dc2626';
+  okBtn.onclick = () => {
+    overlay.remove();
+  };
+
+  footer.appendChild(okBtn);
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+
+  // Remove any existing modal
+  const existingModal = document.getElementById('validation-modal-overlay');
+  if (existingModal) existingModal.remove();
+
+  document.body.appendChild(overlay);
+  modal.id = 'validation-modal-overlay';
+}
+
+function showConfirmSubmission(entries) {
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  `;
+
+  // Create modal
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-width: 500px;
+    width: 90%;
+    overflow: hidden;
+  `;
+
+  // Create header
+  const header = document.createElement('div');
+  header.style.cssText = `
+    background: #0D9488;
+    color: white;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 16px;
+  `;
+  header.innerHTML = `<i class="bi bi-check-circle-fill"></i>Confirm Submission`;
+
+  // Create body
+  const body = document.createElement('div');
+  body.style.cssText = `
+    padding: 24px;
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.6;
+  `;
+  const totalHours = parseFloat(document.getElementById('sumTotal').textContent) || 0;
+
+  // Calculate week end date (6 days after week start)
+  const weekStart = new Date(WEEK_OF);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+
+  // Format dates
+  const options = { month: 'short', day: 'numeric', year: 'numeric' };
+  const startFormatted = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const endFormatted = weekEnd.toLocaleDateString('en-US', options);
+  const weekRange = `${startFormatted} — ${endFormatted}`;
+
+  const isEditingOther = EDITED_USER_UID && CURRENT_USER_UID && EDITED_USER_UID !== CURRENT_USER_UID;
+  const submitMsg = isEditingOther
+    ? `You are about to submit ${EMPLOYEE_NAME}'s timesheet.`
+    : 'You are about to submit your timesheet.';
+
+  body.innerHTML = `
+    <p style="margin-bottom: 12px;">${submitMsg}</p>
+    <div style="background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 12px; margin: 14px 0;">
+      <div style="font-weight: 600; color: #0D9488; margin-bottom: 8px;">Timesheet Summary:</div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span>Total Hours:</span>
+        <span style="font-weight: 600;">${totalHours.toFixed(2)} hrs</span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span>Week Of:</span>
+        <span style="font-weight: 600;">${weekRange}</span>
+      </div>
+    </div>
+  `;
+
+  // Create footer with buttons
+  const footer = document.createElement('div');
+  footer.style.cssText = `
+    padding: 18px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid #e2e8f0;
+  `;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = `
+    background: #f8fafc;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  `;
+  cancelBtn.onmouseover = () => {
+    cancelBtn.style.background = '#f1f5f9';
+    cancelBtn.style.borderColor = '#cbd5e1';
+  };
+  cancelBtn.onmouseout = () => {
+    cancelBtn.style.background = '#f8fafc';
+    cancelBtn.style.borderColor = '#e2e8f0';
+  };
+  cancelBtn.onclick = () => {
+    overlay.remove();
+  };
+
+  const submitBtn = document.createElement('button');
+  submitBtn.innerHTML = '<i class="bi bi-send me-2"></i>Yes, Submit';
+  submitBtn.style.cssText = `
+    background: #0D9488;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+  `;
+  submitBtn.onmouseover = () => submitBtn.style.background = '#0b8075';
+  submitBtn.onmouseout = () => submitBtn.style.background = '#0D9488';
+  submitBtn.onclick = () => {
+    overlay.remove();
+    performSubmit(entries);
+  };
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(submitBtn);
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+
+  document.body.appendChild(overlay);
+}
+
+function performSubmit(entries) {
+  const btn = event.target;
+  if (!btn) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-send me-1"></i>Submitting?';
+
+  fetch('/api/timesheets', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({week_of: WEEK_OF, action: 'submit', entries, edited_uid: EDITED_USER_UID || null})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      window.location = '/timesheets';
+    } else {
+      showValidationError('Error: '+(d.error||'Unknown error'));
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-send me-1"></i>Submit Timesheet';
+    }
+  })
+  .catch(() => {
+    showValidationError('Network error. Please try again.');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-send me-1"></i>Submit Timesheet';
+  });
+}
+
+function saveSheet(action) {
+  const entries = collectEntries();
+  if (action==='submit' && entries.length===0) {
+    showValidationError('Please add at least one entry before submitting.');
+    return;
+  }
+
+  const now = getUserLocalNow();  // User's current LOCAL time
+
+  // Validate all entries BEFORE showing confirmation dialog
+  for (const entry of entries) {
+    if (entry.entry_type === 'work' && entry.date) {
+      // Validate start time
+      if (entry.start_time) {
+        let startDateTime = new Date(entry.date + 'T' + entry.start_time + ':00');
+        if (startDateTime > now) {
+          showValidationError(`Start time for ${entry.date} cannot be in the future. Please enter a valid start time.`);
+          return;
+        }
+      }
+
+      // Validate end time
+      if (entry.end_time) {
+        let endDateTime = new Date(entry.date + 'T' + entry.end_time + ':00');
+
+        // Handle overnight shifts: if end_time < start_time, end is next day
+        if (entry.start_time && entry.end_time) {
+          const [startH, startM] = entry.start_time.split(':').map(Number);
+          const [endH, endM] = entry.end_time.split(':').map(Number);
+          if ((endH * 60 + endM) < (startH * 60 + startM)) {
+            endDateTime = new Date(endDateTime.getTime() + 24 * 60 * 60 * 1000);
+          }
+        }
+
+        if (endDateTime > now) {
+          showValidationError(`End time for ${entry.date} cannot be in the future. Please enter a valid end time.`);
+          return;
+        }
+      }
+    }
+  }
+
+  if (action==='submit') {
+    const tot = parseFloat(document.getElementById('sumTotal').textContent)||0;
+    const nonWorkEntries = entries.filter(e => e.entry_type !== 'work');
+    const workEntries    = entries.filter(e => e.entry_type === 'work');
+    if (workEntries.length > 0 && tot === 0) {
+      showValidationError('Total hours are 0.00. Please enter valid start and end times.');
+      return;
+    }
+    // If validation passes, show confirmation dialog
+    showConfirmSubmission(entries);
+    return;
+  }
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = action==='submit' ? '<i class="bi bi-send me-1"></i>Submitting?' : '<i class="bi bi-floppy me-1"></i>Saving?';
+  fetch('/api/timesheets', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({week_of: WEEK_OF, action, entries, edited_uid: EDITED_USER_UID || null})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      window.location = action==='submit' ? '/timesheets' : `/timesheets/${d.sheet_id}`;
+    } else {
+      showValidationError('Error: '+(d.error||'Unknown error'));
+      btn.disabled = false;
+      btn.innerHTML = action==='submit' ? '<i class="bi bi-send me-1"></i>Submit Timesheet' : '<i class="bi bi-floppy me-1"></i>Save Draft';
+    }
+  })
+  .catch(() => {
+    showValidationError('Network error. Please try again.');
+    btn.disabled = false;
+    btn.innerHTML = action==='submit' ? '<i class="bi bi-send me-1"></i>Submit Timesheet' : '<i class="bi bi-floppy me-1"></i>Save Draft';
+  });
+}
+
+let _prevWeekEntries = [];
+function copyPrevWeek() {
+  if (!_prevWeekEntries.length) return;
+  document.getElementById('prevWeekBanner').style.display='none';
+  document.getElementById('dayBlocksContainer').innerHTML='';
+  dayOrder.length=0; rowId=0;
+  const byDate = {};
+  _prevWeekEntries.forEach(e => {
+    const origDay = WEEK_DAYS.find(d => {
+      const od = new Date(e.date+'T00:00:00');
+      const nd = new Date(d.date+'T00:00:00');
+      return od.getDay()===nd.getDay();
+    });
+    const target = origDay ? origDay.date : null;
+    if (!target || isWeekend(target)) return;
+    if (!byDate[target]) byDate[target]=[];
+    byDate[target].push({project_number:e.project_number, project_name:e.project_name, project_id:e.project_id, entry_type:e.entry_type||'work'});
+  });
+  WEEKDAYS.forEach(d => renderDayBlock(d.date, byDate[d.date]||[{}]));
+  updateAddDayBtn();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (EXISTING && EXISTING.length > 0) {
+    const byDate={}, dateOrder=[];
+    EXISTING.filter(e=>e.date).forEach(e=>{
+      if (!byDate[e.date]){byDate[e.date]=[];dateOrder.push(e.date);}
+      byDate[e.date].push(e);
+    });
+    if (dateOrder.length>0) {
+      dateOrder.forEach(date => renderDayBlock(date, byDate[date]));
+    } else {
+      renderDayBlock(WEEKDAYS[0].date, [{}]);
+    }
+  } else {
+    renderDayBlock(WEEKDAYS[0].date, [{}]);
+    if (!IS_APPROVED) {
+      fetch('/api/timesheets/previous?week='+encodeURIComponent(WEEK_OF))
+        .then(r=>r.json())
+        .then(data=>{
+          if (data.entries && data.entries.length>0) {
+            _prevWeekEntries = data.entries;
+            document.getElementById('prevWeekLabel').textContent = 'Week of '+(data.week_of||'');
+            document.getElementById('prevWeekBanner').style.display='block';
+          }
+        })
+        .catch(()=>{});
+    }
+  }
+  updateAddDayBtn();
+  // Lock approved timesheets, but allow admins to edit at any time
+  if (IS_APPROVED && !IS_ADMIN) {
+    document.querySelectorAll('[data-row-id] input,[data-row-id] select').forEach(el=>el.disabled=true);
+    document.querySelectorAll('[data-row-id] button,.add-proj-btn').forEach(el=>el.disabled=true);
+    document.getElementById('addDayBtn').style.display='none';
+  }
+});
+</script>
+{% endblock %}

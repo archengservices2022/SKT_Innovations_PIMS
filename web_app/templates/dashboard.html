@@ -1,0 +1,1369 @@
+﻿{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% set status_icons = {
+  'Draft':       ('bi-pencil',              'Draft — not sent to client yet'),
+  'Sent':        ('bi-send',                'Sent — awaiting client payment'),
+  'Viewed':      ('bi-eye',                 'Viewed — client has opened the invoice'),
+  'Paid':        ('bi-check-circle-fill',   'Paid — payment received in full'),
+  'Partial':     ('bi-circle-half',         'Partial — part payment received'),
+  'Overdue':     ('bi-exclamation-circle-fill', 'Overdue — past due date'),
+  'Cancelled':   ('bi-x-circle',            'Cancelled'),
+  'Not Started': ('bi-hourglass-split',     'Not yet started'),
+  'In Progress': ('bi-arrow-repeat',        'Currently in progress'),
+  'Active':      ('bi-lightning-charge',    'Active'),
+  'On Hold':     ('bi-pause-circle',        'On hold'),
+  'Completed':   ('bi-check-circle-fill',   'Completed'),
+  'Invoiced':    ('bi-receipt',             'Invoiced'),
+} %}
+{% macro status_badge(status, fallback='Draft') %}
+  {% set st = status or fallback %}
+  {% set icon, tip = status_icons.get(st, ('bi-circle', st)) %}
+  <span class="badge status-{{ st|lower|replace(' ','-') }}" title="{{ tip }}">
+    <i class="bi {{ icon }} me-1"></i>{{ st }}
+  </span>
+{% endmacro %}
+
+{% block content %}
+
+<!-- ?? Alert Banners ??????????????????????????????????????????????????????????? -->
+{% if overdue_count > 0 or expiring_count > 0 or expiring_soon_quotes %}
+<div class="d-flex flex-column gap-2 mb-3">
+  {% if overdue_count > 0 %}
+  <div class="alert alert-danger d-flex align-items-center justify-content-between py-2 mb-0">
+    <div>
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      <strong>{{ overdue_count }} overdue invoice{{ 's' if overdue_count != 1 }}</strong>
+      — payment past due date.
+      {% if 'invoicing' in allowed_pages %}
+      <a href="{{ url_for('invoicing', status='Overdue') }}" class="alert-link ms-2">View →</a>
+      {% endif %}
+    </div>
+    {% if 'invoicing' in allowed_pages %}
+    <form method="POST" action="{{ url_for('send_overdue_reminders') }}" class="ms-3">
+      <button type="submit" class="btn btn-sm btn-danger"
+              onclick="return confirm('Send reminder emails to all {{ overdue_count }} overdue clients?');">
+        <i class="bi bi-envelope-exclamation me-1"></i>Send Reminders
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if expiring_soon_quotes %}
+  <div class="alert mb-0 py-2" style="background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;">
+    <div class="d-flex align-items-start gap-2">
+      <i class="bi bi-alarm-fill mt-1" style="color:#D97706;font-size:16px;flex-shrink:0;"></i>
+      <div>
+        <strong>{{ expiring_soon_quotes|length }} quote{{ 's' if expiring_soon_quotes|length != 1 }} expiring within 3 days — act now!</strong>
+        <div class="mt-1" style="font-size:13px;">
+          {% for q in expiring_soon_quotes %}
+            <span class="badge me-1 mb-1" style="background:#D97706;color:#fff;">
+              {{ (q.get('company_name') or q.get('client_name') or q.get('job_name') or 'Quote') }}
+              {% if q.valid_until %} — expires {{ q.valid_until }}{% endif %}
+            </span>
+          {% endfor %}
+        </div>
+        {% if 'quotes' in allowed_pages %}
+        <a href="{{ url_for('quotes') }}" class="fw-semibold" style="color:#92400E;font-size:13px;">View quotes →</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% elif expiring_count > 0 %}
+  <div class="alert alert-warning d-flex align-items-center py-2 mb-0">
+    <i class="bi bi-clock-fill me-2"></i>
+    <strong>{{ expiring_count }} quote{{ 's' if expiring_count != 1 }}</strong>
+    expiring within 7 days — follow up now.
+    {% if 'quotes' in allowed_pages %}
+    <a href="{{ url_for('quotes') }}" class="alert-link ms-2">View quotes →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ?? Quick Actions ?????????????????????????????????????????????????????????? -->
+<div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+  <span class="text-muted small fw-500 me-1">Quick Actions:</span>
+  {% if 'quotes' in allowed_pages %}
+  <a href="{{ url_for('quotes_new') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-file-earmark-plus me-1"></i>New Quote
+  </a>
+  {% endif %}
+  {% if 'projects' in allowed_pages %}
+  <a href="{{ url_for('project_new') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-plus-square me-1"></i>New Project
+  </a>
+  {% endif %}
+  {% if 'invoicing' in allowed_pages %}
+  <a href="{{ url_for('invoice_new') }}" class="btn btn-sm btn-teal">
+    <i class="bi bi-receipt me-1"></i>New Invoice
+  </a>
+  {% endif %}
+</div>
+
+<!-- ?? Financial Summary - 3 Containers (All Time, This Year, This Month) ???????? -->
+{% if 'financial' in allowed_pages %}
+<div class="row g-3 mb-4">
+
+  <!-- Container 1: All Time -->
+  <div class="col-12 col-lg-4">
+    <div class="card-panel" style="border-top:4px solid #0D9488;height:100%;">
+      <h6 class="mb-4" style="color:#0D9488;font-size:13px;font-weight:700;"><i class="bi bi-cash-coin me-1"></i>Financial Summary</h6>
+
+      <!-- Revenue and Expenses Row -->
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <div style="background:#F0FDFA;border-radius:6px;padding:10px 12px;text-align:center;">
+            <div style="font-size:9px;color:#0D9488;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Total Revenue</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#0D9488;">{{ currency_symbol }}{{ "{:,.0f}".format(total_revenue) }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#FEF2F2;border-radius:6px;padding:10px 12px;text-align:center;">
+            <div style="font-size:9px;color:#DC2626;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Total Expenses</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#DC2626;">{{ currency_symbol }}{{ "{:,.0f}".format(total_expenses) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Net Profit/Loss -->
+      <div style="background:{% if (total_revenue - total_expenses) >= 0 %}#F0FDF4{% else %}#FEF2F2{% endif %};border-radius:6px;padding:10px 12px;text-align:center;">
+        <div style="font-size:9px;color:{% if (total_revenue - total_expenses) >= 0 %}#16a34a{% else %}#DC2626{% endif %};font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Net Profit/Loss</div>
+        <div style="font-size:1.25rem;font-weight:800;color:{% if (total_revenue - total_expenses) >= 0 %}#16a34a{% else %}#DC2626{% endif %};">{{ currency_symbol }}{{ "{:,.0f}".format(total_revenue - total_expenses) }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Container 2: This Year -->
+  <div class="col-12 col-lg-4">
+    <div class="card-panel" style="border-top:4px solid #0369A1;height:100%;">
+      <h6 class="mb-4" style="color:#0369A1;font-size:13px;font-weight:700;"><i class="bi bi-calendar-year me-1"></i>This Year</h6>
+
+      <!-- Revenue and Expenses Row -->
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <div style="background:#EFF6FF;border-radius:6px;padding:10px 12px;text-align:center;">
+            <div style="font-size:9px;color:#0369A1;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Year Revenue</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#0369A1;">{{ currency_symbol }}{{ "{:,.0f}".format(year_revenue if year_revenue else 0) }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#FEF2F2;border-radius:6px;padding:10px 12px;text-align:center;">
+            <div style="font-size:9px;color:#DC2626;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Year Expenses</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#DC2626;">{{ currency_symbol }}{{ "{:,.0f}".format(year_expenses if year_expenses else 0) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Year Net -->
+      <div style="background:{% if (year_revenue - year_expenses) >= 0 %}#F0FDF4{% else %}#FEF2F2{% endif %};border-radius:6px;padding:10px 12px;text-align:center;">
+        <div style="font-size:9px;color:{% if (year_revenue - year_expenses) >= 0 %}#16a34a{% else %}#DC2626{% endif %};font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Year Net</div>
+        <div style="font-size:1.25rem;font-weight:800;color:{% if (year_revenue - year_expenses) >= 0 %}#16a34a{% else %}#DC2626{% endif %};">{{ currency_symbol }}{{ "{:,.0f}".format((year_revenue - year_expenses) if year_revenue else 0) }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Container 3: This Month -->
+  <div class="col-12 col-lg-4">
+    <div class="card-panel" style="border-top:4px solid #EA580C;height:100%;">
+      <h6 class="mb-4" style="color:#EA580C;font-size:13px;font-weight:700;"><i class="bi bi-calendar-month me-1"></i>This Month</h6>
+
+      <!-- Income and Expenses Row -->
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <div style="background:#FFFBEB;border-radius:6px;padding:10px 12px;text-align:center;">
+            <div style="font-size:9px;color:#D97706;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Revenue</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#D97706;">{{ currency_symbol }}{{ "{:,.0f}".format(current_month_income) }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#FEF2F2;border-radius:6px;padding:10px 12px;text-align:center;">
+            <div style="font-size:9px;color:#DC2626;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Expenses</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#DC2626;">{{ currency_symbol }}{{ "{:,.0f}".format(current_month_expenses) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Month Net -->
+      <div style="background:{% if (current_month_income - current_month_expenses) >= 0 %}#F0FDF4{% else %}#FEF2F2{% endif %};border-radius:6px;padding:10px 12px;text-align:center;">
+        <div style="font-size:9px;color:{% if (current_month_income - current_month_expenses) >= 0 %}#16a34a{% else %}#DC2626{% endif %};font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Month Net</div>
+        <div style="font-size:1.25rem;font-weight:800;color:{% if (current_month_income - current_month_expenses) >= 0 %}#16a34a{% else %}#DC2626{% endif %};">{{ currency_symbol }}{{ "{:,.0f}".format(current_month_income - current_month_expenses) }}</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+<!-- ?? Account Receivable Summary ??????????????????????????????????????????? -->
+{% if 'financial' in allowed_pages and ar_data %}
+{% set ar_total = ar_data.get('advanced_payment_amt', 0) + ar_data.get('not_started_amt', 0) + ar_data.get('in_progress_amt', 0) + ar_data.get('pending_invoice_amt', 0) + ar_data.get('partial_payment_amt', 0) + ar_data.get('invoiced_not_paid_amt', 0) + ar_data.get('scope_disagreement_amt', 0) + ar_data.get('project_completion_issue_amt', 0) + ar_data.get('others_on_hold_amt', 0) %}
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="card-panel">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h6 style="color:#0D9488;font-size:14px;font-weight:700;margin:0;"><i class="bi bi-cash-coin me-2"></i>Account Receivable Summary</h6>
+        {% if 'financial' in allowed_pages %}
+        <a href="{{ url_for('financial', tab='ar-summary') }}" class="text-teal small">View Details →</a>
+        {% endif %}
+      </div>
+
+      {% set _ar_cats = [
+        {'key':'advanced_payment_amt', 'label':'Advanced Payment', 'icon':'bi-arrow-down-circle', 'bg':'#F0FDFA', 'color':'#0D9488', 'flex':'1 1 150px', 'minw':'150px'},
+        {'key':'not_started_amt', 'label':'Not Started', 'icon':'bi-flag', 'bg':'#F8FAFC', 'color':'#64748B', 'flex':'1 1 150px', 'minw':'150px'},
+        {'key':'in_progress_amt', 'label':'In Progress', 'icon':'bi-arrow-repeat', 'bg':'#F0FDFA', 'color':'#0D9488', 'flex':'1 1 150px', 'minw':'150px'},
+        {'key':'pending_invoice_amt', 'label':'Pending Invoice', 'icon':'bi-hourglass-split', 'bg':'#F5F3FF', 'color':'#7C3AED', 'flex':'1 1 150px', 'minw':'150px'},
+        {'key':'invoiced_not_paid_amt', 'label':'Invoiced – Not Paid', 'icon':'bi-file-earmark', 'bg':'#FFF7ED', 'color':'#EA580C', 'flex':'1 1 150px', 'minw':'150px'},
+        {'key':'partial_payment_amt', 'label':'Partially Paid – Balance Due', 'icon':'bi-percent', 'bg':'#FFFBEB', 'color':'#D97706', 'flex':'1.6 1 190px', 'minw':'190px'},
+        {'key':'project_completion_issue_amt', 'label':'Project Completion Issue', 'icon':'bi-clock', 'bg':'#EFF6FF', 'color':'#3B82F6', 'flex':'1.25 1 170px', 'minw':'170px'},
+        {'key':'others_on_hold_amt', 'label':'Other / On Hold', 'icon':'bi-hourglass', 'bg':'#EEF2FF', 'color':'#6366F1', 'flex':'1 1 150px', 'minw':'150px'},
+        {'key':'scope_disagreement_amt', 'label':'Scope Disagreement', 'icon':'bi-chat-left-text', 'bg':'#FDF2F8', 'color':'#EC4899', 'flex':'1 1 150px', 'minw':'150px'},
+      ] %}
+      {% set _ar_visible = [] %}
+      {% for c in _ar_cats %}{% if ar_data.get(c.key, 0) > 0 %}{% set _ = _ar_visible.append(c) %}{% endif %}{% endfor %}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% for c in _ar_visible %}
+        {% if _ar_visible|length > 7 and loop.index == 7 %}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">{% endif %}
+        <div style="background:{{ c.bg }};border-radius:8px;padding:14px 8px;display:flex;align-items:center;gap:7px;flex:{{ c.flex }};min-width:{{ c.minw }};">
+          <div style="font-size:18px;flex-shrink:0;"><i class="bi {{ c.icon }}" style="color:{{ c.color }};"></i></div>
+          <div style="min-width:0;flex:1;">
+            <div style="font-size:9px;color:{{ c.color }};font-weight:700;text-transform:uppercase;letter-spacing:0;line-height:1.25;white-space:nowrap;">{{ c.label }}</div>
+            <div style="font-size:15px;font-weight:800;color:{{ c.color }};line-height:1.3;">{{ currency_symbol }}{{ "{:,.0f}".format(ar_data.get(c.key, 0)) }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Total AR -->
+      <div style="padding-top:12px;text-align:center;">
+        <span style="color:#64748B;font-size:12px;font-weight:600;">Total Accounts Receivable:</span>
+        <span style="font-size:16px;font-weight:800;color:#0D9488;margin-left:8px;">{{ currency_symbol }}{{ "{:,.0f}".format(ar_total) }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ?? Projects Overview ?????????????????????????????????????????????????? -->
+{% if 'projects' in allowed_pages %}
+<div class="row g-3 mb-4">
+  <!-- Left: Summary Stats -->
+  <div class="col-12 col-lg-4">
+    <div class="card-panel" style="padding:20px;height:100%;">
+      <h6 class="mb-3" style="color:#0D9488;font-size:12px;font-weight:700;"><i class="bi bi-kanban me-1"></i>Project Summary</h6>
+
+      <!-- All Time -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">All Time</div>
+        <div class="row g-2">
+          <div class="col-6">
+            <div style="background:#F0FDFA;border-radius:8px;padding:12px;border:1px solid #A7F3D0;text-align:center;">
+              <div style="font-size:20px;font-weight:800;color:#0D9488;line-height:1;">{{ total_projects_all }}</div>
+              <div style="font-size:9px;color:#0D9488;font-weight:600;margin-top:3px;">Projects</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div style="background:#ECFDF5;border-radius:8px;padding:12px;border:1px solid #6EE7B7;text-align:center;">
+              <div style="font-size:13px;font-weight:800;color:#059669;line-height:1.2;">{{ currency_symbol }}{{ "{:,.0f}".format(proj_value_all) }}</div>
+              <div style="font-size:9px;color:#059669;font-weight:600;margin-top:3px;">Value</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:#e2e8f0;margin:16px 0;"></div>
+
+      <!-- This Year -->
+      <div>
+        <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">This Year</div>
+        <div class="row g-2">
+          <div class="col-6">
+            <div style="background:#EFF6FF;border-radius:8px;padding:12px;border:1px solid #BFDBFE;text-align:center;">
+              <div style="font-size:20px;font-weight:800;color:#0369A1;line-height:1;">{{ total_projects_2026 }}</div>
+              <div style="font-size:9px;color:#0369A1;font-weight:600;margin-top:3px;">Projects</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div style="background:#FFFBEB;border-radius:8px;padding:12px;border:1px solid #FCD34D;text-align:center;">
+              <div style="font-size:13px;font-weight:800;color:#D97706;line-height:1.2;">{{ currency_symbol }}{{ "{:,.0f}".format(proj_value_2026) }}</div>
+              <div style="font-size:9px;color:#D97706;font-weight:600;margin-top:3px;">Value</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Chart -->
+  <div class="col-12 col-lg-8">
+    <div class="card-panel" style="padding:20px;">
+      <div class="d-flex justify-content-between align-items-start flex-wrap mb-3" style="gap:10px;">
+        <div>
+          <h6 class="mb-1" style="color:#1e293b;font-size:12px;font-weight:700;"><i class="bi bi-bar-chart me-1" style="color:#10B981;"></i>Project Count vs Value</h6>
+          <p class="text-muted mb-0" style="font-size:10px;">Monthly breakdown — {{ cur_year }}</p>
+        </div>
+        {% if carryover_count %}
+        <div class="d-flex" style="gap:8px;">
+          <div style="background:#F0FDF4;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:7px;">
+            <i class="bi bi-folder2-open" style="color:#16a34a;font-size:16px;"></i>
+            <div>
+              <div style="font-size:9px;color:#16a34a;font-weight:700;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;">Carryover Project</div>
+              <div style="font-size:15px;font-weight:800;color:#16a34a;line-height:1.2;">{{ carryover_count }}</div>
+            </div>
+          </div>
+          <div style="background:#EFF6FF;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:7px;">
+            <i class="bi bi-database" style="color:#2563EB;font-size:16px;"></i>
+            <div>
+              <div style="font-size:9px;color:#2563EB;font-weight:700;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;">Carryover Project Value</div>
+              <div style="font-size:15px;font-weight:800;color:#2563EB;line-height:1.2;">{{ currency_symbol }}{{ "{:,.0f}".format(carryover_value) }}</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      <div style="position:relative;height:200px;">
+        <canvas id="projectsChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+
+<!-- Project Pipeline: one card per Projects-tab status (amount, status, project count) -->
+{% if 'projects' in allowed_pages and proj_pipeline %}
+{% set _pipe_total = namespace(count=0, amount=0) %}
+{% for _r in proj_pipeline %}{% set _pipe_total.count = _pipe_total.count + _r.count %}{% set _pipe_total.amount = _pipe_total.amount + _r.amount %}{% endfor %}
+<div class="card-panel mb-3">
+  <div class="panel-header d-flex justify-content-between align-items-center mb-3">
+    <h6 class="panel-title mb-0"><i class="bi bi-kanban me-1"></i>Project Pipeline
+      <span class="text-muted fw-normal" style="font-size:11px;margin-left:4px;">{{ _pipe_total.count }} project{{ 's' if _pipe_total.count != 1 }} &middot; {{ currency_symbol }}{{ "{:,.0f}".format(_pipe_total.amount) }} &middot; {{ cur_year }}</span>
+    </h6>
+    <a href="{{ url_for('projects') }}" class="text-teal small">View all &rarr;</a>
+  </div>
+
+  {% set _pipe_styles = {
+    'Not Started':             '#3B82F6',
+    'In Progress':             '#0D9488',
+    'Active':                  '#0D9488',
+    'Sent out_Invoiced':       '#16a34a',
+    'Sent out_Not Invoiced':   '#8B5CF6',
+    'Ready to Sent':           '#F59E0B',
+    'Fully Invoiced_Not paid':   '#EA580C',
+    'Fully Invoiced_Partially paid': '#CA8A04',
+    'Fully Invoiced_Fully paid':     '#16a34a',
+    'Partially Invoiced_Not paid':       '#6366F1',
+    'Partially Invoiced_paid': '#8B5CF6',
+    'On Hold':                 '#F59E0B',
+    'Scope Disagreement':      '#0891B2',
+    'Project Completion Issue':'#10B981',
+    'Completed':               '#16a34a',
+    'Cancelled':               '#F43F5E',
+  } %}
+  <div class="row g-2">
+    {% for r in proj_pipeline if r.count > 0 %}
+    {% set _ac = _pipe_styles.get(r.status, '#64748B') %}
+    <div class="col-6 col-md-4 col-xl-2">
+      <a href="{{ url_for('projects', status=r.status, tab='all-projects') }}" class="text-decoration-none" title="Open {{ r.status }} projects">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-top:3px solid {{ _ac }};border-radius:8px;padding:12px 10px;text-align:center;height:100%;">
+          <div style="font-size:1.15rem;font-weight:800;color:{{ _ac }};line-height:1.15;">{{ currency_symbol }}{{ "{:,.0f}".format(r.amount) }}</div>
+          <div style="font-size:12px;font-weight:600;color:#1e293b;margin-top:6px;line-height:1.3;overflow-wrap:anywhere;">{{ r.status }}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:3px;">{{ r.count }} project{{ 's' if r.count != 1 }}</div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ?? Action Queue ???????????????????????????????????????????????????????????? -->
+{% if followup_quotes or pending_expenses_dash %}
+<div class="row g-3 mb-3">
+
+  {% if followup_quotes %}
+  <div class="col-lg-6">
+    <div class="card-panel" style="height:100%;">
+      <div class="panel-header d-flex justify-content-between align-items-center mb-2">
+        <h6 class="panel-title mb-0"><i class="bi bi-alarm text-warning me-1"></i>Follow-up Due</h6>
+        {% if 'quotes' in allowed_pages %}
+        <a href="{{ url_for('quotes') }}" class="text-teal small">All quotes</a>
+        {% endif %}
+      </div>
+      {% for q in followup_quotes %}
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+        <div>
+          <div class="fw-500 small">{{ q.get('job_number','—') }} — {{ q.get('project_name') or (q.get('company_name') or q.get('client_name','—')) }}</div>
+          <div class="text-muted" style="font-size:0.75rem;">{{ q.get('company_name') or q.get('client_name','') }}{% if q.get('follow_up_date') %} — Due {{ q.get('follow_up_date') | format_date }}{% endif %}</div>
+        </div>
+        <div class="d-flex gap-1">
+          {% if 'quotes' in allowed_pages and q.get('firebase_id') %}
+          <a href="{{ url_for('quote_detail', quote_id=q.firebase_id) }}" class="btn btn-xs btn-outline-secondary">View</a>
+          {% endif %}
+          {% if 'projects' in allowed_pages and q.get('job_number') %}
+          <a href="{{ url_for('project_new') }}?from_quote={{ q.get('job_number','') }}" class="btn btn-xs btn-teal">Convert</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if pending_expenses_dash %}
+  <div class="col-lg-6">
+    <div class="card-panel" style="height:100%;">
+      <div class="panel-header d-flex justify-content-between align-items-center mb-2">
+        <h6 class="panel-title mb-0">
+          <i class="bi bi-receipt text-danger me-1"></i>Pending Expense Approvals
+          <span class="badge bg-danger ms-1" style="font-size:11px;">{{ pending_expenses_dash|length }}</span>
+        </h6>
+        <a href="{{ url_for('employees') }}#tab-emp-expenses" class="text-teal small">Review &#x2192;</a>
+      </div>
+      {% for e in pending_expenses_dash[:5] %}
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+        <div>
+          <div class="fw-500 small">{{ e.submitted_by_name or e.submitted_by_email or '—' }}</div>
+          <div class="text-muted" style="font-size:0.75rem;">{{ e.expense_name or e.description or '—' }} — {{ e.date | format_date }}</div>
+        </div>
+        <div class="fw-semibold text-success small">{{ currency_symbol }}{{ "{:,.2f}".format(e.get('amount',0)|float) }}</div>
+      </div>
+      {% endfor %}
+      {% if pending_expenses_dash|length > 5 %}
+      <div class="text-muted small text-center pt-2">+{{ pending_expenses_dash|length - 5 }} more</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+<!-- ?? KPI Cards ??????????????????????????????????????????????????????????????? -->
+<div class="row g-3 mb-3">
+
+  {% if 'financial' in allowed_pages %}
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card kpi-teal">
+      <div class="kpi-top">
+        <span class="kpi-label">Total Invoiced</span>
+        <i class="bi bi-receipt-cutoff kpi-icon-sm"></i>
+      </div>
+      <div class="kpi-value">{{ currency_symbol }}{{ "{:,.0f}".format(total_invoiced) }}</div>
+      <div class="kpi-sub">{{ total_invoices }} invoice{{ 's' if total_invoices != 1 else '' }}</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-xl-3">
+    {% set rate = ((total_paid / total_invoiced * 100) if total_invoiced > 0 else 0)|round|int %}
+    <div class="kpi-card kpi-green">
+      <div class="kpi-top">
+        <span class="kpi-label">Collected</span>
+        <i class="bi bi-check-circle-fill kpi-icon-sm"></i>
+      </div>
+      <div class="kpi-value">{{ currency_symbol }}{{ "{:,.0f}".format(total_paid) }}</div>
+      <div class="kpi-sub">{{ rate }}% collection rate</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:{{ rate }}%"></div></div>
+    </div>
+  </div>
+
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card kpi-amber">
+      <div class="kpi-top">
+        <span class="kpi-label">Outstanding</span>
+        <i class="bi bi-hourglass-split kpi-icon-sm"></i>
+      </div>
+      <div class="kpi-value">{{ currency_symbol }}{{ "{:,.0f}".format(total_outstanding) }}</div>
+      <div class="kpi-sub">pending payment</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="col-6 col-xl-3">
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-top">
+        <span class="kpi-label">Active Projects</span>
+        <i class="bi bi-kanban-fill kpi-icon-sm"></i>
+      </div>
+      <div class="kpi-value">{{ active_projects }}</div>
+      <div class="kpi-sub">{{ open_quotes }} open quote{{ 's' if open_quotes != 1 else '' }}</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ?? Module Overview ????????????????????????????????????????????????????????? -->
+<div class="row g-3 mb-4">
+
+  <!-- QUOTES -->
+  {% if 'quotes' in allowed_pages %}
+  <div class="col-12 col-lg-4">
+    <div class="card-panel h-100" style="border-top:3px solid #7C3AED;">
+      {% set _q_open = (quot_status_counts.get('Not Started', 0) + quot_status_counts.get('In Progress', 0)) %}
+      {% set _q_approved = quot_status_counts.get('Approved', 0) %}
+      {% set _q_widget_total = _q_open + _q_approved + quotes_converted %}
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0 fw-bold" style="color:#7C3AED;font-size:14px;">
+          <i class="bi bi-file-earmark-text me-1"></i>Quotes
+          <span class="text-muted fw-normal" style="font-size:11px;margin-left:4px;">{{ _q_widget_total }} total</span>
+        </h6>
+        <a href="{{ url_for('quotes') }}" class="btn btn-xs" style="background:#EDE9FE;color:#5B21B6;border:none;font-size:11px;padding:3px 10px;border-radius:4px;">View All →</a>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <div style="background:#EFF6FF;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;color:#1D4ED8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Open</div>
+            <div style="font-size:1.6rem;font-weight:800;color:#1D4ED8;line-height:1.1;">{{ _q_open }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#F0FDF4;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;color:#16a34a;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Approved</div>
+            <div style="font-size:1.6rem;font-weight:800;color:#16a34a;line-height:1.1;">{{ _q_approved }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#F0FDFA;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;color:#0D9488;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Converted</div>
+            <div style="font-size:1.6rem;font-weight:800;color:#0D9488;line-height:1.1;">{{ quotes_converted }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#FFFBEB;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;color:#D97706;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Win Rate</div>
+            <div style="font-size:1.6rem;font-weight:800;color:#D97706;line-height:1.1;">{{ quotes_conversion_rate }}%</div>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid #f1f5f9;padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;">
+        <div>
+          <div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Pipeline Value</div>
+          <div style="font-size:1.25rem;font-weight:800;color:#7C3AED;">{{ currency_symbol }}{{ "{:,.0f}".format(quotes_pipeline_value) }}</div>
+        </div>
+        {% if 'projects' in allowed_pages %}
+        <a href="{{ url_for('project_new') }}" class="btn btn-xs" style="background:#7C3AED;color:#fff;border:none;font-size:11px;padding:4px 10px;border-radius:4px;">
+          <i class="bi bi-plus me-1"></i>New Quote
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- PROJECTS -->
+  {% if 'projects' in allowed_pages %}
+  <div class="col-12 col-lg-4">
+    <div class="card-panel h-100" style="border-top:3px solid #0D9488;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0 fw-bold" style="color:#0D9488;font-size:14px;">
+          <i class="bi bi-kanban me-1"></i>Projects
+          <span class="text-muted fw-normal" style="font-size:11px;margin-left:4px;">{{ proj_status_counts.values()|sum }} total</span>
+        </h6>
+        <a href="{{ url_for('projects') }}" class="btn btn-xs" style="background:#F0FDFA;color:#0D9488;border:none;font-size:11px;padding:3px 10px;border-radius:4px;">View All →</a>
+      </div>
+      {% set _st_styles = {
+        'Not Started':             ('#EFF6FF', '#3B82F6'),
+        'In Progress':             ('#F0FDFA', '#0D9488'),
+        'Active':                  ('#F0FDFA', '#0D9488'),
+        'On Hold':                 ('#FFFBEB', '#F59E0B'),
+        'Completed':               ('#F0FDF4', '#16a34a'),
+        'Sent out_Invoiced':       ('#F0FDFA', '#0D9488'),
+        'Sent out_Not Invoiced':   ('#EFF6FF', '#6366F1'),
+        'Fully Invoiced_Not paid':   ('#FFF7ED', '#F97316'),
+        'Fully Invoiced_Partially paid': ('#FFFBEB', '#F59E0B'),
+        'Fully Invoiced_Fully paid':     ('#F0FDF4', '#16a34a'),
+        'Partially Invoiced_Not paid':       ('#EEF2FF', '#6366F1'),
+        'Partially Invoiced_paid': ('#F5F3FF', '#8B5CF6'),
+        'Ready to Sent':           ('#F5F3FF', '#8B5CF6'),
+        'Cancelled':               ('#FFF1F2', '#F43F5E'),
+      } %}
+      <div class="row g-2 mb-3">
+        {% for st, cnt in proj_status_counts.items() if st != 'In Progress' %}
+        {% set _bg, _ac = _st_styles.get(st, ('#F8FAFC', '#64748B')) %}
+        <div class="col-6">
+          <div style="background:{{ _bg }};border-radius:8px;padding:10px 12px;">
+            <div style="font-size:10px;color:{{ _ac }};font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ st }}">{{ st }}</div>
+            <div style="font-size:1.6rem;font-weight:800;color:{{ _ac }};line-height:1.1;">{{ cnt }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="border-top:1px solid #f1f5f9;padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;">
+        {% if 'financial' in allowed_pages %}
+        <div>
+          <div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Active Contract Value</div>
+          <div style="font-size:1.25rem;font-weight:800;color:#0D9488;">{{ currency_symbol }}{{ "{:,.0f}".format(proj_contract_active) }}</div>
+        </div>
+        {% else %}
+        <div></div>
+        {% endif %}
+        <a href="{{ url_for('project_new') }}" class="btn btn-xs" style="background:#0D9488;color:#fff;border:none;font-size:11px;padding:4px 10px;border-radius:4px;">
+          <i class="bi bi-plus me-1"></i>New Project
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- INVOICES -->
+  {% if 'invoicing' in allowed_pages %}
+  <div class="col-12 col-lg-4">
+    <div class="card-panel h-100" style="border-top:3px solid #0369A1;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0 fw-bold" style="color:#0369A1;font-size:14px;">
+          <i class="bi bi-receipt me-1"></i>Invoices
+          <span class="text-muted fw-normal" style="font-size:11px;margin-left:4px;">{{ total_invoices }} total</span>
+        </h6>
+        <a href="{{ url_for('invoicing') }}" class="btn btn-xs" style="background:#EFF6FF;color:#0369A1;border:none;font-size:11px;padding:3px 10px;border-radius:4px;">View All →</a>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <div style="background:#F0FDF4;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;color:#16a34a;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Paid / Partial</div>
+            <div style="font-size:1.6rem;font-weight:800;color:#16a34a;line-height:1.1;">{{ inv_status_counts.get('Paid', 0) + inv_status_counts.get('Partial', 0) }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#FFF7ED;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;color:#D97706;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Sent / Viewed</div>
+            <div style="font-size:1.6rem;font-weight:800;color:#D97706;line-height:1.1;">{{ inv_status_counts.get('Sent', 0) + inv_status_counts.get('Viewed', 0) }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#FEF2F2;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;color:#DC2626;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Overdue</div>
+            <div style="font-size:1.6rem;font-weight:800;color:#DC2626;line-height:1.1;">{{ overdue_count }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#F8FAFC;border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Draft</div>
+            <div style="font-size:1.6rem;font-weight:800;color:#64748b;line-height:1.1;">{{ inv_status_counts.get('Draft', 0) }}</div>
+          </div>
+        </div>
+      </div>
+      {% if 'financial' in allowed_pages %}
+      <div style="border-top:1px solid #f1f5f9;padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;">
+        <div>
+          <div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Overdue Amount</div>
+          <div style="font-size:1.25rem;font-weight:800;color:#DC2626;">{{ currency_symbol }}{{ "{:,.0f}".format(inv_overdue_amt) }}</div>
+        </div>
+        <div class="text-end">
+          <div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Collection Rate</div>
+          <div style="font-size:1.25rem;font-weight:800;color:#16a34a;">{{ ((total_paid / total_invoiced * 100) if total_invoiced > 0 else 0)|round|int }}%</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ?? Urgent Alerts (overdue + due in 3 days — silent when all clear) ????????? -->
+{% if reminder_overdue_invoices or reminder_due_soon %}
+<div class="card-panel mb-3" style="border-left:4px solid #DC2626;">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="panel-title mb-0">
+      <i class="bi bi-exclamation-triangle-fill me-2" style="color:#DC2626;"></i>Needs Attention
+      <span class="badge ms-1" style="background:#DC2626;color:#fff;">{{ reminder_overdue_invoices|length + reminder_due_soon|length }}</span>
+    </h6>
+    {% if 'invoicing' in allowed_pages %}
+    <a href="{{ url_for('invoicing') }}" class="text-muted small">All invoices</a>
+    {% endif %}
+  </div>
+
+  <div class="focus-list">
+    {% for inv in reminder_overdue_invoices %}
+    {% set meta = inv.get('meta', {}) or {} %}
+    <div class="focus-item" style="border-left:3px solid #DC2626;">
+      <div class="focus-badge" style="background:#FEF2F2;color:#DC2626;">
+        <i class="bi bi-exclamation-circle-fill"></i>
+      </div>
+      <div class="focus-body">
+        <div class="focus-title">
+          <strong>{{ meta.get('invoice_number','—') }}</strong> — {{ meta.get('company_name') or meta.get('client_name','—') }}
+          <span class="badge ms-1" style="background:#FEE2E2;color:#991B1B;font-size:0.68rem;">OVERDUE</span>
+        </div>
+        <div class="focus-sub">Due {{ meta.get('due_date','—') | format_date }} — {{ currency_symbol }}{{ "{:,.0f}".format(meta.get('total',0)|float) }}</div>
+      </div>
+      <div class="focus-actions">
+        {% if 'invoicing' in allowed_pages and inv.get('firebase_id') %}
+        <a href="{{ url_for('invoice_detail', invoice_id=inv.firebase_id) }}" class="btn btn-xs btn-danger">
+          <i class="bi bi-envelope me-1"></i>View &amp; Remind
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+
+    {% for inv in reminder_due_soon %}
+    {% set meta = inv.get('meta', {}) or {} %}
+    <div class="focus-item" style="border-left:3px solid #F97316;">
+      <div class="focus-badge" style="background:#FFF7ED;color:#EA580C;">
+        <i class="bi bi-clock-fill"></i>
+      </div>
+      <div class="focus-body">
+        <div class="focus-title">
+          <strong>{{ meta.get('invoice_number','—') }}</strong> — {{ meta.get('company_name') or meta.get('client_name','—') }}
+          <span class="badge ms-1" style="background:#FFEDD5;color:#C2410C;font-size:0.68rem;">DUE IN 3 DAYS</span>
+        </div>
+        <div class="focus-sub">Due {{ meta.get('due_date','—') | format_date }} — {{ currency_symbol }}{{ "{:,.0f}".format(meta.get('total',0)|float) }}</div>
+      </div>
+      <div class="focus-actions">
+        {% if 'invoicing' in allowed_pages and inv.get('firebase_id') %}
+        <a href="{{ url_for('invoice_detail', invoice_id=inv.firebase_id) }}#pay" class="btn btn-xs btn-outline-warning">
+          <i class="bi bi-cash-coin me-1"></i>Record Payment
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ?? Team Status (Employees module) ???????????????????????????????????????? -->
+{% if 'employees' in allowed_pages and (clocked_in_now or pending_time_off or pending_expenses_dash) %}
+<div class="row g-3 mb-3">
+
+  {% if clocked_in_now %}
+  <div class="col-lg-6">
+    <div class="card-panel" style="height:100%;">
+      <div class="panel-header d-flex justify-content-between align-items-center mb-2">
+        <h6 class="panel-title mb-0"><i class="bi bi-record-circle-fill text-success me-1"></i>Clocked In Now ({{ clocked_in_now|length }})</h6>
+        <a href="{{ url_for('employees') }}#tab-team" class="text-teal small">Team ?</a>
+      </div>
+      {% for e in clocked_in_now %}
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+        <div>
+          <div class="fw-500 small">{{ e.employee_name }}</div>
+          <div class="text-muted" style="font-size:0.75rem;">{{ e.project_name or e.project_number or 'General / Admin' }}</div>
+        </div>
+        <div class="text-muted small">Since {{ e.clock_in[11:16] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+<!-- ?? Status Donut Charts ????????????????????????????????????????????????????? -->
+<div class="row g-3 mb-3 align-items-stretch">
+  <div class="col-lg-6 d-flex">
+    <div class="card-panel w-100" style="padding:20px 24px;display:flex;flex-direction:column;">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <button class="btn btn-sm btn-link p-0" style="text-decoration:none;color:#0D9488;font-weight:700;font-size:14px;border:none;cursor:pointer;" onclick="toggleSection('invDonutWrap', this)" type="button">
+          <i class="bi bi-chevron-right me-1 collapse-icon" style="display:inline-block;transition:transform 0.3s;transform:rotate(90deg);"></i>
+          <i class="bi bi-pie-chart me-1" style="color:#0D9488;"></i>Invoice Status Breakdown
+        </button>
+        <span class="badge" style="background:#f0fdf4;color:#0D9488;font-size:11px;font-weight:600;border-radius:8px;padding:4px 10px;" id="invTotalBadge"></span>
+      </div>
+      <div class="d-flex align-items-center gap-4" style="flex:1;" id="invDonutWrap">
+        <div style="position:relative;width:150px;height:150px;flex-shrink:0;">
+          <canvas id="invStatusChart"></canvas>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;">
+            <div id="invCenterCount" style="font-size:22px;font-weight:800;color:#1e293b;line-height:1;"></div>
+            <div style="font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Total</div>
+          </div>
+        </div>
+        <div id="invStatusLegend" style="flex:1;max-height:180px;overflow-y:auto;"></div>
+      </div>
+      {% if 'invoicing' in allowed_pages %}
+      <div id="invEmptyState" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 0;">
+        <i class="bi bi-receipt" style="font-size:2rem;color:#cbd5e1;display:block;margin-bottom:8px;"></i>
+        <div class="text-muted small mb-2">No invoices created yet</div>
+        <a href="{{ url_for('invoicing') }}" class="btn btn-sm btn-outline-teal" style="font-size:12px;">Create First Invoice</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-lg-6 d-flex">
+    <div class="card-panel w-100" style="padding:20px 24px;display:flex;flex-direction:column;">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <button class="btn btn-sm btn-link p-0" style="text-decoration:none;color:#7C3AED;font-weight:700;font-size:14px;border:none;cursor:pointer;" onclick="toggleSection('projDonutWrap', this)" type="button">
+          <i class="bi bi-chevron-right me-1 collapse-icon" style="display:inline-block;transition:transform 0.3s;transform:rotate(90deg);"></i>
+          <i class="bi bi-kanban me-1" style="color:#7C3AED;"></i>Project Status Breakdown
+        </button>
+        <span class="badge" style="background:#faf5ff;color:#7C3AED;font-size:11px;font-weight:600;border-radius:8px;padding:4px 10px;" id="projTotalBadge"></span>
+      </div>
+      <div class="d-flex align-items-center gap-4" style="flex:1;" id="projDonutWrap">
+        <div style="position:relative;width:150px;height:150px;flex-shrink:0;">
+          <canvas id="projStatusChart"></canvas>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;">
+            <div id="projCenterCount" style="font-size:22px;font-weight:800;color:#1e293b;line-height:1;"></div>
+            <div style="font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Total</div>
+          </div>
+        </div>
+        <div id="projStatusLegend" style="flex:1;max-height:180px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ?? Revenue Chart + Recent Invoices ??????????????????????????????????????? -->
+<div class="row g-3 mb-3">
+
+  {% if 'financial' in allowed_pages %}
+  <div class="col-lg-7">
+    <div class="card-panel" style="height:100%;">
+      <div class="panel-header d-flex justify-content-between align-items-center">
+        <button class="btn btn-sm btn-link p-0" style="text-decoration:none;color:#1e293b;font-weight:700;font-size:14px;border:none;cursor:pointer;" onclick="toggleSection('revenueChartWrap', this)" type="button">
+          <i class="bi bi-chevron-right me-1 collapse-icon" style="display:inline-block;transition:transform 0.3s;transform:rotate(90deg);"></i>
+          Revenue Overview — Last 6 Months
+        </button>
+        {% if 'invoicing' in allowed_pages %}
+        <a href="{{ url_for('invoicing') }}" class="text-teal small">View invoices →</a>
+        {% endif %}
+      </div>
+      <div id="revenueChartWrap">
+        <canvas id="revenueChart" height="140"></canvas>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="{{ 'col-lg-5' if 'financial' in allowed_pages else 'col-lg-12' }}">
+    <div class="card-panel" style="height:100%;">
+      <div class="panel-header d-flex justify-content-between align-items-center">
+        <button class="btn btn-sm btn-link p-0" style="text-decoration:none;color:#1e293b;font-weight:700;font-size:14px;border:none;cursor:pointer;" onclick="toggleSection('recentInvoicesWrap', this)" type="button">
+          <i class="bi bi-chevron-right me-1 collapse-icon" style="display:inline-block;transition:transform 0.3s;transform:rotate(90deg);"></i>
+          Recent Invoices
+        </button>
+        {% if 'invoicing' in allowed_pages %}
+        <a href="{{ url_for('invoicing') }}" class="text-teal small">View all →</a>
+        {% endif %}
+      </div>
+
+      <div id="recentInvoicesWrap">
+      {% for inv in recent_invoices %}
+      {% set meta = inv.get('meta', {}) %}
+      {% set client_display = meta.get('company_name') or meta.get('client_name','—') %}
+      <a href="{{ url_for('invoice_detail', invoice_id=inv.firebase_id) }}"
+         class="list-item text-decoration-none" style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="d-flex align-items-center gap-2">
+          <div class="inv-avatar">{{ client_display[0]|upper }}</div>
+          <div>
+            <div class="list-item-title">{{ meta.get('invoice_number','N/A') }}</div>
+            <div class="list-item-sub">{{ client_display }}</div>
+          </div>
+        </div>
+        <div class="text-end">
+          {% if 'financial' in allowed_pages %}
+          <div class="list-item-amount">{{ currency_symbol }}{{ "{:,.0f}".format(meta.get('total',0)|float) }}</div>
+          {% endif %}
+          {{ status_badge(meta.get('status'), 'Draft') }}
+        </div>
+      </a>
+      {% else %}
+      <div class="empty-state py-4">
+        <i class="bi bi-receipt fs-2 d-block mb-2"></i>No invoices yet.
+      </div>
+      {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ?? Recent Projects ????????????????????????????????????????????????????????? -->
+<div class="card-panel">
+  <div class="panel-header d-flex justify-content-between align-items-center">
+    <button class="btn btn-sm btn-link p-0" style="text-decoration:none;color:#1e293b;font-weight:700;font-size:14px;border:none;cursor:pointer;" onclick="toggleSection('recentProjectsWrap', this)" type="button">
+      <i class="bi bi-chevron-right me-1 collapse-icon" style="display:inline-block;transition:transform 0.3s;transform:rotate(90deg);"></i>
+      Recent Projects
+    </button>
+    {% if 'projects' in allowed_pages %}
+    <a href="{{ url_for('projects') }}" class="text-teal small">View all →</a>
+    {% endif %}
+  </div>
+
+  <div id="recentProjectsWrap">
+  {% if recent_projects %}
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Project #</th>
+          <th>Name</th>
+          <th>Client</th>
+          <th>Status</th>
+          {% if 'financial' in allowed_pages %}
+          <th class="text-end">Contract Value</th>
+          <th class="text-end">Amount Paid</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in recent_projects %}
+        <tr onclick="location.href='{{ url_for('project_detail', project_id=p.firebase_id) }}'"
+            style="cursor:pointer;">
+          <td><span class="fw-bold text-teal">{{ p.get('project_number','—') }}</span></td>
+          <td class="fw-500">{{ p.get('project_name','—') }}</td>
+          <td class="text-muted">{{ p.get('company_name') or p.get('client_name','—') }}</td>
+          <td>
+            {{ status_badge(p.get('status'), 'Not Started') }}
+          </td>
+          {% if 'financial' in allowed_pages %}
+          <td class="text-end fw-bold">{{ currency_symbol }}{{ "{:,.0f}".format(p.get('contract_value',0)|float) }}</td>
+          <td class="text-end text-success fw-bold">{{ currency_symbol }}{{ "{:,.0f}".format(p.get('amount_paid',0)|float) }}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state py-4">
+    <i class="bi bi-kanban fs-2 d-block mb-2"></i>No projects yet.
+  </div>
+  {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Paired sections that expand/collapse together
+const sectionPairs = {
+  'invDonutWrap': 'projDonutWrap',
+  'projDonutWrap': 'invDonutWrap',
+  'revenueChartWrap': 'recentInvoicesWrap',
+  'recentInvoicesWrap': 'revenueChartWrap'
+};
+
+// Sections whose expanded display is flex (the rest use block).
+const flexSections = ['invDonutWrap', 'projDonutWrap', 'revenueChartWrap'];
+
+// invDonutWrap / projDonutWrap carry Bootstrap's `.d-flex` class, which sets
+// `display:flex !important` — a plain inline `style.display` can't override it,
+// so use setProperty(..., 'important') for both show and hide.
+function setSectionDisplay(section, show) {
+  if (!section) return;
+  if (show) {
+    const displayType = flexSections.includes(section.id) ? 'flex' : 'block';
+    section.style.setProperty('display', displayType, 'important');
+  } else {
+    section.style.setProperty('display', 'none', 'important');
+  }
+}
+
+function setChevron(buttonEl, show) {
+  if (!buttonEl) return;
+  const icon = buttonEl.querySelector('i.collapse-icon');
+  if (icon) icon.style.transform = show ? 'rotate(90deg)' : 'rotate(0deg)';
+}
+
+// Toggle section visibility with synchronized pairs
+function toggleSection(sectionId, buttonEl) {
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+
+  const shouldShow = window.getComputedStyle(section).display === 'none';
+
+  setSectionDisplay(section, shouldShow);
+  setChevron(buttonEl, shouldShow);
+
+  // Sync paired section (and its button) to the same state
+  const pairedId = sectionPairs[sectionId];
+  if (pairedId) {
+    setSectionDisplay(document.getElementById(pairedId), shouldShow);
+    setChevron(document.querySelector(`button[onclick*="${pairedId}"]`), shouldShow);
+  }
+
+  // Charts created while their container was hidden render at 0px — nudge
+  // Chart.js (responsive:true) to refit once the section becomes visible.
+  if (shouldShow) {
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
+  }
+}
+
+const labels = {{ chart_labels|safe }};
+const data   = {{ chart_data|safe }};
+
+const revenueCanvas = document.getElementById('revenueChart');
+if (revenueCanvas) {
+const ctx = revenueCanvas.getContext('2d');
+const grad = ctx.createLinearGradient(0, 0, 0, 300);
+grad.addColorStop(0, 'rgba(15,118,110,0.22)');
+grad.addColorStop(1, 'rgba(15,118,110,0)');
+
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'Revenue',
+      data: data,
+      backgroundColor: 'rgba(15,118,110,0.75)',
+      borderColor: '#0F766E',
+      borderWidth: 0,
+      borderRadius: 5,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0F172A',
+        titleFont: { size: 12 },
+        bodyFont: { size: 13, weight: '700' },
+        callbacks: { label: c => ' $' + c.parsed.y.toLocaleString() }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { font: { size: 11 }, color: '#94A3B8' }
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(0,0,0,.04)' },
+        ticks: {
+          font: { size: 11 }, color: '#94A3B8',
+          maxTicksLimit: 6,
+          callback: v => CURRENCY_SYMBOL + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)
+        }
+      }
+    }
+  }
+});
+}
+
+// ?? Status colour palette ????????????????????????????????????????????????????
+const STATUS_COLORS = {
+  'Draft':       '#64748B',
+  'Sent':        '#2563EB',
+  'Viewed':      '#7C3AED',
+  'Paid':        '#16A34A',
+  'Partial':     '#F59E0B',
+  'Overdue':     '#DC2626',
+  'Cancelled':   '#DB2777',
+  'Not Started': '#94A3B8',
+  'In Progress': '#0EA5E9',
+  'Active':      '#0D9488',
+  'On Hold':     '#D97706',
+  'Completed':   '#15803D',
+  'Invoiced':    '#059669',
+};
+// Fallback vivid palette for statuses not in the map
+const CHART_PALETTE = ['#2563EB','#16A34A','#F59E0B','#DC2626','#7C3AED','#0EA5E9','#DB2777','#0D9488'];
+function statusColors(labels) {
+  return labels.map((l, i) => STATUS_COLORS[l] || CHART_PALETTE[i % CHART_PALETTE.length]);
+}
+function buildDonutLegend(containerId, labels, data, colors) {
+  const total = data.reduce((a, b) => a + b, 0);
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = labels.map((lbl, i) => {
+    const pct = total > 0 ? Math.round(data[i] / total * 100) : 0;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${lbl}">${lbl}</div>
+        <div style="font-size:11px;color:#64748b;">${data[i]} <span style="font-weight:700;color:${colors[i]};">(${pct}%)</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+const donutOpts = () => ({
+  responsive: true, maintainAspectRatio: false, cutout: '68%',
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1e293b', padding: 10, cornerRadius: 8,
+      callbacks: {
+        label: c => {
+          const total = c.dataset.data.reduce((a, b) => a + b, 0);
+          const pct = total > 0 ? Math.round(c.parsed / total * 100) : 0;
+          return `  ${c.label}: ${c.parsed}  (${pct}%)`;
+        }
+      }
+    }
+  }
+});
+
+const invLabels = {{ inv_status_labels|safe }};
+const invData   = {{ inv_status_data|safe }};
+if (invLabels.length) {
+  const invColors = statusColors(invLabels);
+  const invTotal  = invData.reduce((a, b) => a + b, 0);
+  document.getElementById('invCenterCount').textContent = invTotal;
+  document.getElementById('invTotalBadge').textContent  = invTotal + ' invoices';
+  new Chart(document.getElementById('invStatusChart'), {
+    type: 'doughnut',
+    data: { labels: invLabels, datasets: [{ data: invData, backgroundColor: invColors, borderWidth: 3, borderColor: '#fff', hoverOffset: 6 }] },
+    options: donutOpts(),
+  });
+  buildDonutLegend('invStatusLegend', invLabels, invData, invColors);
+} else {
+  const wrap  = document.getElementById('invDonutWrap');
+  const empty = document.getElementById('invEmptyState');
+  setSectionDisplay(wrap, false);
+  if (empty) empty.style.display = 'flex';
+}
+
+const projLabels = {{ proj_status_labels|safe }};
+const projData   = {{ proj_status_data|safe }};
+if (projLabels.length) {
+  const projColors = statusColors(projLabels);
+  const projTotal  = projData.reduce((a, b) => a + b, 0);
+  document.getElementById('projCenterCount').textContent = projTotal;
+  document.getElementById('projTotalBadge').textContent  = projTotal + ' projects';
+  new Chart(document.getElementById('projStatusChart'), {
+    type: 'doughnut',
+    data: { labels: projLabels, datasets: [{ data: projData, backgroundColor: projColors, borderWidth: 3, borderColor: '#fff', hoverOffset: 6 }] },
+    options: donutOpts(),
+  });
+  buildDonutLegend('projStatusLegend', projLabels, projData, projColors);
+}
+
+// ?? Month-wise Projects Chart - Current Year Only (2026)
+const allProjChartLabels = {{ proj_chart_labels|safe }};
+const allProjChartCounts = {{ proj_chart_counts|safe }};
+const allProjChartValues = {{ proj_chart_values|safe }};
+const allProjChartOngoing = {{ proj_chart_ongoing|safe }};
+const allProjChartCancelled = {{ proj_chart_cancelled|safe }};
+
+// Filter for current year (2026) only
+const currentYear = new Date().getFullYear().toString();
+const projChartLabels = [];
+const projChartCounts = [];
+const projChartValues = [];
+const projChartOngoing = [];
+const projChartCancelled = [];
+
+for (let i = 0; i < allProjChartLabels.length; i++) {
+  if (allProjChartLabels[i].includes(currentYear)) {
+    projChartLabels.push(allProjChartLabels[i]);
+    projChartCounts.push(allProjChartCounts[i]);
+    projChartValues.push(allProjChartValues[i]);
+    projChartOngoing.push(allProjChartOngoing[i]);
+    projChartCancelled.push(allProjChartCancelled[i]);
+  }
+}
+
+// If no data for current year, show all 12 months as empty
+if (projChartLabels.length === 0) {
+  const currentDate = new Date();
+  for (let i = 0; i < 12; i++) {
+    const monthDate = new Date(currentDate.getFullYear(), i, 1);
+    projChartLabels.push(monthDate.toLocaleDateString('en-US', { month: 'short' }));
+    projChartCounts.push(0);
+    projChartValues.push(0);
+    projChartOngoing.push(0);
+    projChartCancelled.push(0);
+  }
+}
+
+const projCanvas = document.getElementById('projectsChart');
+if (projCanvas) {
+  const projCtx = projCanvas.getContext('2d');
+
+  // Create professional gradients like Finance Overview
+  const barGradient = projCtx.createLinearGradient(0, 0, 0, 200);
+  barGradient.addColorStop(0, 'rgba(16, 185, 129, 0.85)');
+  barGradient.addColorStop(1, 'rgba(16, 185, 129, 0.55)');
+
+  const lineGradient = projCtx.createLinearGradient(0, 0, 0, 200);
+  lineGradient.addColorStop(0, 'rgba(59, 130, 246, 0.15)');
+  lineGradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+  new Chart(projCtx, {
+    type: 'bar',
+    data: {
+      labels: projChartLabels,
+      datasets: [
+        {
+          label: 'Project Count',
+          data: projChartCounts,
+          backgroundColor: barGradient,
+          borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+          borderSkipped: false,
+          borderWidth: 0,
+          yAxisID: 'y',
+          order: 2,
+          barThickness: 'flex',
+          maxBarThickness: 28,
+          hoverBackgroundColor: 'rgba(5, 150, 105, 0.95)',
+        },
+        {
+          label: 'Not Yet Completed',
+          data: projChartOngoing,
+          backgroundColor: 'rgba(239, 68, 68, 0.75)',
+          borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+          borderSkipped: false,
+          borderWidth: 0,
+          yAxisID: 'y',
+          order: 2,
+          barThickness: 'flex',
+          maxBarThickness: 28,
+          hoverBackgroundColor: 'rgba(220, 38, 38, 0.95)',
+        },
+        {
+          label: 'Cancelled',
+          data: projChartCancelled,
+          backgroundColor: 'rgba(148, 163, 184, 0.75)',
+          borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+          borderSkipped: false,
+          borderWidth: 0,
+          yAxisID: 'y',
+          order: 2,
+          barThickness: 'flex',
+          maxBarThickness: 28,
+          hoverBackgroundColor: 'rgba(100, 116, 139, 0.95)',
+        },
+        {
+          label: 'Project Value',
+          data: projChartValues,
+          borderColor: '#3B82F6',
+          backgroundColor: lineGradient,
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.35,
+          yAxisID: 'y1',
+          pointBackgroundColor: '#3B82F6',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          pointRadius: 3.5,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#1D4ED8',
+          type: 'line',
+          order: 1,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: {
+        duration: 800,
+        easing: 'easeInOutQuart',
+        delay: (ctx) => ctx.dataIndex * 30
+      },
+      plugins: {
+        filler: { propagate: true },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            font: { size: 11, weight: '600' },
+            padding: 12,
+            usePointStyle: true,
+            pointStyle: 'circle',
+            color: '#1e293b',
+            boxWidth: 7,
+            boxHeight: 7
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(30, 41, 59, 0.95)',
+          padding: 10,
+          titleFont: { size: 11, weight: '700' },
+          bodyFont: { size: 10, weight: '600' },
+          borderColor: '#e2e8f0',
+          borderWidth: 1,
+          cornerRadius: 6,
+          displayColors: true,
+          boxPadding: 6,
+          callbacks: {
+            title: function(c) {
+              return c[0].label;
+            },
+            label: function(c) {
+              if (c.datasetIndex === 0) {
+                return 'Count: ' + c.parsed.y;
+              }
+              if (c.datasetIndex === 1) {
+                return 'Not Yet Completed: ' + c.parsed.y;
+              }
+              if (c.datasetIndex === 2) {
+                return 'Cancelled: ' + c.parsed.y;
+              }
+              return 'Value: ' + CURRENCY_SYMBOL + c.parsed.y.toLocaleString(undefined, {maximumFractionDigits: 0});
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false, drawBorder: false },
+          ticks: {
+            font: { size: 10, weight: '500' },
+            color: '#64748B',
+            padding: 6,
+            autoSkip: false,
+            maxRotation: 45,
+            minRotation: 0
+          },
+          border: { display: false }
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          ticks: {
+            font: { size: 9, weight: '500' },
+            color: '#64748B',
+            padding: 6,
+            maxTicksLimit: 3
+          },
+          grid: {
+            color: 'rgba(0,0,0,.04)',
+            drawBorder: false,
+            drawTicks: false
+          },
+          beginAtZero: true
+        },
+        y1: {
+          type: 'linear',
+          position: 'right',
+          ticks: {
+            font: { size: 9, weight: '500' },
+            color: '#3B82F6',
+            padding: 6,
+            maxTicksLimit: 3,
+            callback: v => CURRENCY_SYMBOL + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)
+          },
+          grid: { drawOnChartArea: false, drawBorder: false, drawTicks: false },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+// Initialize collapse/expand state on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // All collapsible sections start collapsed (minimized) — the user expands the
+  // ones they want. Paired sections share this state so a click never makes the
+  // sibling jump.
+  const collapsedSections = [
+    'invDonutWrap', 'projDonutWrap',
+    'revenueChartWrap', 'recentInvoicesWrap', 'recentProjectsWrap'
+  ];
+
+  collapsedSections.forEach(sectionId => {
+    const section = document.getElementById(sectionId);
+    const button = document.querySelector(`button[onclick*="${sectionId}"]`);
+    if (section && button) {
+      setSectionDisplay(section, false);
+      setChevron(button, false);
+    }
+  });
+});
+
+</script>
+{% endblock %}

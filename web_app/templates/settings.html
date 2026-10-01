@@ -1,0 +1,1422 @@
+﻿{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+{% set co    = settings.get('company', company) %}
+{% set em    = settings.get('email', {}) %}
+{% set ap    = settings.get('app', {}) %}
+
+{% set active_tab = request.args.get('tab', 'company') %}
+<!-- Tab nav -->
+<ul class="nav nav-tabs mb-4" id="settingsTabs">
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'company' }}" data-bs-toggle="tab" href="#tab-company">
+      <i class="bi bi-building me-1"></i>Company
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'logo' }}" data-bs-toggle="tab" href="#tab-logo">
+      <i class="bi bi-image me-1"></i>Logo
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'email' }}" data-bs-toggle="tab" href="#tab-email">
+      <i class="bi bi-envelope me-1"></i>Email / SMTP
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'app' }}" data-bs-toggle="tab" href="#tab-app">
+      <i class="bi bi-sliders me-1"></i>App Preferences
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'users' }}" data-bs-toggle="tab" href="#tab-users">
+      <i class="bi bi-people me-1"></i>Users
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'ai' }}" data-bs-toggle="tab" href="#tab-ai">
+      <i class="bi bi-robot me-1"></i>AI
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'activity' }}" data-bs-toggle="tab" href="#tab-activity">
+      <i class="bi bi-bar-chart-line me-1"></i>Activity
+    </a>
+  </li>
+  {% if user_role == 'admin' %}
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'tools' }}" data-bs-toggle="tab" href="#tab-tools">
+      <i class="bi bi-tools me-1"></i>Tools
+    </a>
+  </li>
+  <li class="nav-item">
+    {% set _perm_pending = permission_requests | selectattr('status','equalto','pending') | list | length %}
+    <a class="nav-link {{ 'active' if active_tab == 'permissions' }}" data-bs-toggle="tab" href="#tab-permissions">
+      <i class="bi bi-shield-lock me-1"></i>Permissions
+      {% if _perm_pending > 0 %}<span class="badge bg-danger ms-1" style="font-size:10px;">{{ _perm_pending }}</span>{% endif %}
+    </a>
+  </li>
+  {% endif %}
+</ul>
+
+<div class="tab-content">
+
+  <!-- ?? COMPANY ???????????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'company' }}" id="tab-company">
+    <div class="row">
+      <div class="col-lg-6">
+        <div class="card-panel">
+          <h6 class="section-heading">Company Information</h6>
+          <form method="POST" action="{{ url_for('settings_company') }}">
+            <div class="mb-3">
+              <label class="form-label">Company Name</label>
+              <input type="text" name="name" class="form-control"
+                     value="{{ co.get('name', '') }}" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Address</label>
+              <textarea name="address" class="form-control" rows="3">{{ co.get('address', '') }}</textarea>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control"
+                       value="{{ co.get('email', '') }}">
+              </div>
+              <div class="col-6">
+                <label class="form-label">Phone</label>
+                <input type="text" name="phone" class="form-control"
+                       value="{{ co.get('phone', '') }}">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Website</label>
+              <input type="text" name="website" class="form-control"
+                     value="{{ co.get('website', '') }}">
+            </div>
+
+            <h6 class="section-heading mt-4">Currency Settings</h6>
+            <div class="mb-3">
+              <label class="form-label">BDT Exchange Rate <span class="text-muted fw-normal">(1 USD = — BDT)</span></label>
+              <input type="number" name="bdt_exchange_rate" class="form-control"
+                     value="{{ co.get('bdt_exchange_rate', 110) }}"
+                     min="1" step="0.01" style="max-width:150px;">
+              <div class="form-text text-muted">Used to show USD — BDT equivalent for Outside America employees.</div>
+            </div>
+
+            <h6 class="section-heading mt-4">Invoice Defaults</h6>
+            <div class="mb-3">
+              <label class="form-label">Default Tax Rate (%)</label>
+              <input type="number" name="default_tax_rate" class="form-control"
+                     value="{{ co.get('default_tax_rate', 0) }}"
+                     min="0" max="100" step="0.01" style="max-width:150px;">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Default Terms &amp; Conditions</label>
+              <textarea name="default_terms" class="form-control" rows="3"
+                        placeholder="Thank you for your business!">{{ co.get('default_terms', '') }}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-teal btn-sm">
+              <i class="bi bi-save me-1"></i>Save Company Info
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? LOGO ??????????????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'logo' }}" id="tab-logo">
+    <div class="row">
+      <div class="col-lg-5">
+        <div class="card-panel">
+          <h6 class="section-heading">Company Logo</h6>
+
+          <!-- Current logo preview -->
+          <div class="mb-3 text-center">
+            <img src="{{ url_for('company_logo') }}"
+                 onerror="this.style.display='none';document.getElementById('noLogo').style.display='block';"
+                 style="max-height:120px;max-width:240px;border:1px solid #e5e7eb;border-radius:8px;padding:8px;"
+                 alt="Company logo">
+            <div id="noLogo" style="display:none;color:#9ca3af;padding:24px;border:2px dashed #e5e7eb;border-radius:8px;">
+              <i class="bi bi-image fs-2"></i><br>No logo set
+            </div>
+            {% if co.get('logo_path') %}
+            <div class="text-muted small mt-2">{{ co.get('logo_path') }}</div>
+            {% endif %}
+          </div>
+
+          <form method="POST" action="{{ url_for('settings_logo') }}"
+                enctype="multipart/form-data">
+            <div class="mb-3">
+              <label class="form-label">Upload New Logo</label>
+              <input type="file" name="logo" class="form-control"
+                     accept=".png,.jpg,.jpeg,.bmp">
+              <div class="form-text">PNG or JPG, recommended 300×100 px or similar.</div>
+            </div>
+            <button type="submit" class="btn btn-teal btn-sm">
+              <i class="bi bi-upload me-1"></i>Upload Logo
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? EMAIL / SMTP ???????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'email' }}" id="tab-email">
+    <div class="row">
+      <div class="col-lg-6">
+        <div class="card-panel">
+          <h6 class="section-heading">Email / SMTP Settings</h6>
+          <p class="text-muted small mb-3">
+            Used for sending invoices, welcome emails, and payment reminders.
+            For Gmail, use an <strong>App Password</strong> (not your regular password).
+          </p>
+          <form method="POST" action="{{ url_for('settings_email') }}">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" name="enabled"
+                     id="emailEnabled" {{ 'checked' if em.get('enabled') }}>
+              <label class="form-check-label fw-bold" for="emailEnabled">
+                Enable Email Sending
+              </label>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-8">
+                <label class="form-label">SMTP Host</label>
+                <input type="text" name="smtp_host" class="form-control"
+                       value="{{ em.get('smtp_host', 'smtp.gmail.com') }}"
+                       placeholder="smtp.gmail.com">
+              </div>
+              <div class="col-4">
+                <label class="form-label">Port</label>
+                <input type="number" name="smtp_port" class="form-control"
+                       value="{{ em.get('smtp_port', 587) }}"
+                       placeholder="587">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">SMTP Username / Email</label>
+              <input type="email" name="smtp_user" class="form-control"
+                     value="{{ em.get('smtp_user', '') }}"
+                     placeholder="your@gmail.com">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">SMTP Password / App Password</label>
+              <input type="password" name="smtp_password" class="form-control"
+                     value="{{ em.get('smtp_password', '') }}"
+                     placeholder="????????????">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">From Name</label>
+              <input type="text" name="from_name" class="form-control"
+                     value="{{ em.get('from_name', company.name) }}"
+                     placeholder="{{ company.name }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Reminder Days Before Due</label>
+              <input type="number" name="reminder_days_before" class="form-control"
+                     value="{{ em.get('reminder_days_before', 3) }}"
+                     min="1" max="30" style="max-width:150px;">
+            </div>
+            <button type="submit" class="btn btn-teal btn-sm">
+              <i class="bi bi-save me-1"></i>Save Email Settings
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? APP PREFERENCES ???????????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'app' }}" id="tab-app">
+    <div class="row">
+      <div class="col-lg-5">
+        <div class="card-panel">
+          <h6 class="section-heading">App Preferences</h6>
+          <form method="POST" action="{{ url_for('settings_app') }}">
+            <div class="mb-3">
+              <label class="form-label">Theme</label>
+              <select name="theme" class="form-select">
+                <option value="light" {{ 'selected' if ap.get('theme','light') == 'light' }}>
+                  Light
+                </option>
+                <option value="dark"  {{ 'selected' if ap.get('theme','light') == 'dark' }}>
+                  Dark
+                </option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Log Level</label>
+              <select name="log_level" class="form-select">
+                {% for lvl in ['DEBUG','INFO','WARNING','ERROR'] %}
+                <option value="{{ lvl }}" {{ 'selected' if ap.get('log_level','INFO') == lvl }}>
+                  {{ lvl }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox"
+                     name="auto_check_updates" id="autoUpdate"
+                     {{ 'checked' if ap.get('auto_check_updates', True) }}>
+              <label class="form-check-label" for="autoUpdate">
+                Auto-check for updates
+              </label>
+            </div>
+            <button type="submit" class="btn btn-teal btn-sm">
+              <i class="bi bi-save me-1"></i>Save Preferences
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? USERS ??????????????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'users' }}" id="tab-users">
+    <div class="row g-3">
+      <!-- Add user form -->
+      <div class="col-lg-4">
+        <div class="card-panel mb-3">
+          <h6 class="section-heading">Create New User</h6>
+          <form method="POST" action="{{ url_for('user_new') }}">
+            <div class="mb-2">
+              <label class="form-label">Username</label>
+              <input type="text" name="username" class="form-control form-control-sm" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Email Address</label>
+              <input type="email" name="email" class="form-control form-control-sm" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Password</label>
+              <input type="password" name="password" class="form-control form-control-sm"
+                     minlength="6" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Role</label>
+              <select name="role" class="form-select form-select-sm" id="createUserRole" onchange="toggleCreateCommission()">
+                <option value="sales">Sales — Quotes only</option>
+                <option value="projects">Projects — Projects &amp; Invoicing</option>
+                <option value="finance">Finance — Financial overview</option>
+                <option value="engineer">Engineer — Employee tab only</option>
+                <option value="administration">Administration — Projects, Invoicing, Clients &amp; Employees</option>
+                <option value="accountant">Accountant — Expense/Claim Approvals, Projects &amp; Invoicing</option>
+                <option value="admin">Admin — Full access</option>
+              </select>
+            </div>
+            <hr class="my-2">
+            <p class="text-muted mb-2" style="font-size:11px;"><i class="bi bi-person-badge me-1"></i>Employee details (optional)</p>
+            <div class="mb-2">
+              <label class="form-label">Job Title</label>
+              <input type="text" name="title" class="form-control form-control-sm" placeholder="e.g. Senior Engineer">
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Region</label>
+              <select name="region" class="form-select form-select-sm">
+                <option value="">— Select —</option>
+                <option value="Inside America">Inside America</option>
+                <option value="Outside America">Outside America</option>
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Hourly Rate ($)</label>
+              <input type="number" name="hourly_rate" class="form-control form-control-sm" placeholder="0.00" min="0" step="0.01">
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Monthly Salary ($)
+                <span class="text-muted" style="font-size:10px;">— auto-posts to Payroll</span>
+              </label>
+              <input type="number" name="monthly_salary" class="form-control form-control-sm" placeholder="0.00 (blank if hourly)" min="0" step="0.01">
+            </div>
+            <div id="createCommissionSection" style="display:none;">
+              <hr class="my-2">
+              <p class="text-muted mb-2" style="font-size:11px;"><i class="bi bi-percent me-1"></i>Commission settings</p>
+              <div class="mb-2" id="createEmployeeTypeField">
+                <label class="form-label">Employee Type</label>
+                <select name="employee_type" class="form-select form-select-sm">
+                  <option value="">— None —</option>
+                  <option value="full_time">Full Time</option>
+                  <option value="contractor">Contractor</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Commission Rate (%)</label>
+                <input type="number" name="commission_rate" class="form-control form-control-sm" placeholder="e.g. 5.0" min="0" max="100" step="0.01">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-teal btn-sm w-100">
+              <i class="bi bi-person-plus me-1"></i>Create User
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Users table -->
+      <div class="col-lg-8">
+        <div class="card-panel">
+          <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <h6 class="section-heading mb-0">User Management</h6>
+            <span class="text-muted small">{{ users|length }} user{{ 's' if users|length != 1 }}</span>
+          </div>
+
+          <!-- Role filter tabs -->
+          {% set _g_admin    = users | selectattr('role','equalto','admin')    | list %}
+          {% set _g_finance  = users | selectattr('role','equalto','finance')  | list %}
+          {% set _g_sales    = users | selectattr('role','equalto','sales')    | list %}
+          {% set _g_engineer = users | selectattr('role','equalto','engineer') | list %}
+          {% set _g_projects = users | selectattr('role','equalto','projects') | list %}
+          {% set _g_administration = users | selectattr('role','equalto','administration') | list %}
+          {% set _g_accountant = users | selectattr('role','equalto','accountant') | list %}
+
+          <ul class="nav nav-pills mb-3 gap-1" id="userRoleTabs" style="flex-wrap:wrap;">
+            <li class="nav-item">
+              <a class="nav-link py-1 px-3 active" data-bs-toggle="pill" href="#urole-all" style="font-size:12px;">
+                <i class="bi bi-people me-1"></i>All
+                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ users|length }}</span>
+              </a>
+            </li>
+            {% if _g_admin %}
+            <li class="nav-item">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-admin" style="font-size:12px;">
+                <i class="bi bi-shield-lock me-1"></i>Admin
+                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_admin|length }}</span>
+              </a>
+            </li>
+            {% endif %}
+            {% if _g_finance %}
+            <li class="nav-item">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-finance" style="font-size:12px;">
+                <i class="bi bi-bar-chart-line me-1"></i>Finance
+                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_finance|length }}</span>
+              </a>
+            </li>
+            {% endif %}
+            {% if _g_sales %}
+            <li class="nav-item">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-sales" style="font-size:12px;">
+                <i class="bi bi-megaphone me-1"></i>Sales
+                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_sales|length }}</span>
+              </a>
+            </li>
+            {% endif %}
+            {% if _g_engineer %}
+            <li class="nav-item">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-engineer" style="font-size:12px;">
+                <i class="bi bi-wrench me-1"></i>Engineers
+                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_engineer|length }}</span>
+              </a>
+            </li>
+            {% endif %}
+            {% if _g_projects %}
+            <li class="nav-item">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-projects" style="font-size:12px;">
+                <i class="bi bi-kanban me-1"></i>Projects
+                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_projects|length }}</span>
+              </a>
+            </li>
+            {% endif %}
+            {% if _g_administration %}
+            <li class="nav-item">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-administration" style="font-size:12px;">
+                <i class="bi bi-building me-1"></i>Administration
+                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_administration|length }}</span>
+              </a>
+            </li>
+            {% endif %}
+            {% if _g_accountant %}
+            <li class="nav-item">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-accountant" style="font-size:12px;">
+                <i class="bi bi-calculator me-1"></i>Accountant
+                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_accountant|length }}</span>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+
+          {% macro user_table(group, label) %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size:13px;">
+              <thead>
+                <tr>
+                  <th style="min-width:170px;">Name</th>
+                  <th style="min-width:110px;">Role</th>
+                  <th style="min-width:140px;">Title / Region</th>
+                  <th class="text-end" style="min-width:100px;">Compensation</th>
+                  <th class="text-center" style="min-width:90px;">Status</th>
+                  <th class="text-end" style="min-width:110px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for u in group %}
+                {% set _is_me = u.get('firebase_uid') == session.get('user_uid') %}
+                {% set _active = u.get('active', True) %}
+                {% set _role = u.get('role', 'sales') %}
+                <tr>
+                  <!-- Name -->
+                  <td>
+                    <div class="fw-semibold">
+                      {{ u.get('username','—') }}
+                      {% if _is_me %}<span class="badge bg-secondary ms-1" style="font-size:9px;">You</span>{% endif %}
+                    </div>
+                    <div class="text-muted" style="font-size:11px;">{{ u.get('email','—') }}</div>
+                  </td>
+                  <!-- Role (click the badge to change it — disabled for your own row,
+                       so you can't accidentally demote yourself out of Settings) -->
+                  <td>
+                    {% if _is_me %}
+                    <span class="badge badge-role-{{ _role }}" title="You can't change your own role">{{ _role|capitalize }}</span>
+                    {% else %}
+                    <form method="POST" action="{{ url_for('user_role_update', uid=u.firebase_uid) }}"
+                          class="role-edit-form d-inline-flex align-items-center gap-1">
+                      <select name="role" class="form-select form-select-sm role-edit-select"
+                              style="display:none;width:auto;font-size:11px;padding:2px 22px 2px 6px;"
+                              onchange="this.form.submit()"
+                              onblur="this.style.display='none';this.nextElementSibling.style.display='';">
+                        <option value="sales"          {{ 'selected' if _role=='sales' }}>Sales</option>
+                        <option value="projects"       {{ 'selected' if _role=='projects' }}>Projects</option>
+                        <option value="finance"        {{ 'selected' if _role=='finance' }}>Finance</option>
+                        <option value="engineer"       {{ 'selected' if _role=='engineer' }}>Engineer</option>
+                        <option value="administration" {{ 'selected' if _role=='administration' }}>Administration</option>
+                        <option value="accountant"     {{ 'selected' if _role=='accountant' }}>Accountant</option>
+                        <option value="admin"          {{ 'selected' if _role=='admin' }}>Admin</option>
+                      </select>
+                      <span class="badge badge-role-{{ _role }}" style="cursor:pointer;"
+                            title="Click to change role"
+                            onclick="this.style.display='none';this.previousElementSibling.style.display='';this.previousElementSibling.focus();">
+                        {{ _role|capitalize }}
+                      </span>
+                    </form>
+                    {% endif %}
+                    {% if _role == 'sales' %}
+                      {% set _cr = u.get('commission_rate', 0)|float %}
+                      {% set _et = u.get('employee_type', '') %}
+                      <div style="font-size:10px;color:#94a3b8;margin-top:3px;">
+                        {% if _cr > 0 %}{{ _cr }}% commission{% else %}<span style="color:#f59e0b;">rate not set</span>{% endif %}
+                        {% if _et %} — {{ 'FT' if _et == 'full_time' else 'Contractor' }}{% endif %}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <!-- Title / Region -->
+                  <td>
+                    <div>{{ u.get('title') or '—' }}</div>
+                    {% if u.get('region') %}
+                    <span class="badge" style="font-size:10px;background:{{ '#0D9488' if u.get('region')=='Inside America' else '#7C3AED' }};color:#fff;">{{ u.get('region') }}</span>
+                    {% endif %}
+                  </td>
+                  <!-- Compensation -->
+                  <td class="text-end">
+                    {% if u.get('hourly_rate') %}<div>{{ currency_symbol }}{{ '%.2f'|format(u.get('hourly_rate',0)|float) }}/hr</div>{% endif %}
+                    {% if u.get('monthly_salary') %}<div class="text-success fw-semibold">{{ currency_symbol }}{{ '%.0f'|format(u.get('monthly_salary',0)|float) }}/mo</div>{% endif %}
+                    {% if not u.get('hourly_rate') and not u.get('monthly_salary') %}<span class="text-muted">—</span>{% endif %}
+                  </td>
+                  <!-- Status (clickable toggle) -->
+                  <td class="text-center">
+                    <form method="POST" action="{{ url_for('user_toggle', uid=u.firebase_uid) }}" class="d-inline">
+                      <button type="submit" class="btn btn-xs border-0 p-0"
+                              title="{{ 'Deactivate' if _active else 'Activate' }}"
+                              style="background:none;">
+                        {% if _active %}
+                        <span class="badge bg-success" style="font-size:11px;cursor:pointer;">Active</span>
+                        {% else %}
+                        <span class="badge bg-secondary" style="font-size:11px;cursor:pointer;">Inactive</span>
+                        {% endif %}
+                      </button>
+                    </form>
+                  </td>
+                  <!-- Actions -->
+                  <td class="text-end">
+                    <div class="d-flex gap-1 justify-content-end">
+                      <button class="btn btn-xs btn-outline-primary edit-user-btn"
+                              data-uid="{{ u.firebase_uid }}"
+                              data-username="{{ u.get('username','') | e }}"
+                              data-email="{{ u.get('email','') | e }}"
+                              data-title="{{ u.get('title','') | e }}"
+                              data-region="{{ u.get('region','') | e }}"
+                              data-rate="{{ u.get('hourly_rate', 0) }}"
+                              data-salary="{{ u.get('monthly_salary', 0) }}"
+                              data-employee-type="{{ u.get('employee_type','') | e }}"
+                              data-commission-rate="{{ u.get('commission_rate', 0) }}"
+                              data-role="{{ _role | e }}"
+                              data-active="{{ 'true' if u.get('active', True) else 'false' }}"
+                              title="Edit Details">
+                        <i class="bi bi-pencil"></i> Edit
+                      </button>
+                      <button class="btn btn-xs btn-outline-info pages-btn"
+                              data-uid="{{ u.firebase_uid }}"
+                              data-name="{{ u.get('username','') | e }}"
+                              data-role="{{ _role }}"
+                              data-custompages="{{ (u.get('custom_pages') or []) | join(',') }}"
+                              title="Customize Pages{% if _role == 'accountant' %} (Grant Tabs){% endif %}">
+                        <i class="bi bi-layout-sidebar"></i>
+                      </button>
+                      <button class="btn btn-xs btn-outline-warning send-reset-btn"
+                              data-email="{{ u.get('email','') | e }}"
+                              data-name="{{ u.get('username','') | e }}"
+                              title="Send Password Reset Email">
+                        <i class="bi bi-envelope-arrow-up"></i>
+                      </button>
+                      {% if not _is_me %}
+                      <form method="POST"
+                            action="{{ url_for('user_delete', uid=u.firebase_uid) }}"
+                            onsubmit="return confirm('Delete {{ u.get('username','') }}? This cannot be undone.');"
+                            class="d-inline">
+                        <button type="submit" class="btn btn-xs btn-outline-danger" title="Delete">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="6" class="text-center text-muted py-3">
+                    <i class="bi bi-person-x me-1"></i>No {{ label }} users.
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endmacro %}
+
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="urole-all">
+              {{ user_table(users, 'matching') }}
+            </div>
+            {% if _g_admin %}
+            <div class="tab-pane fade" id="urole-admin">
+              {{ user_table(_g_admin, 'admin') }}
+            </div>
+            {% endif %}
+            {% if _g_finance %}
+            <div class="tab-pane fade" id="urole-finance">
+              {{ user_table(_g_finance, 'finance') }}
+            </div>
+            {% endif %}
+            {% if _g_sales %}
+            <div class="tab-pane fade" id="urole-sales">
+              {{ user_table(_g_sales, 'sales') }}
+            </div>
+            {% endif %}
+            {% if _g_engineer %}
+            <div class="tab-pane fade" id="urole-engineer">
+              {{ user_table(_g_engineer, 'engineer') }}
+            </div>
+            {% endif %}
+            {% if _g_projects %}
+            <div class="tab-pane fade" id="urole-projects">
+              {{ user_table(_g_projects, 'projects') }}
+            </div>
+            {% endif %}
+            {% if _g_administration %}
+            <div class="tab-pane fade" id="urole-administration">
+              {{ user_table(_g_administration, 'administration') }}
+            </div>
+            {% endif %}
+            {% if _g_accountant %}
+            <div class="tab-pane fade" id="urole-accountant">
+              {{ user_table(_g_accountant, 'accountant') }}
+            </div>
+            {% endif %}
+          </div><!-- /tab-content -->
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? AI ???????????????????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'ai' }}" id="tab-ai">
+    <div class="row">
+      <div class="col-lg-6">
+        <div class="card-panel">
+          <h6 class="section-heading">AI Configuration</h6>
+          <p class="text-muted small mb-3">
+            Enables PDF expense extraction, cash flow forecasting, overdue reminders, and project health summaries.
+            Get your free API key at <strong>console.anthropic.com</strong>.
+          </p>
+          <form method="POST" action="{{ url_for('settings_ai') }}">
+            <div class="mb-3">
+              <label class="form-label">Anthropic API Key</label>
+              <input type="password" name="anthropic_key" class="form-control font-monospace"
+                     placeholder="sk-ant-..."
+                     value="{{ settings.get('ai', {}).get('anthropic_key', '') }}">
+              <div class="form-text">Stored securely in your Firebase settings. Never shared.</div>
+            </div>
+            <button type="submit" class="btn btn-sm btn-teal">
+              <i class="bi bi-floppy me-1"></i>Save API Key
+            </button>
+          </form>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card-panel">
+          <h6 class="section-heading">What AI can do</h6>
+          <ul class="list-unstyled small text-muted mb-0">
+            <li class="mb-2"><i class="bi bi-filetype-pdf text-danger me-2"></i><strong>PDF Extraction</strong> — upload a vendor bill, AI fills the expense form automatically</li>
+            <li class="mb-2"><i class="bi bi-graph-up text-teal me-2"></i><strong>Cash Flow Forecast</strong> — predicts next 90 days of incoming payments</li>
+            <li class="mb-2"><i class="bi bi-envelope-exclamation text-warning me-2"></i><strong>Overdue Reminders</strong> — drafts a professional follow-up email per invoice</li>
+            <li class="mb-2"><i class="bi bi-heart-pulse text-blue me-2"></i><strong>Project Health</strong> — one-line status summary for each active project</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVITY -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'activity' }}" id="tab-activity">
+    <div class="card-panel">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h6 class="section-heading mb-0"><i class="bi bi-bar-chart-line me-1" style="color:#0D9488;"></i>Employee App Activity</h6>
+        <span class="text-muted small">Auto-refreshes on page load &nbsp;·&nbsp; Times in minutes</span>
+      </div>
+
+      {% if activity_summary %}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0" style="font-size:13px;">
+          <thead>
+            <tr style="background:#f1f5f9;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">
+              <th style="padding:10px 14px;">Employee</th>
+              <th style="padding:10px 14px;">Status</th>
+              <th style="padding:10px 14px;min-width:200px;">
+                <span style="color:#0D9488;">&#9679;</span> Open Time
+                <span class="text-muted fw-normal" style="font-size:10px;"> (session)</span>
+              </th>
+              <th style="padding:10px 14px;min-width:200px;">
+                <span style="color:#6366f1;">&#9679;</span> Operated Time
+                <span class="text-muted fw-normal" style="font-size:10px;"> (active clicks)</span>
+              </th>
+              <th style="padding:10px 14px;">This Week Open</th>
+              <th style="padding:10px 14px;">Last Seen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in activity_summary %}
+            {% set open_m   = a.get('today_open', 0)     | float %}
+            {% set oper_m   = a.get('today_operated', 0) | float %}
+            {% set wopen_m  = a.get('week_open', 0)      | float %}
+            {% set open_h   = (open_m  / 60) | int %}{% set open_mn  = (open_m  % 60) | int %}
+            {% set oper_h   = (oper_m  / 60) | int %}{% set oper_mn  = (oper_m  % 60) | int %}
+            {% set wopen_h  = (wopen_m / 60) | int %}{% set wopen_mn = (wopen_m % 60) | int %}
+            {% set open_bar = ((open_m / act_max_open) * 100) | int %}
+            {% set oper_bar = ((oper_m / act_max_oper) * 100) | int %}
+            <tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:12px 14px;">
+                <div class="d-flex align-items-center gap-2">
+                  <div style="width:34px;height:34px;border-radius:50%;background:#0D9488;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">
+                    {{ a.employee_name[0].upper() if a.employee_name else '?' }}
+                  </div>
+                  <span class="fw-semibold">{{ a.employee_name }}</span>
+                </div>
+              </td>
+              <td style="padding:12px 14px;">
+                {% if open_m > 0 %}
+                <span style="display:inline-flex;align-items:center;gap:4px;background:#dcfce7;color:#15803d;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;">
+                  <span style="width:6px;height:6px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Active Today
+                </span>
+                {% else %}
+                <span style="display:inline-flex;align-items:center;gap:4px;background:#f1f5f9;color:#64748b;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;">
+                  <span style="width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>Not Active
+                </span>
+                {% endif %}
+              </td>
+              <td style="padding:12px 14px;">
+                <div class="d-flex align-items-center gap-2">
+                  <div style="flex:1;background:#e2e8f0;border-radius:4px;height:8px;min-width:100px;">
+                    <div style="width:{{ open_bar }}%;background:#0D9488;height:8px;border-radius:4px;"></div>
+                  </div>
+                  <span class="fw-semibold" style="min-width:55px;text-align:right;color:{% if open_m > 0 %}#0f172a{% else %}#94a3b8{% endif %};">{% if open_h > 0 %}{{ open_h }}h {{ open_mn }}m{% elif open_mn > 0 %}{{ open_mn }}m{% else %}—{% endif %}</span>
+                </div>
+              </td>
+              <td style="padding:12px 14px;">
+                <div class="d-flex align-items-center gap-2">
+                  <div style="flex:1;background:#e2e8f0;border-radius:4px;height:8px;min-width:100px;">
+                    <div style="width:{{ oper_bar }}%;background:#6366f1;height:8px;border-radius:4px;"></div>
+                  </div>
+                  <span class="fw-semibold" style="min-width:55px;text-align:right;color:{% if oper_m > 0 %}#0f172a{% else %}#94a3b8{% endif %};">{% if oper_h > 0 %}{{ oper_h }}h {{ oper_mn }}m{% elif oper_mn > 0 %}{{ oper_mn }}m{% else %}—{% endif %}</span>
+                </div>
+              </td>
+              <td style="padding:12px 14px;color:#475569;">{% if wopen_h > 0 %}{{ wopen_h }}h {{ wopen_mn }}m{% elif wopen_mn > 0 %}{{ wopen_mn }}m{% else %}—{% endif %}</td>
+              <td style="padding:12px 14px;color:#64748b;font-size:12px;">
+                {{ a.last_seen_at[11:16] if a.last_seen_at and a.last_seen_at[:10] == now.strftime('%Y-%m-%d') else (a.last_seen_at[:10] if a.last_seen_at else '—') }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-bar-chart-line" style="font-size:2rem;opacity:.3;"></i>
+        <div class="mt-2">No activity recorded yet.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if user_role == 'admin' %}
+  <!-- ?? TOOLS ??????????????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'tools' }}" id="tab-tools">
+    <div class="card-panel">
+      <h6 class="section-heading mb-3"><i class="bi bi-tools me-1" style="color:#0D9488;"></i>Admin Tools</h6>
+
+      <!-- Fix project numbers -->
+      <div class="d-flex align-items-start justify-content-between py-3 border-bottom">
+        <div>
+          <div class="fw-600" style="font-size:14px;">Fix Project Numbers</div>
+          <div class="text-muted small mt-1">
+            Removes the extra dash from project numbers that were created with the old format.<br>
+            Example: <code>SKT-202607-136</code> &rarr; <code>SKT-202607136</code>
+          </div>
+        </div>
+        <form method="post" action="/settings/fix-project-numbers" class="ms-4 flex-shrink-0"
+              onsubmit="return confirm('Fix all project numbers? This cannot be undone.');">
+          <button type="submit" class="btn btn-sm btn-outline-teal">
+            <i class="bi bi-wrench me-1"></i>Run Fix
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? PERMISSIONS ????????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade {{ 'show active' if active_tab == 'permissions' }}" id="tab-permissions">
+    <div class="card-panel">
+      <h6 class="section-heading mb-3"><i class="bi bi-shield-lock me-1" style="color:#0D9488;"></i>Permission Requests</h6>
+      {% if permission_requests %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle" style="font-size:13px;">
+          <thead class="table-light">
+            <tr>
+              <th>Requested By</th>
+              <th>Action Requested</th>
+              <th>Notes</th>
+              <th>Page</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for req in permission_requests %}
+          <tr id="permrow-{{ req.firebase_id }}">
+            <td class="fw-semibold">{{ req.get('requested_by_name','—') }}</td>
+            <td>
+              {{ req.get('action','—') }}
+              {% if req.get('entity_label') %}
+              <div class="text-muted" style="font-size:11px;">{{ req.entity_label }}</div>
+              {% endif %}
+            </td>
+            <td class="text-muted">{{ req.get('notes','—') or '—' }}</td>
+            <td>{% if req.get('page_url') %}<button type="button" class="btn btn-xs btn-outline-secondary open-page-btn" data-url="{{ req.page_url | e }}" title="Open page"><i class="bi bi-box-arrow-up-right me-1"></i>Open Page</button>{% else %}—{% endif %}</td>
+            <td class="text-muted text-nowrap">{{ (req.get('requested_at','')[:10] | format_date) if req.get('requested_at') else '—' }}</td>
+            <td>
+              {% if req.get('status') == 'pending' %}
+                <span class="badge" style="background:#fef9c3;color:#92400e;">Pending</span>
+              {% elif req.get('status') == 'approved' %}
+                <span class="badge bg-success">Approved</span>
+                {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:11px;">{{ req.admin_notes }}</div>{% endif %}
+              {% elif req.get('status') == 'completed' %}
+                <span class="badge bg-secondary">Completed</span>
+                <div class="text-muted" style="font-size:11px;">Deleted by {{ req.get('requested_by_name','—') }}</div>
+              {% else %}
+                <span class="badge bg-danger">Denied</span>
+                {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:11px;">{{ req.admin_notes }}</div>{% endif %}
+              {% endif %}
+            </td>
+            <td class="text-center text-nowrap">
+              {% if req.get('status') == 'pending' %}
+              <button class="btn btn-xs btn-success me-1 approve-perm-btn" data-req-id="{{ req.firebase_id }}" data-page-url="{{ req.get('page_url','') | e }}" title="Approve — requester will be notified and can perform the delete">
+                <i class="bi bi-check2"></i> Approve
+              </button>
+              <button class="btn btn-xs btn-outline-danger deny-perm-btn" data-req-id="{{ req.firebase_id }}" title="Deny">
+                <i class="bi bi-x-lg"></i> Deny
+              </button>
+              {% else %}
+              <span class="text-muted small">
+                {% if req.get('status') == 'completed' %}Completed{% else %}Resolved{% endif %}
+                by {{ req.get('reviewed_by','—') }}
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-muted text-center py-4"><i class="bi bi-shield-check" style="font-size:32px;display:block;margin-bottom:8px;opacity:.4;"></i>No permission requests yet.</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+<!-- ?? Permission Request - Deny Modal ??????????????????????????????????????? -->
+<div class="modal fade" id="denyPermissionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">Deny Permission Request</h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pb-2">
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:12px;">Reason for Denying <span class="text-muted fw-normal">(optional)</span></label>
+          <textarea id="denyReason" class="form-control form-control-sm" placeholder="e.g., Already approved by another admin" rows="3" style="font-size:12px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-sm btn-danger" onclick="confirmDeny()">
+          <i class="bi bi-x-circle me-1"></i>Deny Request
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ?? Permission Request - Approve Modal ??????????????????????????????????? -->
+<div class="modal fade" id="approvePermissionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">Approve Permission Request</h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pb-2">
+        <p class="text-muted mb-0" style="font-size:12px;">
+          Approving this request will notify the requester and allow them to proceed with the delete action.
+        </p>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-sm btn-success" onclick="confirmApprove()">
+          <i class="bi bi-check-circle me-1"></i>Approve
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ?? Customize User Pages Modal ???????????????????????????????????????????? -->
+<div class="modal fade" id="userPagesModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">Customize Pages — <span id="pagesUserName"></span> <span id="pagesRoleBadge" class="badge ms-1" style="font-size:10px;"></span></h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-2">
+        <p class="text-muted mb-2" style="font-size:11px;">
+          Check the pages this user can access. Leave all checked = use role default.
+        </p>
+        <input type="hidden" id="pagesUid">
+        <input type="hidden" id="pagesRole">
+        <div id="pagesCheckboxes" class="d-flex flex-column gap-1" style="font-size:13px;">
+          {# rendered by JS #}
+        </div>
+        <div class="mt-2">
+          <button class="btn btn-xs btn-outline-secondary" onclick="resetPagesToRole()">
+            <i class="bi bi-arrow-counterclockwise"></i> Reset to Role Default
+          </button>
+        </div>
+        <div id="pagesMsg" class="mt-2" style="font-size:12px;"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="saveUserPages()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ?? Edit Employee Details Modal ???????????????????????????????????????????? -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+  <div class="modal-dialog modal-md">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="bi bi-person-gear me-1"></i>Edit User Details</h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pb-2">
+        <input type="hidden" id="editUid">
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label fw-semibold" style="font-size:12px;">Username</label>
+            <input type="text" id="editUsername" class="form-control form-control-sm" placeholder="Full name">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold" style="font-size:12px;">Email</label>
+            <input type="email" id="editEmail" class="form-control form-control-sm bg-light" readonly>
+          </div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label fw-semibold" style="font-size:12px;">Job Title</label>
+            <input type="text" id="editTitle" class="form-control form-control-sm" placeholder="e.g. Senior Engineer">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold" style="font-size:12px;">Status</label>
+            <select id="editStatus" class="form-select form-select-sm">
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label fw-semibold" style="font-size:12px;">Role</label>
+            <select id="editRole" class="form-select form-select-sm" onchange="onEditRoleChange()">
+              <option value="sales">Sales</option>
+              <option value="projects">Projects</option>
+              <option value="finance">Finance</option>
+              <option value="engineer">Engineer</option>
+              <option value="administration">Administration</option>
+              <option value="accountant">Accountant</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold" style="font-size:12px;">Region</label>
+            <select id="editRegion" class="form-select form-select-sm">
+              <option value="">— None —</option>
+              <option value="Inside America">Inside America</option>
+              <option value="Outside America">Outside America</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label fw-semibold" style="font-size:12px;">Hourly Rate ($)</label>
+            <input type="number" id="editHourlyRate" class="form-control form-control-sm" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold" style="font-size:12px;">Monthly Salary ($)</label>
+            <input type="number" id="editMonthlySalary" class="form-control form-control-sm" placeholder="0.00 (blank if hourly)" min="0" step="0.01">
+          </div>
+        </div>
+        <div id="editCommissionSection" style="display:none;border-top:1px solid #f1f5f9;padding-top:10px;margin-top:4px;">
+          <div class="row g-2 mb-3">
+            <div class="col-12 mb-1">
+              <span class="text-muted" style="font-size:11px;"><i class="bi bi-percent me-1"></i>Commission settings</span>
+            </div>
+            <div class="col-6" id="editEmployeeTypeField">
+              <label class="form-label fw-semibold" style="font-size:12px;">Employee Type</label>
+              <select id="editEmployeeType" class="form-select form-select-sm">
+                <option value="">— None —</option>
+                <option value="full_time">Full Time</option>
+                <option value="contractor">Contractor</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:12px;">Commission Rate (%)</label>
+              <input type="number" id="editCommissionRate" class="form-control form-control-sm" placeholder="e.g. 5.0" min="0" max="100" step="0.01">
+            </div>
+          </div>
+        </div>
+        <div id="editUserMsg" style="font-size:12px;"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="editSaveBtn" class="btn btn-sm btn-teal" onclick="saveUserDetails()"><i class="bi bi-check-circle me-1"></i>Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ALL_PAGES   = {{ all_pages | tojson }};
+
+function toggleCreateCommission() {
+  var roleEl = document.getElementById('createUserRole');
+  if (!roleEl) return;
+  var role = roleEl.value;
+  var commEl = document.getElementById('createCommissionSection');
+  if (commEl) commEl.style.display = (role === 'sales' || role === 'admin') ? '' : 'none';
+  var typeEl = document.getElementById('createEmployeeTypeField');
+  if (typeEl) typeEl.style.display = role === 'sales' ? '' : 'none';
+}
+const PAGE_LABELS = {{ page_labels | tojson }};
+const ROLE_DEFAULTS = {{ role_pages | tojson }};
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.edit-user-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      try {
+        var d = btn.dataset;
+        var uid = document.getElementById('editUid');
+        var username = document.getElementById('editUsername');
+        var email = document.getElementById('editEmail');
+        var title = document.getElementById('editTitle');
+        var region = document.getElementById('editRegion');
+        var hourlyRate = document.getElementById('editHourlyRate');
+        var monthlySalary = document.getElementById('editMonthlySalary');
+        var roleEl = document.getElementById('editRole');
+        var status = document.getElementById('editStatus');
+        var employeeType = document.getElementById('editEmployeeType');
+        var commissionRate = document.getElementById('editCommissionRate');
+
+        if (uid) uid.value = d.uid || '';
+        if (username) username.value = d.username || '';
+        if (email) email.value = d.email || '';
+        if (title) title.value = d.title || '';
+        if (region) region.value = d.region || '';
+        if (hourlyRate) hourlyRate.value = parseFloat(d.rate) > 0 ? parseFloat(d.rate) : '';
+        if (monthlySalary) monthlySalary.value = parseFloat(d.salary) > 0 ? parseFloat(d.salary) : '';
+        if (roleEl) roleEl.value = (d.role || 'sales').toLowerCase();
+        if (status) status.value = d.active || 'true';
+        var role = (d.role || '').toLowerCase();
+        if (employeeType) employeeType.value = d.employeeType || '';
+        if (commissionRate) commissionRate.value = parseFloat(d.commissionRate) > 0 ? parseFloat(d.commissionRate) : '';
+
+        var msgEl = document.getElementById('editUserMsg');
+        if (msgEl) msgEl.innerHTML = '';
+        var isSalesOrAdmin = role === 'sales' || role === 'admin';
+        var commEl = document.getElementById('editCommissionSection');
+        if (commEl) commEl.style.display = isSalesOrAdmin ? '' : 'none';
+        var typeEl = document.getElementById('editEmployeeTypeField');
+        if (typeEl) typeEl.style.display = role === 'sales' ? '' : 'none';
+        var editModal = document.getElementById('editUserModal');
+        if (editModal) new bootstrap.Modal(editModal).show();
+      } catch(e) {
+        console.error('Error in edit user button:', e);
+      }
+    });
+  });
+
+  document.querySelectorAll('.send-reset-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      try {
+        var email = btn.dataset.email;
+        var name  = btn.dataset.name;
+        if (!confirm('Send password reset email to ' + name + ' (' + email + ')?')) return;
+        btn.disabled = true;
+        fetch('/api/admin/send-reset-email', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({email: email})
+        }).then(r => r.json()).then(data => {
+          btn.disabled = false;
+          if (data.success) {
+            alert('Reset email sent to ' + email);
+          } else {
+            alert('Error: ' + data.error);
+          }
+        }).catch(err => {
+          btn.disabled = false;
+          console.error('Reset email error:', err);
+          alert('Network error. Please try again.');
+        });
+      } catch(e) {
+        btn.disabled = false;
+        console.error('Error in send reset button:', e);
+      }
+    });
+  });
+
+  document.querySelectorAll('.pages-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      try {
+        var uid   = btn.dataset.uid;
+        var name  = btn.dataset.name;
+        var role  = btn.dataset.role;
+        var saved;
+        var _cp = btn.dataset.custompages || '';
+        saved = _cp ? _cp.split(',') : [];
+        var pagesUidEl = document.getElementById('pagesUid');
+        if (pagesUidEl) pagesUidEl.value = uid;
+        var pagesRoleEl = document.getElementById('pagesRole');
+        if (pagesRoleEl) pagesRoleEl.value = role;
+        var pagesNameEl = document.getElementById('pagesUserName');
+        if (pagesNameEl) pagesNameEl.textContent = name;
+        var msgEl = document.getElementById('pagesMsg');
+        if (msgEl) msgEl.innerHTML = '';
+        var badge = document.getElementById('pagesRoleBadge');
+        if (badge) {
+          badge.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+          badge.style.background = {admin:'#dc2626',finance:'#0D9488',projects:'#7C3AED',engineer:'#0369a1',sales:'#d97706',administration:'#92400E',accountant:'#3730A3'}[role] || '#6b7280';
+          badge.style.color = '#fff';
+        }
+        buildPagesCheckboxes(role, saved);
+        var pagesModal = document.getElementById('userPagesModal');
+        if (pagesModal) new bootstrap.Modal(pagesModal).show();
+      } catch(e) {
+        console.error('Error in pages button:', e);
+      }
+    });
+  });
+});
+
+function onEditRoleChange() {
+  var roleEl = document.getElementById('editRole');
+  if (!roleEl) return;
+  var role = roleEl.value;
+  var isSalesOrAdmin = role === 'sales' || role === 'admin';
+  var commEl = document.getElementById('editCommissionSection');
+  if (commEl) commEl.style.display = isSalesOrAdmin ? '' : 'none';
+  var typeEl = document.getElementById('editEmployeeTypeField');
+  if (typeEl) typeEl.style.display = role === 'sales' ? '' : 'none';
+}
+
+async function saveUserDetails() {
+  var uid    = document.getElementById('editUid').value;
+  var msg    = document.getElementById('editUserMsg');
+  var role   = document.getElementById('editRole').value;
+  var saveBtn = document.getElementById('editSaveBtn');
+
+  if (!uid) { msg.innerHTML = '<span class="text-danger">Error: User ID missing</span>'; return; }
+  if (!saveBtn || saveBtn.disabled) return;
+
+  var body   = {
+    username:        document.getElementById('editUsername').value.trim(),
+    role:            role,
+    title:           document.getElementById('editTitle').value.trim(),
+    region:          document.getElementById('editRegion').value,
+    hourly_rate:     parseFloat(document.getElementById('editHourlyRate').value)     || 0,
+    monthly_salary:  parseFloat(document.getElementById('editMonthlySalary').value)  || 0,
+    employee_type:   role === 'admin' ? '' : document.getElementById('editEmployeeType').value,
+    commission_rate: parseFloat(document.getElementById('editCommissionRate').value) || 0,
+    active:          document.getElementById('editStatus').value === 'true',
+  };
+
+  saveBtn.disabled = true;
+  msg.innerHTML = '<span class="text-muted">Saving...</span>';
+
+  var timeoutId = setTimeout(function(){
+    location.reload();
+  }, 1500);
+
+  try {
+    var res = await fetch('/api/users/' + uid + '/details', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      console.error('Response not ok:', res.status);
+      msg.innerHTML = '<span class="text-danger">Error: ' + res.status + ' ' + res.statusText + '</span>';
+      saveBtn.disabled = false;
+      return;
+    }
+
+    var data = {};
+    try {
+      data = await res.json();
+    } catch(parseErr) {
+      console.error('Response parse error:', parseErr);
+      msg.innerHTML = '<span class="text-danger">Invalid response from server</span>';
+      saveBtn.disabled = false;
+      return;
+    }
+
+    if (data.error) {
+      msg.innerHTML = '<span class="text-danger">' + data.error + '</span>';
+      saveBtn.disabled = false;
+      return;
+    }
+
+    msg.innerHTML = '<span class="text-success">Saved!</span>';
+    setTimeout(function(){ location.reload(); }, 200);
+  } catch(e) {
+    clearTimeout(timeoutId);
+    console.error('Save error:', e);
+    msg.innerHTML = '<span class="text-danger">Request failed: ' + (e.message || 'Unknown error') + '</span>';
+    saveBtn.disabled = false;
+  }
+}
+
+function buildPagesCheckboxes(role, selectedPages) {
+  var defaults = ROLE_DEFAULTS[role] || [];
+  var active   = (selectedPages && selectedPages.length > 0) ? selectedPages : defaults;
+  var html = '';
+  ALL_PAGES.forEach(function(p) {
+    var checked  = active.indexOf(p) !== -1 ? 'checked' : '';
+    var isDefault = defaults.indexOf(p) !== -1;
+    var badge    = isDefault ? ' <span class="badge bg-secondary" style="font-size:9px;">role default</span>' : '';
+    html += '<div class="form-check">'
+          + '<input class="form-check-input pages-checkbox" type="checkbox" value="' + p + '" id="pc_' + p + '" ' + checked + '>'
+          + '<label class="form-check-label" for="pc_' + p + '">' + PAGE_LABELS[p] + badge + '</label>'
+          + '</div>';
+  });
+  document.getElementById('pagesCheckboxes').innerHTML = html;
+}
+
+function resetPagesToRole() {
+  var role     = document.getElementById('pagesRole').value;
+  var defaults = ROLE_DEFAULTS[role] || [];
+  document.querySelectorAll('.pages-checkbox').forEach(function(cb) {
+    cb.checked = defaults.indexOf(cb.value) !== -1;
+  });
+}
+
+async function saveUserPages() {
+  var uid  = document.getElementById('pagesUid').value;
+  var msg  = document.getElementById('pagesMsg');
+  var role = document.getElementById('pagesRole').value;
+  var pages = [];
+  document.querySelectorAll('.pages-checkbox:checked').forEach(function(cb) { pages.push(cb.value); });
+  var defaults = ROLE_DEFAULTS[role] || [];
+  var isDefault = defaults.length === pages.length && defaults.every(function(p){ return pages.indexOf(p) !== -1; });
+  var payload = isDefault ? [] : pages;
+  msg.innerHTML = '<span class="text-muted">Saving...</span>';
+  try {
+    var res  = await fetch('/api/users/' + uid + '/pages', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({custom_pages: payload})
+    });
+
+    if (!res.ok) {
+      console.error('Response not ok:', res.status);
+      msg.innerHTML = '<span class="text-danger">Error: ' + res.status + '</span>';
+      return;
+    }
+
+    var data = {};
+    try {
+      data = await res.json();
+    } catch(parseErr) {
+      console.error('Response parse error:', parseErr);
+      msg.innerHTML = '<span class="text-danger">Invalid response from server</span>';
+      return;
+    }
+
+    if (data.error) {
+      msg.innerHTML = '<span class="text-danger">' + data.error + '</span>';
+      return;
+    }
+
+    msg.innerHTML = '<span class="text-success">Saved!</span>';
+    setTimeout(function(){ location.reload(); }, 600);
+  } catch(e) {
+    console.error('Save pages error:', e);
+    msg.innerHTML = '<span class="text-danger">Request failed: ' + (e.message || 'Unknown error') + '</span>';
+  }
+}
+
+var currentPermReqId = null;
+var currentPageUrl = null;
+
+function submitPermissionRequest(action, notes) {
+  if (!currentPermReqId) return;
+  try {
+    fetch('/api/permission-requests/' + currentPermReqId + '/resolve', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: action, notes: notes})
+    })
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(data => {
+      if (!data.success) {
+        alert('Error: ' + (data.error || 'Unknown'));
+        return;
+      }
+      location.reload();
+    })
+    .catch(err => {
+      console.error('Permission request error:', err);
+      alert('Error: ' + (err.message || 'Request failed'));
+    });
+  } catch(e) {
+    console.error('Submit permission error:', e);
+  }
+}
+
+function confirmApprove() {
+  if (!currentPermReqId) return;
+  var modal = document.getElementById('approvePermissionModal');
+  if (modal) {
+    bootstrap.Modal.getInstance(modal).hide();
+  }
+  submitPermissionRequest('approve', '');
+}
+
+function confirmDeny() {
+  if (!currentPermReqId) return;
+  var denyReasonEl = document.getElementById('denyReason');
+  var reason = denyReasonEl ? denyReasonEl.value.trim() : '';
+  var modal = document.getElementById('denyPermissionModal');
+  if (modal) {
+    bootstrap.Modal.getInstance(modal).hide();
+  }
+  submitPermissionRequest('deny', reason);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Clear request ID when deny modal is dismissed (e.g., by Cancel button)
+  var denyModal = document.getElementById('denyPermissionModal');
+  if (denyModal) {
+    denyModal.addEventListener('hidden.bs.modal', function() {
+      currentPermReqId = null;
+    });
+  }
+
+  // Clear request ID when approve modal is dismissed (e.g., by Cancel button)
+  var approveModal = document.getElementById('approvePermissionModal');
+  if (approveModal) {
+    approveModal.addEventListener('hidden.bs.modal', function() {
+      currentPermReqId = null;
+    });
+  }
+
+  document.querySelectorAll('.approve-perm-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      currentPermReqId = this.dataset.reqId;
+      currentPageUrl = this.dataset.pageUrl;
+      var denyReasonEl = document.getElementById('denyReason');
+      if (denyReasonEl) denyReasonEl.value = '';
+      var approveModalEl = document.getElementById('approvePermissionModal');
+      if (approveModalEl) new bootstrap.Modal(approveModalEl).show();
+    });
+  });
+
+  document.querySelectorAll('.deny-perm-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      currentPermReqId = this.dataset.reqId;
+      var denyReasonEl = document.getElementById('denyReason');
+      if (denyReasonEl) denyReasonEl.value = '';
+      var denyModalEl = document.getElementById('denyPermissionModal');
+      if (denyModalEl) new bootstrap.Modal(denyModalEl).show();
+    });
+  });
+
+  document.querySelectorAll('.open-page-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      var storedUrl = this.dataset.url;
+      if (storedUrl) {
+        try {
+          // Extract path and hash from stored URL
+          var urlObj = new URL(storedUrl);
+          var pathWithHash = urlObj.pathname + urlObj.hash;
+
+          // Apply to current domain
+          var currentOrigin = window.location.origin;
+          var finalUrl = currentOrigin + pathWithHash;
+
+          window.open(finalUrl, '_blank');
+        } catch (e) {
+          // Fallback to stored URL if parsing fails
+          window.open(storedUrl, '_blank');
+        }
+      }
+    });
+  });
+});
+</script>
+{% endblock %}
+

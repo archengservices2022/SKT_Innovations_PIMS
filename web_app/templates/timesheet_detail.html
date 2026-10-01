@@ -1,0 +1,569 @@
+﻿{% extends "base.html" %}
+{% block title %}Timesheet — {{ sheet.employee_name }}{% endblock %}
+{% block page_title %}Timesheet Detail{% endblock %}
+
+{% block head %}
+<style>
+/* ?? Global ???????????????????????????????????????????????????? */
+.tsd * {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  box-sizing: border-box;
+}
+
+/* ?? Hero header ??????????????????????????????????????????????? */
+.tsd-hero {
+  background: linear-gradient(120deg, #0D9488 0%, #0369a1 100%);
+  border-radius: 14px;
+  padding: 22px 28px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.tsd-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,.4);
+}
+.tsd-emp-name { font-size: 18px; font-weight: 700; color: #fff; margin: 0; letter-spacing: -.2px; }
+.tsd-emp-week { font-size: 13px; color: rgba(255,255,255,.75); margin-top: 2px; font-weight: 400; }
+
+/* ?? Status badge ?????????????????????????????????????????????? */
+.sbadge {
+  display: inline-flex; align-items: center;
+  padding: 4px 14px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
+}
+.sb-approved  { background: #dcfce7; color: #15803d; }
+.sb-submitted { background: #dbeafe; color: #1e40af; }
+.sb-draft     { background: #ede9fe; color: #6d28d9; }
+.sb-rejected  { background: #fee2e2; color: #b91c1c; }
+
+/* ?? KPI strip ????????????????????????????????????????????????? */
+.tsd-kpi-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.tsd-kpi {
+  flex: 1; min-width: 120px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 18px 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+  border-left: 4px solid #e2e8f0;
+}
+.tsd-kpi.c-teal  { border-left-color: #0D9488; }
+.tsd-kpi.c-green { border-left-color: #16a34a; }
+.tsd-kpi.c-red   { border-left-color: #dc2626; }
+.tsd-kpi.c-blue  { border-left-color: #2563eb; }
+.tsd-kpi.c-slate { border-left-color: #64748b; }
+.tsd-kpi-val {
+  font-size: 24px; font-weight: 800;
+  color: #0f172a; letter-spacing: -.5px; line-height: 1;
+}
+.tsd-kpi-val.ot-color { color: #dc2626; }
+.tsd-kpi-val.muted    { color: #94a3b8; }
+.tsd-kpi-lbl {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px;
+  color: #94a3b8; margin-top: 5px;
+}
+
+/* ?? Main card ????????????????????????????????????????????????? */
+.tsd-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+  overflow: hidden;
+}
+
+/* ?? Table ????????????????????????????????????????????????????? */
+.tsd-table { width: 100%; border-collapse: collapse; }
+.tsd-table thead th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 12px 14px;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+.tsd-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #334155;
+  vertical-align: middle;
+}
+.tsd-table tbody tr:last-child td { border-bottom: none; }
+.tsd-table tbody tr:hover td { background: #fafbfc; }
+
+/* ?? Day group header ?????????????????????????????????????????? */
+.day-grp td {
+  background: #f1f5f9;
+  padding: 8px 14px;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+.day-grp-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.day-grp-badge {
+  background: #0D9488;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 9px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.day-grp-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  letter-spacing: -.1px;
+}
+
+/* ?? Entry type badge ?????????????????????????????????????????? */
+.etype {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+}
+.etype-work    { background: #f0fdfa; color: #0D9488; }
+.etype-holiday { background: #ede9fe; color: #6d28d9; }
+.etype-sick    { background: #fee2e2; color: #b91c1c; }
+.etype-pto     { background: #fff7ed; color: #c2410c; }
+
+/* ?? Hour values ??????????????????????????????????????????????? */
+.val-reg  { color: #0D9488; font-weight: 700; }
+.val-ot   { color: #dc2626; font-weight: 700; }
+.val-tot  { color: #1d4ed8; font-weight: 800; }
+.val-mute { color: #cbd5e1; }
+
+/* ?? Totals row ???????????????????????????????????????????????? */
+.tsd-totals td {
+  background: #f8fafc;
+  border-top: 2px solid #e2e8f0;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+/* ?? Status banners ???????????????????????????????????????????? */
+.tsd-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 22px;
+  font-size: 13px; font-weight: 500;
+  border-top: 1px solid;
+}
+.tsd-banner-approved { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+.tsd-banner-rejected { background: #fff1f2; border-color: #fecdd3; color: #b91c1c; }
+
+/* ?? Admin action bar ?????????????????????????????????????????? */
+.tsd-action-bar {
+  padding: 16px 22px;
+  border-top: 2px solid #f1f5f9;
+  display: flex; align-items: center; gap: 10px;
+  justify-content: flex-end; flex-wrap: wrap;
+  background: #fafbfc;
+}
+.tsd-action-label { font-size: 13px; color: #64748b; margin-right: 4px; }
+.tsd-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 20px; border-radius: 9px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid transparent; transition: all .15s;
+  text-decoration: none;
+}
+.tsd-btn.approve { background: #16a34a; color: #fff; }
+.tsd-btn.approve:hover { background: #15803d; }
+.tsd-btn.reject  { background: #fff; color: #dc2626; border-color: #fca5a5; }
+.tsd-btn.reject:hover  { background: #fee2e2; }
+.tsd-btn.edit    { background: #0D9488; color: #fff; }
+.tsd-btn.edit:hover    { background: #0b8075; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tsd">
+
+<!-- Back link -->
+<div class="mb-3">
+  <a href="{{ url_for('timesheets') }}" style="font-size:13px;font-weight:500;color:#64748b;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+    <i class="bi bi-arrow-left"></i> Back to Timesheets
+  </a>
+</div>
+
+<!-- Hero Header -->
+<div class="tsd-hero">
+  <div class="d-flex align-items-center gap-3">
+    <div class="tsd-avatar">{{ sheet.employee_name[0].upper() if sheet.employee_name else '—' }}</div>
+    <div>
+      <div class="tsd-emp-name">{{ sheet.employee_name or 'Unknown Employee' }}</div>
+      <div class="tsd-emp-week">Week of {{ sheet.week_of }}</div>
+    </div>
+  </div>
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <span class="sbadge sb-{{ sheet.status | lower }}">{{ sheet.status }}</span>
+    {% if is_admin or (sheet.status in ('Draft', 'Rejected') and sheet.employee_uid == user_uid) %}
+    <a href="{{ url_for('timesheets_submit', week=sheet.week_of, edit_uid=sheet.employee_uid if is_admin else '') }}" class="tsd-btn edit">
+      <i class="bi bi-pencil"></i> Edit
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- KPI Strip -->
+<div class="tsd-kpi-row">
+  <div class="tsd-kpi c-teal">
+    <div class="tsd-kpi-val">{{ "%.1f"|format(sheet.total_hours | float) }}</div>
+    <div class="tsd-kpi-lbl">Total Hours</div>
+  </div>
+  <div class="tsd-kpi c-green">
+    <div class="tsd-kpi-val">{{ "%.1f"|format(sheet.total_regular_hours | float) }}</div>
+    <div class="tsd-kpi-lbl">Regular</div>
+  </div>
+  <div class="tsd-kpi {% if sheet.total_overtime_hours | float > 0 %}c-red{% else %}c-slate{% endif %}">
+    <div class="tsd-kpi-val {% if sheet.total_overtime_hours | float > 0 %}ot-color{% else %}muted{% endif %}">
+      {{ "%.1f"|format(sheet.total_overtime_hours | float) }}
+    </div>
+    <div class="tsd-kpi-lbl">Overtime</div>
+  </div>
+  <div class="tsd-kpi c-blue">
+    <div class="tsd-kpi-val">{{ by_date | length }}</div>
+    <div class="tsd-kpi-lbl">Days Worked</div>
+  </div>
+  {% if sheet.submitted_at %}
+  <div class="tsd-kpi c-slate">
+    <div class="tsd-kpi-val" style="font-size:14px;font-weight:700;letter-spacing:0;padding-top:4px;">{{ sheet.submitted_at[:10] | format_date }}</div>
+    <div class="tsd-kpi-lbl">Submitted</div>
+  </div>
+  {% endif %}
+  {% if sheet.approved_at %}
+  <div class="tsd-kpi c-slate">
+    <div class="tsd-kpi-val" style="font-size:14px;font-weight:700;letter-spacing:0;padding-top:4px;">{{ sheet.approved_at[:10] | format_date }}</div>
+    <div class="tsd-kpi-lbl">Reviewed</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Entries Table Card -->
+<div class="tsd-card">
+  <div class="table-responsive">
+    <table class="tsd-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Project</th>
+          <th>Start</th>
+          <th>End</th>
+          <th style="text-align:right;">Reg Hrs</th>
+          <th style="text-align:right;">OT Hrs</th>
+          <th style="text-align:right;">Total</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if sheet.entries %}
+          {% set ns = namespace(prev_date='') %}
+          {% for entry in sheet.entries %}
+
+          {# ?? Day group header ?? #}
+          {% if entry.date != ns.prev_date %}
+          {% set _dow = entry.date | format_date if entry.date else '' %}
+          <tr class="day-grp">
+            <td colspan="9">
+              <div class="day-grp-inner">
+                <span class="day-grp-badge">
+                  {% if entry.date %}{{ entry.date[5:] | replace('-','/') }}{% endif %}
+                </span>
+                <span class="day-grp-label">{{ entry.date | format_date if entry.date else 'No date' }}</span>
+              </div>
+            </td>
+          </tr>
+          {% set ns.prev_date = entry.date %}
+          {% endif %}
+
+          {# ?? Entry row ?? #}
+          {% set etype = entry.entry_type | default('work') | lower %}
+          <tr>
+            <td style="color:#94a3b8;font-size:12px;white-space:nowrap;">{{ entry.date | format_date if entry.date else '—' }}</td>
+            <td>
+              {% if etype == 'holiday' %}
+                <span class="etype etype-holiday"><i class="bi bi-umbrella-fill"></i> Holiday</span>
+              {% elif etype == 'sick' %}
+                <span class="etype etype-sick"><i class="bi bi-heart-pulse-fill"></i> Sick</span>
+              {% elif etype == 'pto' %}
+                <span class="etype etype-pto"><i class="bi bi-calendar-heart-fill"></i> PTO</span>
+              {% else %}
+                <span class="etype etype-work"><i class="bi bi-briefcase-fill"></i> Work</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if entry.project_name %}
+                <span style="font-weight:600;color:#1e293b;">{{ entry.project_name }}</span>
+                {% if entry.project_number %}
+                  <span style="color:#94a3b8;font-size:11px;margin-left:4px;">{{ entry.project_number }}</span>
+                {% endif %}
+              {% else %}
+                <span style="color:#94a3b8;">General / Admin</span>
+              {% endif %}
+            </td>
+            <td style="font-variant-numeric:tabular-nums;white-space:nowrap;">
+              {% if entry.start_time %}
+                <span style="background:#f0fdfa;color:#0D9488;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;">{{ entry.start_time }}</span>
+              {% else %}<span class="val-mute">—</span>{% endif %}
+            </td>
+            <td style="font-variant-numeric:tabular-nums;white-space:nowrap;">
+              {% if entry.end_time %}
+                <span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;">{{ entry.end_time }}</span>
+              {% else %}<span class="val-mute">—</span>{% endif %}
+            </td>
+            <td style="text-align:right;">
+              {% if entry.regular_hours | float > 0 %}
+                <span class="val-reg">{{ "%.2f"|format(entry.regular_hours | float) }}</span>
+              {% else %}<span class="val-mute">0.00</span>{% endif %}
+            </td>
+            <td style="text-align:right;">
+              {% if entry.overtime_hours | float > 0 %}
+                <span class="val-ot">{{ "%.2f"|format(entry.overtime_hours | float) }}</span>
+              {% else %}<span class="val-mute">—</span>{% endif %}
+            </td>
+            <td style="text-align:right;">
+              <span class="val-tot">{{ "%.2f"|format(entry.total_hours | float) }}</span>
+            </td>
+            <td style="color:#64748b;font-size:12px;max-width:180px;">{{ entry.notes or '—' }}</td>
+          </tr>
+          {% endfor %}
+
+          {# ?? Totals row ?? #}
+          <tr class="tsd-totals">
+            <td colspan="5" style="text-align:right;font-weight:700;color:#475569;font-size:12px;letter-spacing:.3px;text-transform:uppercase;">Totals</td>
+            <td style="text-align:right;"><span class="val-reg">{{ "%.2f"|format(sheet.total_regular_hours | float) }}</span></td>
+            <td style="text-align:right;">
+              {% if sheet.total_overtime_hours | float > 0 %}
+                <span class="val-ot">{{ "%.2f"|format(sheet.total_overtime_hours | float) }}</span>
+              {% else %}<span class="val-mute">0.00</span>{% endif %}
+            </td>
+            <td style="text-align:right;"><span class="val-tot" style="font-size:14px;">{{ "%.2f"|format(sheet.total_hours | float) }}</span></td>
+            <td></td>
+          </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" style="text-align:center;padding:52px 20px;color:#94a3b8;">
+            <i class="bi bi-clipboard-x" style="font-size:2rem;display:block;margin-bottom:10px;"></i>
+            No entries recorded for this timesheet.
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Approved / Rejected banner -->
+  {% if sheet.status == 'Approved' %}
+  <div class="tsd-banner tsd-banner-approved">
+    <i class="bi bi-check-circle-fill"></i>
+    <span>Approved by <strong>{{ sheet.approved_by or 'manager' }}</strong>{% if sheet.approved_at %} — {{ sheet.approved_at[:10] | format_date }}{% endif %}</span>
+  </div>
+  {% elif sheet.status == 'Rejected' %}
+  <div class="tsd-banner tsd-banner-rejected">
+    <i class="bi bi-x-circle-fill"></i>
+    <span>Rejected by <strong>{{ sheet.approved_by or 'manager' }}</strong>{% if sheet.approved_at %} — {{ sheet.approved_at[:10] | format_date }}{% endif %}{% if sheet.rejection_notes %} ? {{ sheet.rejection_notes }}{% endif %}</span>
+  </div>
+  {% endif %}
+
+  <!-- Admin action bar -->
+  {% if is_admin and sheet.status == 'Submitted' %}
+  <div class="tsd-action-bar">
+    <span class="tsd-action-label"><i class="bi bi-hourglass-split me-1"></i>Awaiting your review:</span>
+    <button onclick="approveSheet('{{ sheet.firebase_id }}','approve')" class="tsd-btn approve">
+      <i class="bi bi-check2-circle"></i> Approve
+    </button>
+    <button onclick="approveSheet('{{ sheet.firebase_id }}','reject')" class="tsd-btn reject">
+      <i class="bi bi-x-circle"></i> Reject
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+</div><!-- /tsd -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showConfirmationDialog(action, sheetId, employeeName) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  `;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-width: 500px;
+    width: 90%;
+    overflow: hidden;
+  `;
+
+  let headerBg, headerText, titleText, bodyText;
+
+  if (action === 'approve') {
+    headerBg = '#10b981';
+    headerText = 'Confirm Approval';
+    titleText = `<i class="bi bi-check-circle-fill"></i> Approve Timesheet`;
+    bodyText = `You are about to approve <strong>${employeeName}'s</strong> timesheet. This action cannot be undone.`;
+  } else {
+    headerBg = '#ef4444';
+    headerText = 'Confirm Rejection';
+    titleText = `<i class="bi bi-x-circle-fill"></i> Reject Timesheet`;
+    bodyText = `You are about to reject <strong>${employeeName}'s</strong> timesheet. This action cannot be undone.`;
+  }
+
+  const header = document.createElement('div');
+  header.style.cssText = `
+    background: ${headerBg};
+    color: white;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 16px;
+  `;
+  header.innerHTML = titleText;
+
+  const body = document.createElement('div');
+  body.style.cssText = `
+    padding: 24px;
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.6;
+  `;
+
+  if (action === 'reject') {
+    body.innerHTML = `
+      <p style="margin-bottom: 16px;">${bodyText}</p>
+      <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">
+        Rejection Reason (optional):
+      </label>
+      <textarea id="rejectionReason" style="
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 13px;
+        resize: vertical;
+        min-height: 80px;
+        box-sizing: border-box;
+      " placeholder="Enter reason for rejection..."></textarea>
+    `;
+  } else {
+    body.innerHTML = `<p>${bodyText}</p>`;
+  }
+
+  const footer = document.createElement('div');
+  footer.style.cssText = `
+    padding: 18px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid #e2e8f0;
+  `;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = `
+    padding: 9px 18px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: white;
+    color: #334155;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  `;
+  cancelBtn.onclick = () => overlay.remove();
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.textContent = action === 'approve' ? 'Approve' : 'Reject';
+  confirmBtn.style.cssText = `
+    padding: 9px 18px;
+    border: none;
+    border-radius: 6px;
+    background: ${headerBg};
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  `;
+  confirmBtn.onclick = () => {
+    overlay.remove();
+    let notes = '';
+    if (action === 'reject') {
+      notes = document.getElementById('rejectionReason')?.value ?? '';
+    }
+    executeAction(sheetId, action, notes);
+  };
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(confirmBtn);
+
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function approveSheet(sheetId, action) {
+  const employeeName = document.querySelector('.tsd h5')?.textContent?.trim() || 'Employee';
+  showConfirmationDialog(action, sheetId, employeeName);
+}
+
+function executeAction(sheetId, action, notes = '') {
+  fetch(`/api/timesheets/${sheetId}/approve`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action, notes})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      location.reload();
+    } else {
+      alert('Error: ' + (d.error || 'Unknown error'));
+    }
+  })
+  .catch(() => alert('Network error. Please try again.'));
+}
+</script>
+{% endblock %}

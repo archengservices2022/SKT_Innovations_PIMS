@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ company.name }}{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/icon.png') }}" type="image/png">
+
+  <!-- Inter font (matches desktop) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Custom -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .notif-bell { position: relative; }
+    .notif-btn {
+      background: none; border: none; cursor: pointer; color: #6B7280;
+      font-size: 18px; padding: 4px 6px; position: relative; line-height: 1;
+    }
+    .notif-btn:hover { color: #1A2B3C; }
+    .notif-badge {
+      position: absolute; top: -1px; right: -3px;
+      background: #EF4444; color: #fff; font-size: 10px; font-weight: 700;
+      border-radius: 10px; padding: 1px 5px; min-width: 16px; text-align: center;
+      line-height: 14px; pointer-events: none;
+    }
+    .notif-dropdown {
+      position: absolute; right: 0; top: calc(100% + 8px); width: 340px;
+      background: #fff; border: 1px solid #E5E7EB; border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.14); z-index: 9999; max-height: 420px;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .notif-header {
+      padding: 12px 16px; border-bottom: 1px solid #E5E7EB;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; font-weight: 600; flex-shrink: 0;
+    }
+    .notif-mark-all { background: none; border: none; color: #6B7280; font-size: 12px; cursor: pointer; }
+    .notif-mark-all:hover { color: #1A2B3C; text-decoration: underline; }
+    #notifList { flex: 1; overflow-y: auto; }
+    .notif-list-inner { display: contents; }
+    .notif-item {
+      padding: 12px 16px; border-bottom: 1px solid #F3F4F6;
+      cursor: pointer; transition: background .1s;
+    }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-item:hover { background: #F9FAFB; }
+    .notif-item.unread { background: #EFF6FF; border-left: 3px solid #3B82F6; padding-left: 13px; }
+    .notif-item.unread:hover { background: #DBEAFE; }
+    .notif-title { font-size: 13px; font-weight: 600; color: #111827; }
+    .notif-msg { font-size: 12px; color: #6B7280; margin-top: 2px; line-height: 1.4; }
+    .notif-time { font-size: 11px; color: #9CA3AF; margin-top: 3px; }
+    .notif-empty { padding: 28px 16px; text-align: center; color: #9CA3AF; font-size: 13px; }
+    @media (prefers-color-scheme: dark) {
+      .notif-dropdown { background: #1e293b; border-color: #334155; }
+      .notif-header { border-color: #334155; color: #e2e8f0; }
+      .notif-item { border-color: #1e293b; }
+      .notif-item:hover { background: #334155; }
+      .notif-item.unread { background: #1e3a5f; }
+      .notif-title { color: #f1f5f9; }
+      .notif-msg { color: #94a3b8; }
+      .notif-btn { color: #94a3b8; }
+      .notif-btn:hover { color: #e2e8f0; }
+      .notif-mark-all { color: #94a3b8; }
+      .notif-mark-all:hover { color: #e2e8f0; }
+      #notifList { scrollbar-color: #475569 #1e293b; }
+      #notifList::-webkit-scrollbar { width: 6px; }
+      #notifList::-webkit-scrollbar-track { background: transparent; }
+      #notifList::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    }
+    #notifList { scrollbar-color: #d1d5db #f9fafb; }
+    #notifList::-webkit-scrollbar { width: 6px; }
+    #notifList::-webkit-scrollbar-track { background: transparent; }
+    #notifList::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+  </style>
+  {% block head %}{% endblock %}
+  <script>const CURRENCY_SYMBOL = "{{ currency_symbol }}";</script>
+</head>
+<body>
+
+<!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+
+  <!-- Brand / Logo -->
+  <div class="sidebar-brand">
+    <img src="{{ url_for('static', filename='skt_logo_wide.png') }}"
+         onerror="this.style.display='none';document.getElementById('sb-icon').style.display='flex';"
+         class="sb-logo-wide" alt="SKT Innovations">
+    <img src="{{ url_for('static', filename='skt_logo_icon.png') }}"
+         class="sb-logo-icon" alt="SKT">
+    <div class="sb-icon" id="sb-icon" style="display:none;">S</div>
+    <div class="brand-sub">Project &amp; Invoice Management</div>
+  </div>
+
+  <div class="sb-divider"></div>
+
+  <!-- Section label -->
+  <div class="sb-section-label">WORKSPACE</div>
+
+  <nav class="sidebar-nav">
+    {% if 'dashboard' in allowed_pages %}
+    <a href="{{ url_for('dashboard') }}"
+       class="nav-item accent-teal {% if request.endpoint == 'dashboard' %}active{% endif %}">
+      <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span>
+      <span class="nav-label">Dashboard</span>
+    </a>
+    {% endif %}
+
+    {% if 'sales_dashboard' in allowed_pages and user_role == 'sales' %}
+    <a href="{{ url_for('sales_dashboard') }}"
+       class="nav-item accent-teal {% if request.endpoint == 'sales_dashboard' %}active{% endif %}">
+      <span class="nav-icon"><i class="bi bi-speedometer2"></i></span>
+      <span class="nav-label">Dashboard</span>
+    </a>
+    {% endif %}
+
+    {% if 'quotes' in allowed_pages %}
+    <a href="{{ url_for('quotes') }}"
+       class="nav-item accent-blue {% if request.endpoint in ['quotes','quotes_new','quote_detail','quote_edit'] %}active{% endif %}">
+      <span class="nav-icon"><i class="bi bi-file-earmark-text-fill"></i></span>
+      <span class="nav-label">Quote Forms</span>
+    </a>
+    {% endif %}
+
+    {% if 'projects' in allowed_pages %}
+    <a href="{{ url_for('projects') }}"
+       class="nav-item accent-green {% if request.endpoint in ['projects','project_new','project_detail','project_edit'] %}active{% endif %}">
+      <span class="nav-icon"><i class="bi bi-kanban-fill"></i></span>
+      <span class="nav-label">Projects</span>
+    </a>
+    {% endif %}
+
+    {% if 'invoicing' in allowed_pages %}
+    <a href="{{ url_for('invoicing') }}"
+       class="nav-item accent-amber {% if request.endpoint in ['invoicing','invoice_new','invoice_detail'] %}active{% endif %}">
+      <span class="nav-icon"><i class="bi bi-receipt-cutoff"></i></span>
+      <span class="nav-label">Invoicing</span>
+    </a>
+    {% endif %}
+
+    {% if 'clients' in allowed_pages %}
+    <a href="{{ url_for('clients') }}"
+       class="nav-item {{ 'nav-sub' if 'invoicing' in allowed_pages }} accent-amber {% if request.endpoint in ['clients','client_new','client_edit'] %}active{% endif %}">
+      <span class="nav-icon"><i class="bi bi-people-fill"></i></span>
+      <span class="nav-label">Clients</span>
+    </a>
+    {% endif %}
+
+    {% if 'financial' in allowed_pages %}
+    {% set fin_active = request.path.startswith('/financial') %}
+    {% set fin_overview_active = request.endpoint == 'financial_overview' or (request.endpoint == 'financial' and request.args.get('tab', 'overview') == 'overview') %}
+    {% set fin_expenses_active = request.endpoint == 'financial_expenses' or (request.endpoint == 'financial' and request.args.get('tab', '') in ['expenses', 'archived-expenses']) %}
+    {% set fin_receivables_active = request.endpoint == 'financial_receivables' or (request.endpoint == 'financial' and request.args.get('tab', '') in ['ar-summary', 'aging']) %}
+    <div class="nav-group">
+      <button class="nav-item accent-teal nav-group-toggle w-100 {% if fin_active %}active{% endif %}"
+              onclick="toggleNavGroup(this)" type="button"
+              data-target="finSubNav"
+              style="border:none;background:none;text-align:left;cursor:pointer;">
+        <span class="nav-icon"><i class="bi bi-bar-chart-fill"></i></span>
+        <span class="nav-label">Finance</span>
+        <span class="nav-chevron ms-auto"><i class="bi bi-chevron-down" style="font-size:10px;transition:transform .2s;"></i></span>
+      </button>
+      <div id="finSubNav" class="nav-sub-group {% if not fin_active %}collapsed{% endif %}">
+        <a href="{{ url_for('financial_overview') }}"
+           class="nav-item nav-sub accent-teal {% if fin_overview_active %}active{% endif %}">
+          <span class="nav-icon"><i class="bi bi-graph-up"></i></span>
+          <span class="nav-label">Financial Overview</span>
+        </a>
+        <a href="{{ url_for('financial_expenses') }}"
+           class="nav-item nav-sub accent-orange {% if fin_expenses_active %}active{% endif %}">
+          <span class="nav-icon"><i class="bi bi-receipt"></i></span>
+          <span class="nav-label">Expenses</span>
+        </a>
+        <a href="{{ url_for('financial_receivables') }}"
+           class="nav-item nav-sub accent-blue {% if fin_receivables_active %}active{% endif %}">
+          <span class="nav-icon"><i class="bi bi-file-earmark-check"></i></span>
+          <span class="nav-label">Accounts Receivable</span>
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if 'employees' in allowed_pages or 'timesheets' in allowed_pages or 'payroll' in allowed_pages or 'reviews' in allowed_pages %}
+    {% set emp_active = request.endpoint in ['employees','employee_profile','timesheets','timesheets_submit','timesheet_detail','payroll','reviews','reviews_new','review_detail','review_edit','review_acknowledge','review_delete'] %}
+    <div class="nav-group">
+      <button class="nav-item accent-purple nav-group-toggle w-100 {% if emp_active %}active{% endif %}"
+              onclick="toggleNavGroup(this)" type="button"
+              data-target="empSubNav"
+              style="border:none;background:none;text-align:left;cursor:pointer;">
+        <span class="nav-icon"><i class="bi bi-people-fill"></i></span>
+        <span class="nav-label">Employees</span>
+        <span class="nav-chevron ms-auto"><i class="bi bi-chevron-down" style="font-size:10px;transition:transform .2s;"></i></span>
+      </button>
+      <div id="empSubNav" class="nav-sub-group {% if not emp_active %}collapsed{% endif %}">
+        {% if 'employees' in allowed_pages %}
+        <a href="{{ url_for('employees') }}#tab-team"
+           class="nav-item nav-sub accent-purple {% if request.endpoint in ['employees','employee_profile'] %}active{% endif %}">
+          <span class="nav-icon"><i class="bi bi-person-lines-fill"></i></span>
+          <span class="nav-label">Team</span>
+        </a>
+        {% endif %}
+        {% if 'timesheets' in allowed_pages %}
+        <a href="{{ url_for('timesheets') }}"
+           class="nav-item nav-sub accent-blue {% if request.endpoint in ['timesheets','timesheets_submit','timesheet_detail'] %}active{% endif %}">
+          <span class="nav-icon"><i class="bi bi-calendar-week-fill"></i></span>
+          <span class="nav-label">Timesheets</span>
+        </a>
+        {% endif %}
+        {% if 'payroll' in allowed_pages %}
+        <a href="{{ url_for('payroll') }}"
+           class="nav-item nav-sub accent-orange {% if request.endpoint == 'payroll' %}active{% endif %}">
+          <span class="nav-icon"><i class="bi bi-cash-coin"></i></span>
+          <span class="nav-label">Payroll</span>
+        </a>
+        {% endif %}
+        {% if 'reviews' in allowed_pages %}
+        <a href="{{ url_for('reviews') }}"
+           class="nav-item nav-sub accent-teal {% if request.endpoint in ['reviews','reviews_new','review_detail','review_edit','review_acknowledge','review_delete'] %}active{% endif %}">
+          <span class="nav-icon"><i class="bi bi-clipboard-check-fill"></i></span>
+          <span class="nav-label">Reviews</span>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if 'approvals' in allowed_pages %}
+    <a href="{{ url_for('approvals') }}"
+       class="nav-item accent-teal {% if request.endpoint == 'approvals' %}active{% endif %}"
+       id="approvalsNavItem">
+      <span class="nav-icon"><i class="bi bi-check-circle-fill"></i></span>
+      <span class="nav-label">Approvals</span>
+      <span class="badge bg-danger" id="approvalsCountBadge" style="font-size:9px;margin-left:6px;display:none;"></span>
+    </a>
+    {% endif %}
+  </nav>
+
+  <div class="sb-spacer"></div>
+  <div class="sb-divider"></div>
+
+  {% if 'settings' in allowed_pages %}
+  <a href="{{ url_for('settings') }}"
+     class="nav-item accent-teal {% if request.endpoint == 'settings' %}active{% endif %}"
+     style="margin:4px 0 0;">
+    <span class="nav-icon"><i class="bi bi-gear-fill"></i></span>
+    <span class="nav-label">Settings</span>
+  </a>
+  {% endif %}
+
+  <!-- Footer / User -->
+  <div class="sidebar-footer">
+    <div class="user-avatar">{{ user_name[0]|upper if user_name else 'U' }}</div>
+    <div class="user-details">
+      <div class="user-name">{{ user_name }}</div>
+      <div class="user-role-label">{{ user_role|capitalize }}</div>
+    </div>
+    <a href="{{ url_for('logout') }}" class="logout-btn" title="Sign Out">
+      <i class="bi bi-box-arrow-right"></i>
+    </a>
+  </div>
+</aside>
+
+<!-- Mobile sidebar overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ══ MAIN ══════════════════════════════════════════════════════════════════ -->
+<div class="main-wrapper">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="sidebar-toggle" id="sidebarToggle">
+      <i class="bi bi-list"></i>
+    </button>
+    <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+    <div class="topbar-right d-flex align-items-center gap-3">
+      <span class="topbar-date">{{ now.strftime('%b %d, %Y') }}</span>
+      <!-- Notification Bell -->
+      <div class="notif-bell" id="notifBell">
+        <button class="notif-btn" id="notifBtn" onclick="toggleNotifDropdown(event)" title="Notifications">
+          <i class="bi bi-bell-fill"></i>
+          <span class="notif-badge d-none" id="notifBadge">0</span>
+        </button>
+        <div class="notif-dropdown d-none" id="notifDropdown">
+          <div class="notif-header">
+            <span>Notifications</span>
+            <button class="notif-mark-all" onclick="markAllRead(event)">Mark all read</button>
+          </div>
+          <div id="notifList"><div class="notif-empty"><i class="bi bi-bell-slash" style="font-size:22px;opacity:.4;display:block;margin-bottom:6px;"></i>Loading…</div></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Flash messages -->
+  <div class="flash-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ 'danger' if cat == 'danger' else ('warning' if cat == 'warning' else 'success') }} alert-dismissible fade show alert-toast" role="alert">
+      <i class="bi bi-{% if cat == 'danger' %}exclamation-circle{% elif cat == 'warning' %}exclamation-triangle{% else %}check-circle{% endif %}-fill me-2"></i>
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endwith %}
+  </div>
+
+  <!-- Page content -->
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<!-- Permission Request Modal (shown for non-admin delete attempts) -->
+<div class="modal fade" id="_permReqModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-shield-lock me-2 text-warning"></i>Admin Permission Required</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning py-2 mb-3" style="font-size:13px;">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          You don't have permission to delete items. Request admin approval below.
+        </div>
+        <p class="small text-muted mb-3"><strong>Action:</strong> <span id="_permReqMsg"></span></p>
+        <div class="mb-2">
+          <label class="form-label form-label-sm">Reason <span class="text-muted fw-normal">(optional)</span></label>
+          <textarea id="_permReqNotes" class="form-control form-control-sm" rows="2" placeholder="Briefly explain why this needs to be deleted…"></textarea>
+        </div>
+        <input type="hidden" id="_permReqLabel">
+        <input type="hidden" id="_permReqUrl">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning btn-sm" onclick="_submitPermissionRequest()">
+          <i class="bi bi-send me-1"></i>Send Request to Admin
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap 5 JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ── Generic Table Paginator (available on every page) ─────────────────── -->
+<script>
+var _PAGERS = {};
+function _pagerGo(id, page) { if (_PAGERS[id]) _PAGERS[id].go(page); }
+
+function TablePager(id, tbodySelector, rowSelector, pageSize) {
+  this.id = id;
+  this.tbodySelector = tbodySelector;
+  this.rowSelector = rowSelector || 'tr';
+  this.pageSize = pageSize || 15;
+  this.page = 1;
+  _PAGERS[id] = this;
+}
+
+TablePager.prototype._allRows = function() {
+  var self = this;
+  var tbodies = typeof self.tbodySelector === 'string'
+    ? Array.from(document.querySelectorAll(self.tbodySelector))
+    : [self.tbodySelector];
+  var rows = [];
+  tbodies.forEach(function(tb) {
+    if (tb) Array.from(tb.querySelectorAll(self.rowSelector)).forEach(function(r) { rows.push(r); });
+  });
+  return rows;
+};
+
+TablePager.prototype._paginate = function() {
+  var self = this;
+  var vis = self._vis || [];
+  var totalPages = Math.max(1, Math.ceil(vis.length / self.pageSize));
+  if (self.page > totalPages) self.page = 1;
+  self._allRows().forEach(function(r) { r.style.display = 'none'; });
+  var start = (self.page - 1) * self.pageSize;
+  vis.slice(start, start + self.pageSize).forEach(function(r) { r.style.display = ''; });
+  self._render(totalPages, vis.length);
+};
+
+// refresh() — called after a filter runs; re-reads DOM display state to build visible list
+TablePager.prototype.refresh = function() {
+  var self = this;
+  var all = self._allRows();
+  // Filter-visible = rows the filter left showing (style.display !== 'none')
+  self._vis = all.filter(function(r) { return r.style.display !== 'none'; });
+  self._paginate();
+};
+
+// go() — called by page-button clicks; reuses saved _vis so pager-hidden rows aren't lost
+TablePager.prototype.go = function(p) { this.page = p; this._paginate(); };
+
+TablePager.prototype._render = function(totalPages, total) {
+  var self = this;
+  var el = document.getElementById(self.id + '_pager');
+  if (!el) return;
+  if (totalPages <= 1 && total <= self.pageSize) { el.innerHTML = ''; return; }
+  var prevDis = self.page === 1;
+  var nextDis = self.page === totalPages;
+  var btnBase = 'display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:14px;color:#374151;text-decoration:none;';
+  var btnDis  = btnBase + 'opacity:0.4;cursor:default;pointer-events:none;';
+  var html = '<div class="d-flex align-items-center justify-content-center gap-2 mt-3 pt-3" style="border-top:1px solid #e2e8f0;">';
+  var inputStyle = 'width:52px;height:32px;border:1px solid #d1d5db;border-radius:6px;background:#fff;font-size:14px;color:#374151;font-weight:600;text-align:center;padding:0 4px;outline:none;';
+  var goFn = 'var v=parseInt(this.value);if(v>=1&&v<=' + totalPages + ')_pagerGo(\'' + self.id + '\',v);else this.value=' + self.page + ';';
+  html += '<a href="#" onclick="event.preventDefault();' + (prevDis ? '' : '_pagerGo(\'' + self.id + '\',' + (self.page - 1) + ')') + '" style="' + (prevDis ? btnDis : btnBase) + '">&#8249;</a>';
+  html += '<input type="number" min="1" max="' + totalPages + '" value="' + self.page + '" title="Type page number and press Enter" style="' + inputStyle + '" onkeydown="if(event.key===\'Enter\'){' + goFn + '}" onblur="' + goFn + '">';
+  html += '<span style="font-size:14px;color:#6b7280;white-space:nowrap;">of ' + totalPages + '</span>';
+  html += '<a href="#" onclick="event.preventDefault();' + (nextDis ? '' : '_pagerGo(\'' + self.id + '\',' + (self.page + 1) + ')') + '" style="' + (nextDis ? btnDis : btnBase) + '">&#8250;</a>';
+  html += '</div>';
+  el.innerHTML = html;
+};
+
+// Helper: mark rows as filter-hidden then call pager.refresh()
+// Usage: pagerMarkAndRefresh(pager, allRows, visibleRows)
+function pagerMarkAndRefresh(pager, allRows, visSet) {
+  allRows.forEach(function(r) {
+    r.setAttribute('data-filter-hidden', visSet.has(r) ? '0' : '1');
+  });
+  pager.page = 1;
+  pager.refresh();
+}
+</script>
+
+{% block scripts %}{% endblock %}
+
+<script>
+// Expandable nav group toggle
+function toggleNavGroup(btn) {
+  var targetId = btn.getAttribute('data-target');
+  var sub = document.getElementById(targetId);
+  if (!sub) return;
+  var isCollapsed = sub.classList.contains('collapsed');
+  sub.classList.toggle('collapsed', !isCollapsed);
+  btn.classList.toggle('active', isCollapsed);
+}
+
+// Sidebar toggle — drawer on mobile, collapse on desktop
+var _sidebar  = document.getElementById('sidebar');
+var _overlay  = document.getElementById('sidebarOverlay');
+var _main     = document.querySelector('.main-wrapper');
+
+function _isMobile() { return window.innerWidth <= 768; }
+
+function _closeMobileSidebar() {
+  _sidebar.classList.remove('mobile-open');
+  _overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('sidebarToggle').addEventListener('click', function() {
+  if (_isMobile()) {
+    var opening = !_sidebar.classList.contains('mobile-open');
+    _sidebar.classList.toggle('mobile-open');
+    _overlay.classList.toggle('active');
+    document.body.style.overflow = opening ? 'hidden' : '';
+  } else {
+    _sidebar.classList.toggle('collapsed');
+    _main.classList.toggle('sidebar-collapsed');
+  }
+});
+
+// Close drawer when overlay is clicked
+_overlay.addEventListener('click', _closeMobileSidebar);
+
+// Close drawer when a nav link is tapped on mobile
+document.querySelectorAll('.sidebar .nav-item').forEach(function(link) {
+  link.addEventListener('click', function() {
+    if (_isMobile()) _closeMobileSidebar();
+  });
+});
+
+// On resize: clean up mobile state if switching to desktop
+window.addEventListener('resize', function() {
+  if (!_isMobile()) {
+    _closeMobileSidebar();
+    document.body.style.overflow = '';
+  }
+});
+
+// Auto-dismiss alerts after 4 s
+document.querySelectorAll('.alert-toast').forEach(function(el) {
+  setTimeout(function() {
+    var alert = bootstrap.Alert.getOrCreateInstance(el);
+    if (alert) alert.close();
+  }, 4000);
+});
+
+// Live elapsed-time counters for the "My Time Clock" topbar widget
+(function () {
+  const timers = document.querySelectorAll('.clock-elapsed-timer');
+  if (!timers.length) return;
+  function tick() {
+    const now = Date.now();
+    timers.forEach(function (el) {
+      const start = new Date(el.dataset.clockIn);
+      const diff = Math.max(0, now - start.getTime());
+      const totalSec = Math.floor(diff / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      el.textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    });
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+
+// ── Notification Bell ─────────────────────────────────────────────────────────
+(function () {
+  var _open = false;
+
+  function updateBadge(unread) {
+    var badge = document.getElementById('notifBadge');
+    if (!badge) return;
+    if (unread > 0) {
+      badge.textContent = unread > 99 ? '99+' : unread;
+      badge.classList.remove('d-none');
+    } else {
+      badge.classList.add('d-none');
+    }
+  }
+
+  function timeAgo(iso) {
+    if (!iso) return '';
+    var diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 60)    return 'Just now';
+    if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+  }
+
+  function renderItems(items) {
+    var list = document.getElementById('notifList');
+    if (!list) return;
+    if (!items || !items.length) {
+      list.innerHTML = '<div class="notif-empty"><i class="bi bi-bell-slash" style="font-size:24px;opacity:.4;display:block;margin-bottom:6px;"></i>No notifications</div>';
+      return;
+    }
+    list.innerHTML = '<div class="notif-list-inner">' + items.map(function (n) {
+      var cls = n.read ? '' : 'unread';
+      return '<div class="notif-item ' + cls + '" onclick="_notifOpen_(' + JSON.stringify(n.id) + ',' + JSON.stringify(n.link || '') + ')">' +
+        '<div class="notif-title">' + (n.title || '') + '</div>' +
+        '<div class="notif-msg">' + (n.message || '') + '</div>' +
+        '<div class="notif-time">' + timeAgo(n.created_at) + '</div>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  function fetchNotifications(render) {
+    fetch('/api/notifications').then(function (r) { return r.json(); }).then(function (data) {
+      updateBadge(data.unread);
+      if (render) renderItems(data.items);
+    }).catch(function () {});
+  }
+
+  window.toggleNotifDropdown = function (e) {
+    if (e) e.stopPropagation();
+    _open = !_open;
+    var dd = document.getElementById('notifDropdown');
+    if (!dd) return;
+    dd.classList.toggle('d-none', !_open);
+    if (_open) fetchNotifications(true);
+  };
+
+  window._notifOpen_ = function (id, link) {
+    fetch('/api/notifications/mark-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id })
+    }).then(function () { fetchNotifications(true); });
+    if (link) window.location = link;
+  };
+
+  window.markAllRead = function (e) {
+    var list = document.getElementById('notifList');
+    if (list) {
+      var items = list.querySelectorAll('.notif-item');
+      items.forEach(function(item) { item.classList.remove('unread'); });
+    }
+    var badge = document.getElementById('notifBadge');
+    if (badge) badge.classList.add('d-none');
+
+    fetch('/api/notifications/mark-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: null })
+    }).catch(function (err) {
+      console.error('Mark all read failed:', err);
+    });
+  };
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function (e) {
+    var bell = document.getElementById('notifBell');
+    if (bell && !bell.contains(e.target)) {
+      _open = false;
+      var dd = document.getElementById('notifDropdown');
+      if (dd) dd.classList.add('d-none');
+    }
+  });
+
+  // Initial badge load + poll every 60s
+  fetchNotifications(false);
+  setInterval(function () { fetchNotifications(false); }, 60000);
+})();
+
+// ── Approvals Badge ───────────────────────────────────────────────────────────
+(function () {
+  function updateApprovalsBadge() {
+    var badge = document.getElementById('approvalsCountBadge');
+    if (!badge) return;
+    fetch('/api/approvals/count').then(function (r) { return r.json(); }).then(function (data) {
+      if (data.count > 0) {
+        badge.textContent = data.count > 99 ? '99+' : data.count;
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+    }).catch(function () {});
+  }
+  if (document.getElementById('approvalsNavItem')) {
+    updateApprovalsBadge();
+    setInterval(updateApprovalsBadge, 60000);
+  }
+})();
+
+// Global copy-to-clipboard helper
+function copyNumber(text, btn) {
+  navigator.clipboard.writeText(text).then(function() {
+    var orig = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check2"></i>';
+    btn.classList.add('text-success');
+    setTimeout(function() {
+      btn.innerHTML = orig;
+      btn.classList.remove('text-success');
+    }, 1500);
+  });
+}
+
+// ── Permission Guard: intercept delete confirmations for non-admin ────────────
+(function () {
+  var _isAdmin = {{ 'true' if user_role == 'admin' else 'false' }};
+  var _permModal = null;
+
+  function _showPermModal(msg) {
+    document.getElementById('_permReqLabel').value = msg || 'Delete action';
+    document.getElementById('_permReqMsg').textContent = msg || 'Delete action';
+    document.getElementById('_permReqUrl').value = window.location.href;
+    document.getElementById('_permReqNotes').value = '';
+    if (!_permModal) _permModal = new bootstrap.Modal(document.getElementById('_permReqModal'));
+    _permModal.show();
+  }
+
+  // Global helper: call from any custom delete button/modal
+  // If admin or user has an approved delete permission, runs proceedFn immediately; otherwise shows permission modal
+  window._guardedDelete = function (label, proceedFn) {
+    if (_isAdmin || window._userCanDelete) {
+      if (proceedFn) proceedFn();
+    } else {
+      _showPermModal(label || 'Delete action');
+    }
+  };
+
+  if (_isAdmin) return;
+
+  var _origConfirm = window.confirm;
+  window._nativeConfirm = _origConfirm;
+  var _DEL_RE = /delete|remove/i;
+
+  window.confirm = function (msg) {
+    if (_DEL_RE.test(msg || '') && !window._userCanDelete) {
+      _showPermModal(msg);
+      return false;
+    }
+    return _origConfirm.call(window, msg);
+  };
+})();
+
+window._submitPermissionRequest = function () {
+  var label = document.getElementById('_permReqLabel').value || 'Delete action';
+  var notes = (document.getElementById('_permReqNotes').value || '').trim();
+  var url   = document.getElementById('_permReqUrl').value || window.location.href;
+  fetch('/api/permission-request', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: label, notes: notes, page_url: url})
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (d) {
+    var m = bootstrap.Modal.getInstance(document.getElementById('_permReqModal'));
+    if (m) m.hide();
+    if (d.success) {
+      var t = document.createElement('div');
+      t.className = 'alert alert-success alert-dismissible position-fixed shadow';
+      t.style.cssText = 'top:72px;right:20px;z-index:9999;min-width:280px;font-size:13px;';
+      t.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Permission request sent to admin. <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert"></button>';
+      document.body.appendChild(t);
+      setTimeout(function () { t.remove(); }, 5000);
+    } else {
+      alert('Error: ' + (d.error || 'Could not send request'));
+    }
+  })
+  .catch(function () { alert('Network error. Please try again.'); });
+};
+</script>
+
+<!-- Delete Request Modal (global — populated by openDeleteRequestModal()) -->
+<div class="modal fade" id="deleteRequestModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-send me-2 text-warning"></i>Request Delete Permission</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-1">An admin or accountant will review your request to delete:</p>
+        <p class="fw-semibold mb-3" id="drEntityLabel" style="word-break:break-word;">—</p>
+        <label class="form-label small fw-semibold">Reason <span class="text-muted fw-normal">(optional)</span></label>
+        <textarea id="drNotes" class="form-control form-control-sm" rows="2"
+                  placeholder="Why do you need to delete this record?"></textarea>
+        <div id="drAlreadyMsg" class="alert alert-warning mt-2 py-1 small d-none">
+          You already have a pending request for this record. The admin or accountant has not responded yet.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning" id="drSubmitBtn" onclick="submitDeleteRequest()">
+          <i class="bi bi-send me-1"></i>Send Request
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var _drType='', _drId='', _drLabel='', _drAction='';
+  window.openDeleteRequestModal = function(entityType, entityId, entityLabel, actionText){
+    _drType   = entityType;
+    _drId     = entityId;
+    _drLabel  = entityLabel;
+    _drAction = 'Delete ' + (actionText || entityLabel);
+    var lbl = document.getElementById('drEntityLabel');
+    if(lbl) lbl.textContent = entityLabel;
+    var notes = document.getElementById('drNotes');
+    if(notes) notes.value = '';
+    var msg = document.getElementById('drAlreadyMsg');
+    if(msg) msg.classList.add('d-none');
+    var btn = document.getElementById('drSubmitBtn');
+    if(btn){ btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-1"></i>Send Request'; }
+    new bootstrap.Modal(document.getElementById('deleteRequestModal')).show();
+  };
+  window.submitDeleteRequest = function(){
+    var notes = (document.getElementById('drNotes').value || '').trim();
+    var btn   = document.getElementById('drSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending…';
+
+    console.log('Sending delete request:', {
+      action: _drAction,
+      entity_type: _drType,
+      entity_id: _drId,
+      entity_label: _drLabel,
+      notes: notes
+    });
+
+    fetch('/api/permission-request', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action:       _drAction,
+        notes:        notes,
+        page_url:     window.location.href,
+        entity_type:  _drType,
+        entity_id:    _drId,
+        entity_label: _drLabel
+      })
+    })
+    .then(function(r){
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(d){
+      console.log('Delete request response:', d);
+      if (d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('deleteRequestModal')).hide();
+        var toastEl = document.createElement('div');
+        toastEl.className = 'position-fixed bottom-0 end-0 p-3';
+        toastEl.style.zIndex = 9999;
+        toastEl.innerHTML = '<div class="toast show align-items-center text-bg-success border-0" role="alert"><div class="d-flex"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Delete request sent to admin for approval.</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>';
+        document.body.appendChild(toastEl);
+        setTimeout(function(){ toastEl.remove(); }, 4000);
+      } else {
+        throw new Error(d.error || 'Request failed');
+      }
+    })
+    .catch(function(err){
+      console.error('Delete request error:', err);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-send me-1"></i>Send Request';
+      alert('Failed to send request: ' + err.message);
+    });
+  };
+})();
+
+// Global success notification function - matches payroll dialog style
+function showSuccessToast(title, message = '', skipReload = false) {
+  const backdropContainer = document.createElement('div');
+  backdropContainer.className = 'success-toast-backdrop';
+  backdropContainer.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  `;
+
+  const closeDialog = () => {
+    if (backdropContainer && backdropContainer.parentNode) {
+      backdropContainer.remove();
+    }
+  };
+
+  const dialogContent = `
+    <div style="background: #f0fdf4; border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); width: 90%; max-width: 480px; overflow: hidden;">
+      <!-- Header with Close Button -->
+      <div style="padding: 20px 24px; border-bottom: 1px solid #d1fae5; display: flex; align-items: center; gap: 12px; position: relative;">
+        <i class="bi bi-check-circle" style="color: #10b981; font-size: 20px; flex-shrink: 0;"></i>
+        <div style="flex: 1;">
+          <h4 style="color: #059669; font-weight: 600; font-size: 15px; margin: 0;">${title}</h4>
+        </div>
+        <button type="button" class="close-success-toast" style="background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 20px; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+          ✕
+        </button>
+      </div>
+
+      <!-- Message -->
+      ${message ? `<div style="padding: 16px 24px; color: #6b7280; font-size: 14px; line-height: 1.6; border-bottom: 1px solid #d1fae5;">${message}</div>` : ''}
+
+      <!-- Footer with OK Button -->
+      <div style="padding: 12px 24px; display: flex; justify-content: flex-end;">
+        <button type="button" class="close-success-toast" style="background: #10b981; color: white; border: none; border-radius: 6px; padding: 8px 20px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+          <i class="bi bi-check-lg" style="font-size: 14px;"></i>OK
+        </button>
+      </div>
+    </div>
+  `;
+
+  backdropContainer.innerHTML = dialogContent;
+  document.body.appendChild(backdropContainer);
+
+  // Add click handlers for close buttons
+  backdropContainer.querySelectorAll('.close-success-toast').forEach(btn => {
+    btn.addEventListener('click', closeDialog);
+  });
+
+  // Only reload if not called from DOMContentLoaded (skipReload = false means reload)
+  if (!skipReload) {
+    sessionStorage.setItem('pendingSuccessMessage', JSON.stringify({ title, message }));
+    closeDialog();
+    setTimeout(() => {
+      location.reload();
+    }, 200);
+  } else {
+    // Auto-close after 3 seconds when showing after reload
+    setTimeout(() => {
+      closeDialog();
+    }, 3000);
+  }
+}
+
+// Delete confirmation dialog
+function showDeleteConfirmation(title, message, onConfirm) {
+  const backdropContainer = document.createElement('div');
+  backdropContainer.className = 'delete-confirmation-backdrop';
+  backdropContainer.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  `;
+
+  const closeDialog = () => {
+    if (backdropContainer && backdropContainer.parentNode) {
+      backdropContainer.remove();
+    }
+  };
+
+  const dialogContent = `
+    <div style="background: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); width: 90%; max-width: 480px; overflow: hidden;">
+      <!-- Header -->
+      <div style="padding: 20px 24px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 12px;">
+        <i class="bi bi-exclamation-circle" style="color: #ef4444; font-size: 20px; flex-shrink: 0;"></i>
+        <div style="flex: 1;">
+          <h4 style="color: #1f2937; font-weight: 600; font-size: 15px; margin: 0;">${title}</h4>
+        </div>
+        <button type="button" class="close-delete-dialog" style="background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 20px; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+          ✕
+        </button>
+      </div>
+
+      <!-- Message -->
+      <div style="padding: 16px 24px; color: #6b7280; font-size: 14px; line-height: 1.6; border-bottom: 1px solid #e5e7eb;">${message}</div>
+
+      <!-- Footer with Buttons -->
+      <div style="padding: 12px 24px; display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="close-delete-dialog" style="background: white; color: #6b7280; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 20px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+          Cancel
+        </button>
+        <button type="button" class="confirm-delete-dialog" style="background: #ef4444; color: white; border: none; border-radius: 6px; padding: 8px 20px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+          <i class="bi bi-trash" style="font-size: 14px;"></i>Delete
+        </button>
+      </div>
+    </div>
+  `;
+
+  backdropContainer.innerHTML = dialogContent;
+  document.body.appendChild(backdropContainer);
+
+  // Add click handlers
+  backdropContainer.querySelectorAll('.close-delete-dialog').forEach(btn => {
+    btn.addEventListener('click', closeDialog);
+  });
+
+  backdropContainer.querySelector('.confirm-delete-dialog').addEventListener('click', () => {
+    closeDialog();
+    onConfirm();
+  });
+}
+
+// Check for pending success message after page reload
+function showPendingSuccessMessage() {
+  try {
+    const pendingMessage = sessionStorage.getItem('pendingSuccessMessage');
+    if (pendingMessage) {
+      const { title, message } = JSON.parse(pendingMessage);
+      sessionStorage.removeItem('pendingSuccessMessage');
+
+      // Show success message after page is loaded (skipReload = true to prevent another reload)
+      setTimeout(() => {
+        if (typeof showSuccessToast === 'function') {
+          showSuccessToast(title, message, true);
+        }
+      }, 300);
+    }
+  } catch (e) {
+    console.error('Error showing pending success message:', e);
+  }
+}
+
+// Try on DOMContentLoaded first
+document.addEventListener('DOMContentLoaded', showPendingSuccessMessage);
+
+// Also try on load event for pages that need it
+window.addEventListener('load', showPendingSuccessMessage);
+</script>
+
+
+</body>
+</html>
