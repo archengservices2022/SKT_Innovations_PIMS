@@ -418,6 +418,12 @@ def first_page(role: str, custom_pages=None, uid: str = "") -> str:
 # ── Flask app ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 
+# Render (and most hosts) put a proxy in front of the app, so without this every
+# visitor shares the proxy's IP — one person's failed logins would lock out
+# everyone. Trust exactly one proxy hop for the client IP and scheme.
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+
 # Session signing key. MUST be provided via env in production — a known key lets
 # anyone forge a session cookie for any user/role. If it is missing we fall back
 # to a random per-process key (no forgery possible) but sessions then reset on
