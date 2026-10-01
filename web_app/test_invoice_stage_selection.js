@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = fs.readFileSync(__dirname + '/templates/invoice_form.html', 'utf8');
+const source = fs.readFileSync(__dirname + '/templates/invoicing/invoice_form.html', 'utf8');
 const functions = source.slice(source.indexOf('function stageIdentityKeys'), source.indexOf('// Turn a plain <select>'));
 let rows = [];
 const catalog = {

@@ -23,7 +23,7 @@ class Inputs(HTMLParser):
 
 class InvoiceStageFieldsTests(unittest.TestCase):
     def test_all_initial_row_variants_submit_aligned_metadata(self):
-        source = Path(__file__).with_name('templates').joinpath('invoice_form.html').read_text(encoding='utf-8')
+        source = Path(__file__).with_name('templates').joinpath('invoicing', 'invoice_form.html').read_text(encoding='utf-8')
         fragment = source.split('<tbody id="lineItemsBody">', 1)[1].split('</tbody>', 1)[0]
         template = Environment().from_string(fragment)
         for overrides in ({}, {'prefill_proj': 'A'}, {'stage_idx': 0},

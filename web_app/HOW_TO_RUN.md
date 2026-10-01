@@ -1,4 +1,4 @@
-# MABS PIMS — Web App — How to Run
+# SKT PIMS — Web App — How to Run
 
 ## Step 1: Install Python packages
 

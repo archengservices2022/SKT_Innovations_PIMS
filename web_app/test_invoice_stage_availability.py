@@ -52,7 +52,7 @@ class InvoiceStageAvailabilityTests(unittest.TestCase):
             {'project_number': 'B', 'payment_stage_index': 0}]}))
 
     def test_complete_rendered_javascript_syntax(self):
-        source = Path(__file__).with_name('templates').joinpath('invoice_form.html').read_text(encoding='utf-8')
+        source = Path(__file__).with_name('templates').joinpath('invoicing', 'invoice_form.html').read_text(encoding='utf-8')
         script = source.split('{% block scripts %}', 1)[1].split('<script>', 1)[1].split('</script>', 1)[0]
         rendered = Environment().from_string(script).render(now=datetime.now(), projects=[], invoice=None)
         result = subprocess.run(['node', '--check'], input=rendered, encoding='utf-8', capture_output=True)

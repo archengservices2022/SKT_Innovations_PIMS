@@ -1,0 +1,2769 @@
+﻿{% extends "base.html" %}
+{% block title %}Payroll{% endblock %}
+{% block page_title %}Payroll Management{% endblock %}
+
+{% block head %}
+<style>
+.payroll-tabs-container {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 30px;
+}
+
+.payroll-tab-button {
+  padding: 14px 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+  margin-right: 5px;
+}
+
+.payroll-tab-button:hover { color: #0f172a; }
+.payroll-tab-button.active { color: #0d9488; border-bottom-color: #0d9488; }
+
+.payroll-tab-content { display: none; }
+.payroll-tab-content.active { display: block; }
+
+.salaries-section { animation: fadeIn 0.2s ease-in; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(400px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(400px); opacity: 0; }
+}
+
+/* Salaries Filters */
+.salaries-filters {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 25px;
+  border: 1px solid #e2e8f0;
+}
+
+.filter-group { display: flex; flex-direction: column; }
+.filter-group label {
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.filter-group input,
+.filter-group select {
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: white;
+}
+.filter-group input:focus,
+.filter-group select:focus {
+  outline: none;
+  border-color: #0d9488;
+  box-shadow: 0 0 0 2px rgba(13,148,136,.1);
+}
+
+/* Form */
+.form-grid-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 15px;
+}
+.form-group { display: flex; flex-direction: column; }
+.form-group label { font-weight: 600; color: #0f172a; margin-bottom: 6px; font-size: 13px; }
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.form-group input:focus,
+.form-group select:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 2px rgba(13,148,136,.1); }
+
+.btn-primary { background: #0d9488; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background .2s; }
+.btn-primary:hover { background: #0a7860; }
+.btn-secondary { background: #e2e8f0; color: #0f172a; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background .2s; }
+.btn-secondary:hover { background: #cbd5e1; }
+
+/* Autocomplete Dropdown */
+.dropdown-list { border:1px solid #cbd5e1; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,.1); max-height:200px; overflow-y:auto; }
+.dropdown-list.show { display:block !important; }
+.dropdown-list .option { padding:10px 12px; cursor:pointer; font-size:13px; color:#0f172a; transition:background .1s; }
+.dropdown-list .option:hover { background:#f1f5f9; }
+.dropdown-list .option:nth-child(even) { background:#fafbfc; }
+
+/* Table */
+.table-wrapper { background: white; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; }
+.payroll-table { width: 100%; border-collapse: collapse; }
+.payroll-table thead { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+.payroll-table th { padding: 14px; text-align: left; font-weight: 700; color: #0f172a; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+.payroll-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; }
+.payroll-table th:nth-child(1) { width: 14%; }
+.payroll-table th:nth-child(2) { width: 9%; }
+.payroll-table th:nth-child(3) { width: 13%; }
+.payroll-table th:nth-child(4) { width: 10%; }
+.payroll-table th:nth-child(5) { width: 10%; }
+.payroll-table th:nth-child(6) { width: 10%; }
+.payroll-table th:nth-child(7) { width: 15%; }
+.payroll-table th:nth-child(8) { width: 28%; }
+.payroll-table th:nth-child(9) { width: 8%; }
+.payroll-table td:nth-child(6) { font-size: 13px; }
+.payroll-table td:nth-child(8) { font-size: 11.5px; }
+.payroll-table tbody tr:hover { background: #f8fafc; }
+.payroll-table tbody tr:last-child td { border-bottom: none; }
+.payroll-table a { text-decoration: none !important; color: inherit; }
+
+/* Commission table specific column widths */
+#commission th:nth-child(1) { width: 12%; }
+#commission th:nth-child(2) { width: 8%; }
+#commission th:nth-child(3) { width: 16%; }
+#commission th:nth-child(4) { width: 16%; }
+#commission th:nth-child(5) { width: 16%; }
+#commission th:nth-child(6) { width: 12%; }
+#commission th:nth-child(7) { width: 12%; }
+#commission th:nth-child(8) { width: 8%; }
+
+.region-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.region-usa   { background: #dbeafe; color: #1e40af; }
+.region-intl  { background: #fed7aa; color: #92400e; }
+
+.action-buttons { display: flex; gap: 6px; }
+.btn-sm { padding: 6px 10px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 4px; }
+.btn-delete { background: #fee2e2; color: #991b1b; }
+.btn-delete:hover { background: #fecaca; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+.empty-state-icon { font-size: 56px; margin-bottom: 15px; }
+.empty-state-title { font-size: 18px; font-weight: 600; color: #0f172a; margin-bottom: 8px; }
+
+/* Year + Month group headers */
+.year-group-header  { background: #e2e8f0; cursor: pointer; user-select: none; }
+.year-group-header td  { padding: 10px 14px; font-weight: 800; font-size: 14px; color: #0f172a; border-bottom: 2px solid #cbd5e1; }
+.year-group-header:hover td  { background: #d4dce8; }
+.period-group-header { background: #f8fafc; cursor: pointer; user-select: none; }
+.period-group-header td { padding: 8px 14px; font-weight: 700; font-size: 13px; color: #374151; border-bottom: 1px solid #e2e8f0; }
+.period-group-header:hover td { background: #f1f5f9; }
+.period-toggle { display:inline-block; width:18px; transition: transform .2s; }
+.year-group-header.collapsed  .period-toggle { transform: rotate(-90deg); }
+.period-group-header.collapsed .period-toggle { transform: rotate(-90deg); }
+
+.summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
+.summary-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; text-align: center; }
+.summary-card-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: .5px; }
+.summary-card-value { font-size: 26px; font-weight: 800; color: #0f172a; }
+.summary-card.usa  { border-left: 4px solid #3b82f6; }
+.summary-card.intl { border-left: 4px solid #f59e0b; }
+
+/* Export Cards */
+.card-panel { background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
+.section-heading { font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; }
+.export-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; text-align: center; transition: all 0.2s; }
+.export-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.export-card h6 { margin: 0 0 8px 0; font-size: 14px; }
+.export-card .text-muted { margin: 0; }
+.btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.btn-danger { background: #DC2626; color: white; padding: 10px 16px; border-radius: 6px; font-weight: 600; transition: background 0.2s; }
+.btn-danger:hover { background: #B91C1C; }
+.btn-success { background: #16A34A; color: white; padding: 10px 16px; border-radius: 6px; font-weight: 600; transition: background 0.2s; }
+.btn-success:hover { background: #15803D; }
+.btn-primary { background: #0D9488; color: white; padding: 10px 16px; border-radius: 6px; font-weight: 600; transition: background 0.2s; }
+.btn-primary:hover { background: #0A7860; }
+.w-100 { width: 100%; }
+.fw-bold { font-weight: 700; }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+
+/* Advance & Commission Adjustment — employee summary */
+.adv-table { width: 100%; border-collapse: collapse; }
+.adv-table thead { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+.adv-table th { padding: 13px 14px; text-align: center; font-weight: 700; color: #0f172a; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+.adv-table td { padding: 13px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #1f2937; text-align: center; vertical-align: middle; }
+.adv-table .num { font-variant-numeric: tabular-nums; }
+.adv-table tbody tr:last-child td { border-bottom: none; }
+.adv-row { cursor: pointer; transition: background .15s; }
+.adv-row:hover { background: #f8fafc; }
+.adv-emp-link { color: #0d9488; font-weight: 700; text-decoration: none; }
+.adv-emp-link:hover { text-decoration: underline; }
+.adv-badge { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 11.5px; font-weight: 700; }
+.adv-badge-open { background: #dbeafe; color: #1d4ed8; }
+.adv-badge-closed { background: #dcfce7; color: #15803d; }
+.adv-total-row td { background: #f0f9ff; border-top: 2px solid #cbd5e1; font-weight: 700; }
+@media (max-width: 768px) { .summary-cards { grid-template-columns: repeat(2, 1fr); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Tab Navigation -->
+  <div class="payroll-tabs-container">
+    <button class="payroll-tab-button active" onclick="switchTab('salaries', event)">
+      <i class="bi bi-receipt me-2" style="font-size:16px;"></i>Payroll Records
+    </button>
+    <button class="payroll-tab-button" onclick="switchTab('add-salary', event)">
+      <i class="bi bi-plus-circle me-2" style="font-size:16px;"></i>Payroll Entry
+    </button>
+    <button class="payroll-tab-button" onclick="switchTab('commission', event)">
+      <i class="bi bi-percent me-2" style="font-size:16px;"></i>Commission Management
+    </button>
+    <button class="payroll-tab-button" onclick="switchTab('employee-advance', event)">
+      <i class="bi bi-wallet2 me-2" style="font-size:16px;"></i>Advances &amp; Adjustments
+    </button>
+    <button class="payroll-tab-button" onclick="switchTab('export', event)">
+      <i class="bi bi-download me-2" style="font-size:16px;"></i>Export
+    </button>
+  </div>
+
+  <!-- ?? Salaries Tab ?????????????????????????????????????????? -->
+  <div id="salaries" class="payroll-tab-content active">
+    <div class="salaries-section">
+      <h5 style="margin-bottom:25px;font-weight:700;color:#0f172a;">Payroll Records</h5>
+
+      <!-- Summary Cards (server-rendered) -->
+      {% set all_salaries = salaries | list %}
+      {% set paid_salaries = salaries | selectattr('salary_status','equalto','Paid') | list %}
+      {% set pending_salaries = salaries | selectattr('salary_status','equalto','Pending') | list %}
+      {% set salary_entries = paid_salaries | selectattr('salary_type','equalto','Salary') | list %}
+      {% set bonus_entries = all_salaries | selectattr('salary_type','equalto','Bonus') | list %}
+      {% set salary_only_total = salary_entries | sum(attribute='amount') %}
+      {% set bonus_total = bonus_entries | sum(attribute='amount') %}
+      {% set pending_total = pending_salaries | sum(attribute='amount') %}
+      {% set paid_total = paid_salaries | sum(attribute='amount') %}
+      <div class="summary-cards" id="salaryCards">
+        <div class="summary-card usa">
+          <div class="summary-card-label">Total Salaries</div>
+          <div class="summary-card-value" id="cardSalary">{{ currency_symbol }}{{ "{:,.2f}".format(salary_only_total | float) }}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">{{ salary_entries | length }} Salary Entries</div>
+        </div>
+        <div class="summary-card" style="border-left:4px solid #8b5cf6;">
+          <div class="summary-card-label">Total Bonus</div>
+          <div class="summary-card-value" id="cardBonus">{{ currency_symbol }}{{ "{:,.2f}".format(bonus_total | float) }}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">{{ bonus_entries | length }} Performance Bonuses</div>
+        </div>
+        <div class="summary-card intl">
+          <div class="summary-card-label">Total Pending</div>
+          <div class="summary-card-value" id="cardPending">{{ currency_symbol }}{{ "{:,.2f}".format(pending_total | float) }}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">{{ pending_salaries | length }} Awaiting approvals</div>
+        </div>
+        <div class="summary-card" style="border-left:4px solid #10b981;">
+          <div class="summary-card-label">Total Paid</div>
+          <div class="summary-card-value" id="cardPaid">{{ currency_symbol }}{{ "{:,.2f}".format(paid_total | float) }}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">{{ paid_salaries | length }} Paid Entries</div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div style="margin-bottom:20px;">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <input type="text" id="searchEmployee" placeholder="Search employee..." class="form-control form-control-sm" style="width:200px;">
+            <select id="filterType" class="form-select form-select-sm" style="width:160px;">
+              <option value="">All Types</option>
+              <option value="Salary">Salary</option>
+              <option value="Bonus">Bonus</option>
+            </select>
+            <select id="filterRegion" class="form-select form-select-sm" style="width:180px;">
+              <option value="">All Regions</option>
+              <option value="Inside America">Inside America</option>
+              <option value="Outside America">Outside America</option>
+            </select>
+            <select id="filterStatus" class="form-select form-select-sm" style="width:160px;">
+              <option value="">All Status</option>
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+              <option value="Processing">Processing</option>
+            </select>
+          </div>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <span class="text-muted small" style="min-width:75px;">Start date:</span>
+          <input type="date" id="dateFrom" class="form-control form-control-sm" style="width:160px;">
+          <span class="text-muted small">to</span>
+          <input type="date" id="dateTo" class="form-control form-control-sm" style="width:160px;">
+          <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setDateRange('month')">This Month</button>
+          <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setDateRange('year')">This Year</button>
+          <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setDateRange('last30')">Last 30 Days</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="applySalaryFilters()">Apply</button>
+          <button type="button" class="btn btn-sm btn-light" onclick="clearFilters()">Clear</button>
+        </div>
+      </div>
+
+      <!-- Salaries Table -->
+      <div class="table-wrapper">
+        <table class="payroll-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Type</th>
+              <th>Date</th>
+              <th>Period</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Region</th>
+              <th>Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="salaryTableBody">
+            {% if salaries %}
+              {% for sal in salaries %}
+              {% set sal_emp  = sal.employee_name or sal.get('employee','') %}
+              {% set sal_period = sal.date[:7] if sal.date and sal.date|length >= 7 else '' %}
+              {% set ss = sal.get('salary_status','Pending') %}
+              {% set sal_type = sal.get('salary_type','Salary') %}
+              <tr data-salary="1" data-employee="{{ sal_emp | lower }}" data-type="{{ sal_type }}" data-status="{{ ss }}" data-region="{{ sal.region }}" data-date="{{ sal.date }}" data-amount="{{ sal.amount | float }}">
+                <td><strong>{{ sal_emp or '—' }}</strong></td>
+                <td><span style="display:inline-block;padding:3px 8px;border-radius:14px;font-size:11px;font-weight:600;{% if sal_type == 'Bonus' %}background:#fcd34d;color:#78350f;{% elif sal_type == 'Commission' %}background:#d1fae5;color:#065f46;{% else %}background:#dbeafe;color:#1e40af;{% endif %}">{{ sal_type }}</span></td>
+                <td>{{ sal.date[5:7] + '-' + sal.date[8:10] + '-' + sal.date[0:4] if sal.date and sal.date|length >= 10 else '—' }}</td>
+                <td style="color:#475569;font-size:.82rem;">{{ sal_period or '—' }}</td>
+                <td>{{ currency_symbol }}{{ "{:,.2f}".format(sal.amount | float) }}</td>
+                <td>
+                  <span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:.68rem;font-weight:700;
+                    {% if ss == 'Paid' %}background:#dcfce7;color:#15803d;
+                    {% elif ss == 'Pending' %}background:#fef9c3;color:#92400e;
+                    {% else %}background:#dbeafe;color:#1d4ed8;{% endif %}">{{ ss }}</span>
+                </td>
+                <td><span class="region-badge {{ 'region-usa' if sal.region == 'Inside America' else 'region-intl' }}">{{ sal.region or '—' }}</span></td>
+                <td>{{ sal.notes or '—' }}</td>
+                <td>
+                  <div class="d-flex gap-1" style="justify-content:center;">
+                    <button type="button" class="btn btn-xs btn-outline-secondary" title="Edit" onclick="editSalary('{{ sal.firebase_id }}','{{ sal_emp | replace("'","&#39;") }}','{{ sal.date }}','{{ sal.amount }}','{{ sal.region }}','{{ (sal.notes or '') | replace("'","&#39;") }}','{{ sal.get('salary_status','Pending') }}','{{ sal_type }}','{{ sal.get('paid_at','') }}')"><i class="bi bi-pencil"></i></button>
+                    <span id="salary-action-{{ sal.firebase_id }}"></span>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="9" class="empty-state">
+                <div class="empty-state-title">No Salary Entries</div>
+                <p style="margin:0;">Click "Add Salary" tab to create entries.</p>
+              </td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? Add Salary Tab ???????????????????????????????????????? -->
+  <div id="add-salary" class="payroll-tab-content">
+    <div>
+      <h5 style="margin-bottom:25px;font-weight:700;color:#0f172a;">Payroll Entry</h5>
+
+      <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:25px;">
+        <form id="salaryForm" onsubmit="addSalary(event)">
+          <input type="hidden" id="salary_id" value="">
+          <div class="form-grid-3col">
+            <div class="form-group" style="grid-column:1/-1;">
+              <label for="sal_employee">Employee Name</label>
+              <div style="position:relative;">
+                <input type="text" id="sal_employee" class="form-control form-control-sm" placeholder="Type or select employee..." required />
+                <div class="dropdown-list" id="sal_employee_dropdown" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #e2e8f0;border-top:none;max-height:200px;overflow-y:auto;display:none;z-index:1000;"></div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="sal_type">Type</label>
+              <select id="sal_type" required onchange="toggleCommissionPaidDate()">
+                <option value="Salary">Salary</option>
+                <option value="Bonus">Bonus</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="sal_date">Date</label>
+              <input type="date" id="sal_date" required />
+            </div>
+
+            <div class="form-group">
+              <label for="sal_amount">Amount ($)</label>
+              <input type="number" id="sal_amount" step="0.01" min="0" required />
+            </div>
+
+            <div class="form-group">
+              <label for="sal_region">Region</label>
+              <select id="sal_region" required>
+                <option value="">Select Region</option>
+                <option value="Inside America">Inside America</option>
+                <option value="Outside America">Outside America</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="sal_status">Status</label>
+              <select id="sal_status" onchange="toggleCommissionPaidDate()">
+                <option value="Pending">Pending</option>
+                <option value="Paid">Paid</option>
+                <option value="Processing">Processing</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="sal_paid_date_group" style="display:none;">
+              <label for="sal_paid_date">Paid Date</label>
+              <input type="date" id="sal_paid_date" />
+            </div>
+
+            <div class="form-group" style="grid-column:1/-1;">
+              <label for="sal_notes">Notes</label>
+              <input type="text" id="sal_notes" placeholder="e.g., Monthly salary, Performance bonus, etc." />
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;">
+            <button type="submit" class="btn-primary" id="submitBtn">
+              <i class="bi bi-check-circle me-1"></i><span id="submitBtnText">Add Entry</span>
+            </button>
+            <button type="reset" class="btn-secondary" onclick="resetSalaryForm()">Clear</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? Commission Management Tab ????????????????????????????? -->
+  <div id="commission" class="payroll-tab-content">
+    <div>
+      <h5 style="margin-bottom:25px;font-weight:700;color:#0f172a;">Commission Management</h5>
+
+      <!-- Summary Cards -->
+      <div class="summary-cards" id="commissionCards" style="display:grid;grid-template-columns:repeat(5,1fr);gap:15px;margin-bottom:25px;">
+        <div class="summary-card" style="border-left:4px solid #3b82f6;">
+          <div class="summary-card-label">Total Employees</div>
+          <div class="summary-card-value" id="cardCommEmployees" style="color:#3b82f6;font-size:26px;font-weight:800;">0</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Commission available employees</div>
+        </div>
+        <div class="summary-card" style="border-left:4px solid #8b5cf6;">
+          <div class="summary-card-label">Total Earned</div>
+          <div class="summary-card-value" id="cardCommEarned" style="color:#8b5cf6;">{{ currency_symbol }}0.00</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Across all employees</div>
+        </div>
+        <div class="summary-card" style="border-left:4px solid #06b6d4;">
+          <div class="summary-card-label">Total Adjusted</div>
+          <div class="summary-card-value" id="cardCommAdjusted" style="color:#06b6d4;">{{ currency_symbol }}0.00</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Deductions and adjustments</div>
+        </div>
+        <div class="summary-card" style="border-left:4px solid #10b981;">
+          <div class="summary-card-label">Commission Paid</div>
+          <div class="summary-card-value" id="cardCommPaid" style="color:#10b981;">{{ currency_symbol }}0.00</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Paid directly to employee</div>
+        </div>
+        <div class="summary-card" style="border-left:4px solid #f59e0b;">
+          <div class="summary-card-label">Outstanding</div>
+          <div class="summary-card-value" id="cardCommOutstanding" style="color:#f59e0b;">{{ currency_symbol }}0.00</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Pending commission payment</div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div style="margin-bottom:20px;">
+        <div class="d-flex gap-2 align-items-center flex-wrap justify-content-between">
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <input type="text" id="commSearchSalesperson" placeholder="Search salesperson..." class="form-control form-control-sm" style="width:200px;">
+            <select id="commFilterStatus" class="form-select form-select-sm" style="width:160px;">
+              <option value="">All Status</option>
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+            </select>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadCommissions()">Refresh</button>
+            <button type="button" class="btn btn-sm btn-light" onclick="clearCommissionFilters()">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Commission Table - Grouped by Project -->
+      <div class="table-wrapper">
+        <table class="payroll-table" id="commission">
+          <thead>
+            <tr>
+              <th>Project #</th>
+              <th>Client</th>
+              <th>Salesperson</th>
+              <th>Contract Value</th>
+              <th>Rate / Type</th>
+              <th>Commission</th>
+              <th>Adjusted</th>
+              <th>Remaining Due</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="commissionTableBody">
+            <tr>
+              <td colspan="9" style="text-align:center;color:#94a3b8;padding:40px;">
+                Loading commissions...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commission Details Modal -->
+  <div class="modal fade" id="commissionDetailsModal" tabindex="-1" role="dialog" aria-hidden="true" style="--bs-modal-width: 1400px;">
+    <div class="modal-dialog modal-xl" role="document" style="max-width: 1400px;">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+          <h5 class="modal-title" id="commissionDetailsModalTitle">Commission Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="commissionDetailsModalBody" style="padding:20px;">
+          <p>Loading...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commission Edit Modal -->
+  <div class="modal fade" id="commissionEditModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Commission</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="commissionEditForm" onsubmit="saveCommissionEdit(event)">
+          <input type="hidden" id="commEditProjectId" value="">
+          <div class="modal-body">
+            <!-- Row 1: Project # -->
+            <div style="display:grid;grid-template-columns:1fr;gap:15px;margin-bottom:15px;">
+              <div class="form-group">
+                <label for="commEditProject">Project #</label>
+                <input type="text" id="commEditProject" class="form-control form-control-sm" readonly style="background:#f8fafc;" />
+              </div>
+            </div>
+
+            <!-- Row 2: Salesperson, Contract Value (equal widths) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:15px;">
+              <div class="form-group">
+                <label for="commEditSalesperson">Salesperson</label>
+                <input type="text" id="commEditSalesperson" class="form-control form-control-sm" readonly style="background:#f8fafc;" />
+              </div>
+              <div class="form-group">
+                <label for="commEditContractValue">Contract Value ($)</label>
+                <input type="number" id="commEditContractValue" class="form-control form-control-sm" step="0.01" readonly style="background:#f8fafc;" />
+              </div>
+            </div>
+
+            <!-- Row 3: Rate Type, Rate Value (equal widths) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:15px;">
+              <div class="form-group">
+                <label for="commEditRateType">Rate Type</label>
+                <select id="commEditRateType" class="form-control form-control-sm" onchange="calcCommissionEarned()">
+                  <option value="percent">Percent (%)</option>
+                  <option value="fixed">Fixed Amount ($)</option>
+                  <option value="default">Default</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="commEditRateValue">Rate Value</label>
+                <input type="number" id="commEditRateValue" class="form-control form-control-sm" step="0.01" placeholder="e.g., 5.0" oninput="calcCommissionEarned()" />
+              </div>
+            </div>
+
+            <!-- Row 4: Commission Earned, Adjusted, Remaining Due (equal widths) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px;margin-bottom:15px;">
+              <div class="form-group">
+                <label for="commEditEarned">Commission Earned ($)</label>
+                <input type="number" id="commEditEarned" class="form-control form-control-sm" step="0.01" readonly style="background:#f8fafc;color:#10b981;font-weight:600;" />
+              </div>
+              <div class="form-group">
+                <label for="commEditAdjusted">Adjusted / Deducted ($)</label>
+                <input type="number" id="commEditAdjusted" class="form-control form-control-sm" step="0.01" readonly style="background:#f8fafc;color:#64748b;" />
+              </div>
+              <div class="form-group">
+                <label for="commEditRemainingDue">Remaining Due ($)</label>
+                <input type="number" id="commEditRemainingDue" class="form-control form-control-sm" step="0.01" readonly style="background:#f8fafc;color:#10b981;font-weight:600;" />
+              </div>
+            </div>
+
+            <!-- Row 5: Status, Paid Date (show paid date if status is Paid) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:15px;">
+              <div class="form-group">
+                <label for="commEditStatus">Status</label>
+                <select id="commEditStatus" class="form-control form-control-sm" onchange="togglePaidDate()">
+                  <option value="Pending">Pending</option>
+                  <option value="Paid">Paid</option>
+                </select>
+              </div>
+              <div class="form-group" id="paidDateGroup" style="display:none;">
+                <label for="commEditPaidDate">Paid Date</label>
+                <input type="date" id="commEditPaidDate" class="form-control form-control-sm" />
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Advance & Commission Adjustment Tab ─────────────────────────── -->
+  <div id="employee-advance" class="payroll-tab-content">
+    <div>
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2" style="margin-bottom:20px;">
+        <div>
+          <h5 style="margin:0;font-size:19px;font-weight:700;color:#0f172a;letter-spacing:-.01em;">Employee Advances &amp; Adjustments</h5>
+          <p style="margin:5px 0 0;font-size:13.5px;line-height:1.5;color:#64748b;font-weight:400;">Manage employee advances, adjustments, and outstanding balances.</p>
+        </div>
+        <button type="button" class="btn-advance" onclick="AdvanceDialog.open()" style="font-size:13px;padding:9px 16px;">
+          <i class="bi bi-plus-circle"></i> Add Advance Entry
+        </button>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="summary-cards" id="advanceCards">
+        <div class="summary-card" style="border-left:4px solid #3b82f6;">
+          <div class="summary-card-label">Employees With Advances</div>
+          <div class="summary-card-value" id="advCardEmployees" style="color:#3b82f6;">0</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;" id="advCardEmployeesSub">&nbsp;</div>
+        </div>
+        <div class="summary-card" style="border-left:4px solid #8b5cf6;">
+          <div class="summary-card-label">Total Advanced</div>
+          <div class="summary-card-value" id="advCardAdvance" style="color:#8b5cf6;">{{ currency_symbol }}0.00</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;" id="advCardAdvanceSub">&nbsp;</div>
+        </div>
+        <div class="summary-card" style="border-left:4px solid #10b981;">
+          <div class="summary-card-label">Total Adjusted</div>
+          <div class="summary-card-value" id="advCardAdjusted" style="color:#10b981;">{{ currency_symbol }}0.00</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Commission &amp; other adjustments</div>
+        </div>
+        <div class="summary-card" style="border-left:4px solid #f59e0b;">
+          <div class="summary-card-label">Outstanding Balance</div>
+          <div class="summary-card-value" id="advCardBalance" style="color:#f59e0b;">{{ currency_symbol }}0.00</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Remaining to be recovered</div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="d-flex gap-2 align-items-center flex-wrap justify-content-between" style="margin-bottom:16px;">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <input type="text" id="advEmpSearch" placeholder="Search employee..." class="form-control form-control-sm" style="width:220px;" oninput="renderAdvanceSummary()">
+          <select id="advEmpStatus" class="form-select form-select-sm" style="width:170px;" onchange="renderAdvanceSummary()">
+            <option value="">All Status</option>
+            <option value="outstanding">Open</option>
+            <option value="settled">Closed</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Employee summary (click a row to open that employee's ledger) -->
+      <div class="table-wrapper">
+        <table class="adv-table" id="advEmpTable">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th class="num">Advances</th>
+              <th class="num">Total Advance</th>
+              <th class="num">Advance Adjusted</th>
+              <th class="num">Balance</th>
+              <th>Last Activity</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="advEmpBody">
+            <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:40px;">No advances yet. Use “Add Advance Entry” to create one.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="color:#6b7280;font-size:12px;padding:10px 0;"><span id="advEmpCount">0 employee(s)</span></div>
+    </div>
+  </div>
+
+  <!-- ?? Export Tab ???????????????????????????????????????????? -->
+  <div id="export" class="payroll-tab-content">
+    <div class="card-panel mb-4">
+      <h6 class="section-heading mb-3">Filter Export</h6>
+      <div class="d-flex gap-2 flex-wrap align-items-center mb-3">
+        <select id="exportType" class="form-select form-select-sm" style="width:180px;" onchange="handleExportTypeChange()">
+          <option value="salary">Salary</option>
+          <option value="advance">Advance</option>
+        </select>
+      </div>
+      <div id="regionFilterContainer" class="d-flex gap-2 flex-wrap align-items-center mb-2">
+        <select id="exportRegion" class="form-select form-select-sm" style="width:180px;" onchange="buildPayrollExportLinks()">
+          <option value="">All Regions</option>
+          <option value="Inside America">Inside America</option>
+          <option value="Outside America">Outside America</option>
+        </select>
+      </div>
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        <span class="text-muted small" style="min-width:75px;">Start date:</span>
+        <input type="date" id="exportFrom" class="form-control form-control-sm" style="width:160px;" oninput="buildPayrollExportLinks()">
+        <span class="text-muted small">to</span>
+        <input type="date" id="exportTo" class="form-control form-control-sm" style="width:160px;" oninput="buildPayrollExportLinks()">
+        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setPayrollExportRange('month')">This Month</button>
+        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setPayrollExportRange('year')">This Year</button>
+        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setPayrollExportRange('last30')">Last 30 Days</button>
+        <button type="button" class="btn btn-xs btn-outline-danger" onclick="clearPayrollExportFilters()"><i class="bi bi-x me-1"></i>Clear</button>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="export-card">
+          <div style="font-size:2.5rem;color:#DC2626;margin-bottom:12px;">
+            <i class="bi bi-file-earmark-pdf-fill"></i>
+          </div>
+          <h6 class="fw-bold mb-1">PDF Report</h6>
+          <p class="text-muted small mb-3">Professional PDF with all payroll data</p>
+          <a id="exportPayrollPdfLink" href="{{ url_for('payroll_export_pdf') }}"
+             class="btn btn-sm btn-danger w-100">
+            <i class="bi bi-download me-1"></i>Download PDF
+          </a>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="export-card">
+          <div style="font-size:2.5rem;color:#16A34A;margin-bottom:12px;">
+            <i class="bi bi-file-earmark-spreadsheet-fill"></i>
+          </div>
+          <h6 class="fw-bold mb-1">Excel Spreadsheet</h6>
+          <p class="text-muted small mb-3">Styled .xlsx with all payroll details</p>
+          <a id="exportPayrollExcelLink" href="{{ url_for('payroll_export_excel') }}"
+             class="btn btn-sm btn-success w-100">
+            <i class="bi bi-download me-1"></i>Download Excel
+          </a>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="export-card">
+          <div style="font-size:2.5rem;color:#2563EB;margin-bottom:12px;">
+            <i class="bi bi-file-earmark-text-fill"></i>
+          </div>
+          <h6 class="fw-bold mb-1">CSV Export</h6>
+          <p class="text-muted small mb-3">Comma-separated values file</p>
+          <a id="exportPayrollCsvLink" href="{{ url_for('payroll_export_csv') }}"
+             class="btn btn-sm btn-primary w-100">
+            <i class="bi bi-download me-1"></i>Download CSV
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TODAY_ISO = {{ now.strftime('%Y-%m-%d') | tojson }}; // company-timezone "today", not the browser's local/UTC date
+
+// ?? Two-level grouping: Year — Month ?????????????????????????????????????????
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function fmt(n) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function formatMonthLabel(period) {
+  if (!period || period === '—') return period;
+  const [, m] = period.split('-');
+  return MONTHS[parseInt(m, 10) - 1];
+}
+
+function buildPeriodGroups() {
+  const tbody      = document.getElementById('salaryTableBody');
+
+  // Clear all existing group headers before rebuilding
+  tbody.querySelectorAll('tr.year-group-header, tr.period-group-header').forEach(hdr => hdr.remove());
+
+  const rows       = Array.from(tbody.querySelectorAll('tr[data-salary]'));
+  const today      = localDate(new Date());
+  const currentPer = today.slice(0, 7);   // YYYY-MM
+  const currentYr  = today.slice(0, 4);   // YYYY
+
+  // Tag each row with period + year
+  rows.forEach(r => {
+    const p = (r.dataset.date || '').slice(0, 7) || '—';
+    r.dataset.periodGroup = p;
+    r.dataset.yearGroup   = p.slice(0, 4) || '—';
+  });
+
+  // Unique years (in order of appearance)
+  const seenY = new Set(), years = [];
+  rows.forEach(r => { const y = r.dataset.yearGroup; if (!seenY.has(y)) { seenY.add(y); years.push(y); } });
+
+  years.forEach(year => {
+    const yearRows     = rows.filter(r => r.dataset.yearGroup === year);
+    const yearTotal    = yearRows.reduce((s, r) => s + parseFloat(r.dataset.amount || 0), 0);
+    const yearCollapsed = year !== currentYr;
+
+    // Unique months within this year
+    const seenM = new Set(), months = [];
+    yearRows.forEach(r => { const p = r.dataset.periodGroup; if (!seenM.has(p)) { seenM.add(p); months.push(p); } });
+
+    // --- Year header row ---
+    const yearHdr = document.createElement('tr');
+    yearHdr.className = 'year-group-header' + (yearCollapsed ? ' collapsed' : '');
+    yearHdr.dataset.yearHeader = year;
+    yearHdr.onclick = () => toggleYear(year);
+    yearHdr.innerHTML = `<td colspan="8">
+      <span class="period-toggle"><i class="bi bi-chevron-down"></i></span>
+      <strong style="font-size:14px;">${year}</strong>
+      <span class="text-muted ms-2" style="font-size:12px;font-weight:400;">${months.length} month${months.length !== 1 ? 's' : ''}</span>
+      <span class="ms-2 fw-semibold" style="color:#15803d;font-size:13px;" data-year-total="${year}">${CURRENCY_SYMBOL}${fmt(yearTotal)}</span>
+    </td>`;
+    tbody.insertBefore(yearHdr, yearRows[0]);
+
+    // --- Month header rows ---
+    months.forEach(period => {
+      const periodRows    = rows.filter(r => r.dataset.periodGroup === period);
+      const periodTotal   = periodRows.reduce((s, r) => s + parseFloat(r.dataset.amount || 0), 0);
+      const count         = periodRows.length;
+      const monthCollapsed = period !== currentPer;
+
+      const mHdr = document.createElement('tr');
+      mHdr.className = 'period-group-header' + (monthCollapsed ? ' collapsed' : '');
+      mHdr.dataset.periodHeader = period;
+      mHdr.dataset.yearGroup    = year;
+      mHdr.onclick = (e) => { e.stopPropagation(); togglePeriod(period); };
+      // Hidden initially if year is collapsed
+      if (yearCollapsed) mHdr.style.display = 'none';
+      mHdr.innerHTML = `<td colspan="8" style="padding-left:28px;">
+        <span class="period-toggle"><i class="bi bi-chevron-down"></i></span>
+        <strong>${formatMonthLabel(period)}</strong>
+        <span class="text-muted ms-2" style="font-size:12px;font-weight:400;">${count} record${count !== 1 ? 's' : ''}</span>
+        <span class="ms-2 fw-semibold" style="color:#15803d;font-size:13px;" data-period-total="${period}">${CURRENCY_SYMBOL}${fmt(periodTotal)}</span>
+      </td>`;
+      tbody.insertBefore(mHdr, periodRows[0]);
+
+      // Data rows: hidden if year collapsed OR month collapsed
+      periodRows.forEach(r => {
+        r.dataset.yearHidden   = yearCollapsed  ? '1' : '';
+        r.dataset.periodHidden = monthCollapsed ? '1' : '';
+        if (yearCollapsed || monthCollapsed) r.style.display = 'none';
+        // Indent data rows slightly
+        r.style.paddingLeft = '40px';
+      });
+    });
+  });
+}
+
+function toggleYear(year) {
+  const hdr = document.querySelector(`[data-year-header="${year}"]`);
+  if (!hdr) return;
+  const nowCollapsed = hdr.classList.toggle('collapsed');
+  // Show/hide month headers for this year
+  document.querySelectorAll(`[data-period-header][data-year-group="${year}"]`).forEach(mHdr => {
+    mHdr.style.display = nowCollapsed ? 'none' : '';
+  });
+  // Show/hide data rows for this year
+  document.querySelectorAll(`[data-year-group="${year}"][data-salary]`).forEach(r => {
+    r.dataset.yearHidden = nowCollapsed ? '1' : '';
+    updateRowVisibility(r);
+  });
+}
+
+function togglePeriod(period) {
+  const hdr = document.querySelector(`[data-period-header="${period}"]`);
+  if (!hdr) return;
+  const nowCollapsed = hdr.classList.toggle('collapsed');
+  document.querySelectorAll(`[data-period-group="${period}"][data-salary]`).forEach(r => {
+    r.dataset.periodHidden = nowCollapsed ? '1' : '';
+    updateRowVisibility(r);
+  });
+}
+
+function updateRowVisibility(row) {
+  const hidden = row.dataset.yearHidden === '1'
+              || row.dataset.periodHidden === '1'
+              || row.dataset.filterHidden === '1';
+  row.style.display = hidden ? 'none' : '';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  buildPeriodGroups();
+
+  const params = new URLSearchParams(window.location.search);
+  const employeeFilter = params.get('employee');
+  const regionFilter   = params.get('region');
+  const yearFilter     = params.get('year');
+
+  if (employeeFilter) document.getElementById('searchEmployee').value = employeeFilter;
+  if (regionFilter)   document.getElementById('filterRegion').value   = regionFilter;
+  if (yearFilter) {
+    document.getElementById('dateFrom').value = yearFilter + '-01-01';
+    document.getElementById('dateTo').value   = yearFilter + '-12-31';
+  }
+
+  if (employeeFilter || regionFilter || yearFilter) {
+    applySalaryFilters();
+  } else {
+    // Default: show current year so previous months are visible
+    setDateRange('year');
+  }
+});
+
+function switchTab(tabName, event) {
+  if (event) event.preventDefault();
+  document.querySelectorAll('.payroll-tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.payroll-tab-button').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabName).classList.add('active');
+  event.target.closest('.payroll-tab-button').classList.add('active');
+}
+
+async function handleSalaryDelete(salaryId) {
+  console.log(`handleSalaryDelete called with: "${salaryId}"`);
+
+  // Fetch fresh permissions before checking (to catch admin approvals)
+  try {
+    const response = await fetch('{{ url_for("salary_delete_perms") }}');
+    const data = await response.json();
+    salaryDeletePerms = new Set(data.delete_perms || []);
+    console.log(`Fresh perms loaded: ${JSON.stringify(Array.from(salaryDeletePerms))}`);
+    console.log(`Checking if "${salaryId}" is in perms: ${salaryDeletePerms.has(salaryId)}`);
+  } catch (e) {
+    console.error('Error fetching perms:', e);
+  }
+
+  if (salaryDeletePerms.has(salaryId)) {
+    console.log(`Permission granted - showing delete dialog`);
+    deleteSalary(salaryId);
+  } else {
+    console.log(`No permission - showing request modal`);
+    openDeleteRequestModal('salary', salaryId, 'Salary Entry');
+  }
+}
+
+function renderSalaryDeleteButtons() {
+  document.querySelectorAll('[id^="salary-action-"]').forEach(el => {
+    const salaryId = el.id.replace('salary-action-', '');
+    const hasPermission = salaryDeletePerms.has(salaryId);
+
+    if (hasPermission) {
+      el.innerHTML = `<button type="button" class="btn btn-xs btn-outline-danger" title="Delete" data-salary-id="${salaryId}" data-salary-delete-btn="${salaryId}"><i class="bi bi-trash"></i></button>`;
+      const btn = el.querySelector('button');
+      if (btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = this.getAttribute('data-salary-id');
+          handleSalaryDelete(id);
+        });
+      }
+    } else {
+      el.innerHTML = `<button type="button" class="btn btn-xs btn-outline-warning" title="Request Delete" data-salary-id="${salaryId}"><i class="bi bi-send"></i></button>`;
+      const btn = el.querySelector('button');
+      if (btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = this.getAttribute('data-salary-id');
+          openDeleteRequestModal('salary', id, 'Salary Entry');
+        });
+      }
+    }
+  });
+}
+
+function applySalaryFilters() {
+  const search   = document.getElementById('searchEmployee').value.toLowerCase();
+  const type     = document.getElementById('filterType').value;
+  const region   = document.getElementById('filterRegion').value;
+  const status   = document.getElementById('filterStatus').value;
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo   = document.getElementById('dateTo').value;
+
+  // Per-period accumulators for summary cards and header totals
+  const periodTotals  = {};
+  const periodVisible = {};
+
+  // Summary card totals
+  let salaryTotal = 0, pendingTotal = 0, bonusTotal = 0, commissionTotal = 0, paidTotal = 0;
+  let salaryCount = 0, pendingCount = 0, bonusCount = 0, commissionCount = 0, paidCount = 0;
+
+  document.querySelectorAll('#salaryTableBody tr[data-salary]').forEach(row => {
+    const emp    = (row.dataset.employee || '').toLowerCase();
+    const salType = row.dataset.type || 'Salary';
+    const salStatus = row.dataset.status || 'Pending';
+    const reg    = row.dataset.region || '';
+    const date   = row.dataset.date || '';
+    const period = row.dataset.periodGroup || '';
+    const amt    = parseFloat(row.dataset.amount || 0);
+
+    const passes = (!search || emp.includes(search))
+                && (!type || salType === type)
+                && (!region || reg === region)
+                && (!status || salStatus === status)
+                && (!dateFrom || date >= dateFrom)
+                && (!dateTo   || date <= dateTo);
+    row.dataset.filterHidden = passes ? '' : '1';
+    updateRowVisibility(row);
+
+    if (passes) {
+      periodTotals[period]  = (periodTotals[period]  || 0) + amt;
+      periodVisible[period] = (periodVisible[period] || 0) + 1;
+
+      // Update summary card totals
+      if (salType === 'Salary' && salStatus === 'Paid') { salaryTotal += amt; salaryCount++; }
+      if (salStatus === 'Pending') { pendingTotal += amt; pendingCount++; }
+      if (salType === 'Bonus') { bonusTotal += amt; bonusCount++; }
+      if (salType === 'Commission') { commissionTotal += amt; commissionCount++; }
+      if (salStatus === 'Paid') { paidTotal += amt; paidCount++; }
+    }
+  });
+
+  // Re-render salary delete buttons after filtering
+  renderSalaryDeleteButtons();
+
+  // Update month headers
+  document.querySelectorAll('#salaryTableBody tr[data-period-header]').forEach(hdr => {
+    const p   = hdr.dataset.periodHeader;
+    const yr  = hdr.dataset.yearGroup;
+    const vis = (periodVisible[p] || 0) > 0;
+    // Keep hidden if its year is collapsed
+    const yearCollapsed = document.querySelector(`[data-year-header="${yr}"]`)?.classList.contains('collapsed');
+    hdr.style.display = (vis && !yearCollapsed) ? '' : 'none';
+    const totalEl = hdr.querySelector('[data-period-total]');
+    if (totalEl) totalEl.textContent = CURRENCY_SYMBOL + fmt(periodTotals[p] || 0);
+  });
+
+  // Update year headers
+  const yearVisible = {}, yearTotals = {};
+  document.querySelectorAll('#salaryTableBody tr[data-salary]').forEach(row => {
+    if (row.dataset.filterHidden !== '1') {
+      const yr  = row.dataset.yearGroup || '—';
+      const amt = parseFloat(row.dataset.amount || 0);
+      yearVisible[yr] = (yearVisible[yr] || 0) + 1;
+      yearTotals[yr]  = (yearTotals[yr]  || 0) + amt;
+    }
+  });
+  document.querySelectorAll('#salaryTableBody tr[data-year-header]').forEach(hdr => {
+    const yr = hdr.dataset.yearHeader;
+    hdr.style.display = (yearVisible[yr] || 0) > 0 ? '' : 'none';
+    const totalEl = hdr.querySelector('[data-year-total]');
+    if (totalEl) totalEl.textContent = CURRENCY_SYMBOL + fmt(yearTotals[yr] || 0);
+  });
+
+  // Update summary cards to reflect filtered data
+  const cardSalary = document.getElementById('cardSalary');
+  const cardPending = document.getElementById('cardPending');
+  const cardBonus = document.getElementById('cardBonus');
+  const cardPaid = document.getElementById('cardPaid');
+
+  if (cardSalary) cardSalary.textContent = CURRENCY_SYMBOL + fmt(salaryTotal);
+  if (cardPending) cardPending.textContent = CURRENCY_SYMBOL + fmt(pendingTotal);
+  if (cardBonus) cardBonus.textContent = CURRENCY_SYMBOL + fmt(bonusTotal);
+  if (cardPaid) cardPaid.textContent = CURRENCY_SYMBOL + fmt(paidTotal);
+
+  // Update entry counts in the cards
+  const salaryCard = document.querySelector('.summary-card.usa');
+  const pendingCard = document.querySelector('.summary-card.intl');
+  const bonusCard = document.querySelectorAll('.summary-card')[1];
+  const paidCard = document.querySelectorAll('.summary-card')[3];
+
+  if (salaryCard) salaryCard.querySelector('div:last-child').textContent = salaryCount + ' Salary Entries';
+  if (pendingCard) pendingCard.querySelector('div:last-child').textContent = pendingCount + ' Awaiting approvals';
+  if (bonusCard) bonusCard.querySelector('div:last-child').textContent = bonusCount + ' Performance Bonuses';
+  if (paidCard) paidCard.querySelector('div:last-child').textContent = paidCount + ' Paid Entries';
+}
+
+function setDateRange(range) {
+  const today = new Date();
+  let from, to = today.toISOString().split('T')[0];
+  if (range === 'month')  from = new Date(today.getFullYear(), today.getMonth(), 1);
+  else if (range === 'year')   from = new Date(today.getFullYear(), 0, 1);
+  else if (range === 'last30') from = new Date(today.getTime() - 30*24*60*60*1000);
+  document.getElementById('dateFrom').value = from.toISOString().split('T')[0];
+  document.getElementById('dateTo').value   = to;
+  applySalaryFilters();
+}
+
+function clearFilters() {
+  document.getElementById('searchEmployee').value = '';
+  document.getElementById('filterType').value     = '';
+  document.getElementById('filterRegion').value   = '';
+  document.getElementById('dateFrom').value        = '';
+  document.getElementById('dateTo').value          = '';
+  applySalaryFilters();
+}
+
+// Real-time filter updates for summary cards
+document.addEventListener('DOMContentLoaded', function() {
+  const searchEmployee = document.getElementById('searchEmployee');
+  const filterType = document.getElementById('filterType');
+  const filterRegion = document.getElementById('filterRegion');
+  const filterStatus = document.getElementById('filterStatus');
+  const dateFrom = document.getElementById('dateFrom');
+  const dateTo = document.getElementById('dateTo');
+
+  // Add event listeners for real-time updates
+  if (searchEmployee) searchEmployee.addEventListener('input', applySalaryFilters);
+  if (filterType) filterType.addEventListener('change', applySalaryFilters);
+  if (filterRegion) filterRegion.addEventListener('change', applySalaryFilters);
+  if (filterStatus) filterStatus.addEventListener('change', applySalaryFilters);
+  if (dateFrom) dateFrom.addEventListener('change', applySalaryFilters);
+  if (dateTo) dateTo.addEventListener('change', applySalaryFilters);
+});
+
+// Employee autocomplete
+const employeesList = {{ employee_profiles | tojson | safe }};
+
+function initEmployeeAutocomplete() {
+  const input = document.getElementById('sal_employee');
+  const dropdown = document.getElementById('sal_employee_dropdown');
+  if (!input || !dropdown) return;
+  input.addEventListener('focus', function() { renderEmployeeOptions(''); dropdown.style.display = ''; });
+  input.addEventListener('input', function() { renderEmployeeOptions(this.value.toLowerCase()); dropdown.style.display = ''; });
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#sal_employee') && !e.target.closest('#sal_employee_dropdown'))
+      dropdown.style.display = 'none';
+  });
+}
+
+function renderEmployeeOptions(filter) {
+  const dropdown = document.getElementById('sal_employee_dropdown');
+  const input = document.getElementById('sal_employee');
+  dropdown.innerHTML = '';
+  const filtered = employeesList.filter(emp => emp.name.toLowerCase().includes(filter));
+  if (filtered.length === 0) {
+    const d = document.createElement('div');
+    d.className = 'option'; d.textContent = 'No employees found';
+    d.style.cssText = 'color:#94a3b8;pointer-events:none;';
+    dropdown.appendChild(d); return;
+  }
+  filtered.forEach(emp => {
+    const d = document.createElement('div');
+    d.className = 'option';
+    d.textContent = emp.name + (emp.title ? ' — ' + emp.title : '');
+    d.onclick = () => {
+      input.value = emp.name;
+      dropdown.style.display = 'none';
+      if (emp.region) document.getElementById('sal_region').value = emp.region;
+    };
+    dropdown.appendChild(d);
+  });
+}
+
+function toggleCommissionPaidDate() {
+  const type = document.getElementById('sal_type').value;
+  const status = document.getElementById('sal_status').value;
+  const paidDateGroup = document.getElementById('sal_paid_date_group');
+  if (type === 'Commission' && status === 'Paid') {
+    paidDateGroup.style.display = 'block';
+  } else {
+    paidDateGroup.style.display = 'none';
+  }
+}
+
+function editSalary(id, employee, date, amount, region, notes, status, type, paidDate) {
+  // For Commission, show the quick edit modal instead
+  if (type === 'Commission') {
+    showCommissionEditModal(id, employee, date, amount, region, status, notes, paidDate);
+    return;
+  }
+
+  document.getElementById('salary_id').value = id;
+  document.getElementById('sal_employee').value = employee;
+  document.getElementById('sal_date').value = date;
+  document.getElementById('sal_amount').value = amount;
+  document.getElementById('sal_region').value = region;
+  document.getElementById('sal_notes').value = notes || '';
+  document.getElementById('sal_status').value = status || 'Pending';
+  document.getElementById('sal_type').value = type || 'Salary';
+  if (paidDate) document.getElementById('sal_paid_date').value = paidDate;
+  document.getElementById('submitBtnText').textContent = 'Update ' + (type === 'Bonus' ? 'Bonus' : type === 'Commission' ? 'Commission' : 'Salary');
+  toggleCommissionPaidDate();
+  // Switch to add-salary tab
+  document.querySelectorAll('.payroll-tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.payroll-tab-button').forEach(b => b.classList.remove('active'));
+  document.getElementById('add-salary').classList.add('active');
+  document.querySelector('button[onclick="switchTab(\'add-salary\', event)"]').classList.add('active');
+  document.querySelector('form').scrollIntoView({behavior:'smooth'});
+}
+
+function resetSalaryForm() {
+  document.getElementById('salary_id').value = '';
+  document.getElementById('sal_type').value = 'Salary';
+  document.getElementById('sal_paid_date').value = '';
+  document.getElementById('submitBtnText').textContent = 'Add Entry';
+  toggleCommissionPaidDate();
+}
+
+function addSalary(e) {
+  e.preventDefault();
+
+  // Prevent double-submit
+  const submitBtn = document.getElementById('submitBtn');
+  if (submitBtn.disabled) return;
+  submitBtn.disabled = true;
+  submitBtn.style.opacity = '0.6';
+  submitBtn.style.cursor = 'not-allowed';
+
+  const employeeName = (document.getElementById('sal_employee').value || '').trim();
+  if (!employeeName) { alert('Please enter an employee name'); submitBtn.disabled = false; submitBtn.style.opacity = '1'; submitBtn.style.cursor = 'pointer'; return; }
+
+  const dateVal = document.getElementById('sal_date').value;
+  if (dateVal > TODAY_ISO) {
+    alert('Date cannot be a future date.'); submitBtn.disabled = false; submitBtn.style.opacity = '1'; submitBtn.style.cursor = 'pointer'; return;
+  }
+  const amountVal = parseFloat(document.getElementById('sal_amount').value);
+  if (isNaN(amountVal) || amountVal < 0) {
+    alert('Amount cannot be negative.'); submitBtn.disabled = false; submitBtn.style.opacity = '1'; submitBtn.style.cursor = 'pointer'; return;
+  }
+
+  const salaryId = document.getElementById('salary_id').value;
+  const salType = document.getElementById('sal_type').value || 'Salary';
+  const salStatus = document.getElementById('sal_status').value || 'Pending';
+  const data = {
+    employee_name:  employeeName,
+    date:           dateVal,
+    amount:         amountVal,
+    region:         document.getElementById('sal_region').value,
+    notes:          document.getElementById('sal_notes').value,
+    salary_status:  salStatus,
+    salary_type:    salType,
+  };
+
+  // Add paid_at for commission records when status is Paid
+  if (salType === 'Commission' && salStatus === 'Paid') {
+    const paidDateVal = document.getElementById('sal_paid_date').value;
+    if (paidDateVal) {
+      data.paid_at = paidDateVal;
+    }
+  }
+
+  const method = salaryId ? 'PUT' : 'POST';
+  const url = salaryId ? '/api/payroll/salaries/' + salaryId : '/api/payroll/salaries';
+
+  fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success || res.salary_id || res.firebase_id) {
+      const isEditing = !!salaryId;
+      // Clear form and load salaries, then show modal
+      document.getElementById('salaryForm').reset();
+      document.getElementById('salary_id').value = '';
+      loadSalariesAndShowModal(isEditing, salType);
+    } else {
+      alert('Error: ' + (res.error || 'Failed to save salary'));
+      submitBtn.disabled = false;
+      submitBtn.style.opacity = '1';
+      submitBtn.style.cursor = 'pointer';
+    }
+  })
+  .catch(err => {
+    console.error('Error:', err);
+    alert('Failed to save. Please try again.');
+    submitBtn.disabled = false;
+    submitBtn.style.opacity = '1';
+    submitBtn.style.cursor = 'pointer';
+  });
+}
+
+var currentSalaryDeleteId = null;
+
+function deleteSalary(id) {
+  // Prevent deletion if another deletion is in progress
+  if (isSalaryDeleting) return;
+
+  currentSalaryDeleteId = (id || '').trim();
+  console.log(`deleteSalary called with id="${currentSalaryDeleteId}", perms=${Array.from(salaryDeletePerms)}`);
+  new bootstrap.Modal(document.getElementById('payrollDeleteSalaryConfirmModal')).show();
+}
+
+function performDeleteSalary() {
+  if (!currentSalaryDeleteId || isSalaryDeleting) return;
+
+  isSalaryDeleting = true;
+  // Disable all delete buttons while deletion is in progress
+  document.querySelectorAll('[data-salary-delete-btn]').forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+  });
+
+  bootstrap.Modal.getInstance(document.getElementById('payrollDeleteSalaryConfirmModal')).hide();
+
+  fetch(`/api/payroll/salaries/${currentSalaryDeleteId}`, {method: 'DELETE'})
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        const deletedType = res.salary_type || 'Salary';
+        sessionStorage.setItem('salaryDeleteSuccess', 'Deleted');
+        sessionStorage.setItem('deletedType', deletedType);
+        location.reload();
+      } else {
+        isSalaryDeleting = false;
+        // Re-enable delete buttons on error
+        document.querySelectorAll('[data-salary-delete-btn]').forEach(btn => {
+          if (salaryDeletePerms.has(btn.dataset.salaryDeleteBtn)) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+          }
+        });
+        alert('Error: ' + (res.error || 'Unknown error'));
+      }
+    })
+    .catch(e => {
+      console.error('Error:', e);
+      isSalaryDeleting = false;
+      // Re-enable delete buttons on error
+      document.querySelectorAll('[data-salary-delete-btn]').forEach(btn => {
+        if (salaryDeletePerms.has(btn.dataset.salaryDeleteBtn)) {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          btn.style.cursor = 'pointer';
+        }
+      });
+      alert('Error deleting salary');
+    });
+}
+
+// Real-time filter listeners
+document.addEventListener('DOMContentLoaded', () => {
+  // Check if there's a salary success message (after page reload)
+  const salarySuccessMsg = sessionStorage.getItem('salarySuccessMsg');
+  const salaryType = sessionStorage.getItem('salaryType') || 'Salary';
+  if (salarySuccessMsg) {
+    sessionStorage.removeItem('salarySuccessMsg');
+    sessionStorage.removeItem('salaryType');
+    const isUpdating = salarySuccessMsg.toLowerCase().includes('updated');
+    const typeLabel = salaryType.toLowerCase();
+    const action = isUpdating ? 'updated' : 'added';
+    document.getElementById('salarySuccessTitle').textContent = salarySuccessMsg;
+    document.getElementById('salarySuccessMsg').textContent = `${salaryType} entry has been successfully ${action}.`;
+    new bootstrap.Modal(document.getElementById('payrollSalarySuccessModal')).show();
+  }
+
+  // Check if there's a salary delete success message (after page reload)
+  const salaryDeleteSuccess = sessionStorage.getItem('salaryDeleteSuccess');
+  const deletedType = sessionStorage.getItem('deletedType') || 'Salary';
+  if (salaryDeleteSuccess) {
+    sessionStorage.removeItem('salaryDeleteSuccess');
+    sessionStorage.removeItem('deletedType');
+    // Refresh permissions to ensure all salaries have correct delete buttons
+    refreshSalaryDeletePerms();
+    // Show delete success modal after a brief delay to ensure UI is updated
+    setTimeout(() => {
+      document.getElementById('salarySuccessTitle').textContent = 'Deleted';
+      document.getElementById('salarySuccessMsg').textContent = `${deletedType} entry has been successfully deleted.`;
+      new bootstrap.Modal(document.getElementById('payrollSalarySuccessModal')).show();
+    }, 300);
+  }
+
+  document.getElementById('sal_date').setAttribute('max', TODAY_ISO);
+  initEmployeeAutocomplete();
+  document.getElementById('searchEmployee').addEventListener('input', applySalaryFilters);
+  document.getElementById('filterType').addEventListener('change', applySalaryFilters);
+  document.getElementById('filterRegion').addEventListener('change', applySalaryFilters);
+  document.getElementById('dateFrom').addEventListener('change', applySalaryFilters);
+  document.getElementById('dateTo').addEventListener('change', applySalaryFilters);
+  buildPayrollExportLinks();
+  handleExportTypeChange();
+
+  // Render the Advance & Commission Adjustment employee summary
+  renderAdvanceSummary();
+
+  // Load salary delete permissions immediately
+  refreshSalaryDeletePerms();
+
+
+  // Refresh permissions when returning to page (admin approval detection)
+  window.addEventListener('focus', function() {
+    console.log('Window focus - refreshing salary permissions');
+    refreshSalaryDeletePerms();
+  });
+
+  // Display salary delete success message if available
+  if (sessionStorage.getItem('salaryDeleteSuccess')) {
+    sessionStorage.removeItem('salaryDeleteSuccess');
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-success alert-dismissible position-fixed shadow';
+    alert.style.cssText = 'top:72px;right:20px;z-index:9999;min-width:280px;font-size:13px;';
+    alert.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Salary entry deleted successfully! <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert"></button>';
+    document.body.appendChild(alert);
+    setTimeout(() => alert.remove(), 5000);
+  }
+});
+
+// ?? Export Functions ??????????????????????????????????????
+const PDF_PAYROLL   = "{{ url_for('payroll_export_pdf') }}";
+const EXCEL_PAYROLL = "{{ url_for('payroll_export_excel') }}";
+const CSV_PAYROLL   = "{{ url_for('payroll_export_csv') }}";
+
+function buildPayrollExportLinks() {
+  const params = new URLSearchParams();
+  const type = document.getElementById('exportType').value;
+  const r  = document.getElementById('exportRegion').value;
+  const f  = document.getElementById('exportFrom').value;
+  const t  = document.getElementById('exportTo').value;
+  if (type && type !== 'salary') params.set('type', type);
+  if (r) params.set('region', r);
+  if (f) params.set('from', f);
+  if (t) params.set('to', t);
+  const q = params.toString() ? '?' + params.toString() : '';
+  document.getElementById('exportPayrollPdfLink').href   = PDF_PAYROLL   + q;
+  document.getElementById('exportPayrollExcelLink').href = EXCEL_PAYROLL + q;
+  document.getElementById('exportPayrollCsvLink').href   = CSV_PAYROLL   + q;
+}
+
+function handleExportTypeChange() {
+  const type = document.getElementById('exportType').value;
+  const regionContainer = document.getElementById('regionFilterContainer');
+
+  // Show region filter only for salary export, hide for advance export
+  if (type === 'advance') {
+    regionContainer.style.cssText = 'display: none !important;';
+    document.getElementById('exportRegion').value = '';
+  } else {
+    regionContainer.style.cssText = 'display: flex !important; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.5rem;';
+  }
+
+  buildPayrollExportLinks();
+}
+
+function clearPayrollExportFilters() {
+  document.getElementById('exportType').value   = 'salary';
+  document.getElementById('exportRegion').value = '';
+  document.getElementById('exportFrom').value   = '';
+  document.getElementById('exportTo').value     = '';
+  handleExportTypeChange();
+}
+
+function setPayrollExportRange(type) {
+  const now = new Date();
+  if (type === 'month') {
+    document.getElementById('exportFrom').value = localDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    document.getElementById('exportTo').value   = localDate(new Date(now.getFullYear(), now.getMonth()+1, 0));
+  } else if (type === 'year') {
+    document.getElementById('exportFrom').value = `${now.getFullYear()}-01-01`;
+    document.getElementById('exportTo').value   = `${now.getFullYear()}-12-31`;
+  } else if (type === 'last30') {
+    const f = new Date(now); f.setDate(f.getDate()-30);
+    document.getElementById('exportFrom').value = localDate(f);
+    document.getElementById('exportTo').value   = localDate(now);
+  }
+  buildPayrollExportLinks();
+}
+
+function localDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ── Advance & Commission Adjustment (employee summary) ──────────────────────────
+let advanceSummary = {{ advance_summary|tojson|safe }};
+
+const ADV_CUR = '{{ currency_symbol }}';
+function advMoney(n) {
+  const v = parseFloat(n) || 0;
+  return (v < 0 ? '-' : '') + ADV_CUR + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function advEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// YYYY-MM-DD -> MM-DD-YYYY (same format the rest of Payroll uses)
+function advDate(d) {
+  const p = (d || '').split('-');
+  return p.length === 3 ? `${p[1]}-${p[2]}-${p[0]}` : (d || '—');
+}
+function advEmployeeUrl(name) {
+  return '{{ url_for("advance_employee_detail", employee_name="EMPLOYEE_NAME") }}'.replace('EMPLOYEE_NAME', encodeURIComponent(name));
+}
+
+function advVisibleRows() {
+  const q = (document.getElementById('advEmpSearch').value || '').trim().toLowerCase();
+  const status = document.getElementById('advEmpStatus').value;
+  return advanceSummary.filter(r => {
+    if (q && !r.employee_name.toLowerCase().includes(q)) return false;
+    if (status === 'outstanding' && !(r.balance > 0.005)) return false;
+    if (status === 'settled' && r.balance > 0.005) return false;
+    return true;
+  });
+}
+
+function renderAdvanceSummary() {
+  const rows = advVisibleRows();
+  const body = document.getElementById('advEmpBody');
+
+  // Cards follow the filters: they total exactly the employees shown in the table
+  const filtered = rows.length !== advanceSummary.length;
+  const totAdv = rows.reduce((s, r) => s + r.total_advance, 0);
+  const totAdj = rows.reduce((s, r) => s + r.total_adjusted, 0);
+  const owing = rows.filter(r => r.balance > 0.005).length;
+  document.getElementById('advCardEmployees').textContent = rows.length;
+  document.getElementById('advCardEmployeesSub').textContent = filtered ? `${rows.length} of ${advanceSummary.length} employees` : (owing ? `${owing} currently open` : 'All closed');
+  document.getElementById('advCardAdvance').textContent = advMoney(totAdv);
+  const advCount = rows.reduce((s, r) => s + r.advance_count, 0);
+  document.getElementById('advCardAdvanceSub').textContent = `Across ${advCount} advance${advCount === 1 ? '' : 's'}`;
+  document.getElementById('advCardAdjusted').textContent = advMoney(totAdj);
+  document.getElementById('advCardBalance').textContent = advMoney(totAdv - totAdj);
+
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:40px;">${
+      advanceSummary.length ? 'No employees match your filters.' : 'No advances yet. Use “Add Advance Entry” to create one.'}</td></tr>`;
+    document.getElementById('advEmpCount').textContent = '0 employee(s)';
+    return;
+  }
+
+  const sumBal = rows.reduce((s, r) => s + r.balance, 0);
+  body.innerHTML = rows.map(r => {
+    const url = advEmployeeUrl(r.employee_name);
+    const settled = !(r.balance > 0.005);
+    return `<tr class="adv-row" onclick="window.location='${url}'">
+      <td><a href="${url}" class="adv-emp-link">${advEsc(r.employee_name)}</a></td>
+      <td class="num">${r.advance_count}</td>
+      <td class="num" style="color:#2563eb;font-weight:600;">${advMoney(r.total_advance)}</td>
+      <td class="num" style="color:#16a34a;font-weight:600;">${advMoney(r.total_adjusted)}</td>
+      <td class="num" style="color:${settled ? '#15803d' : '#dc2626'};font-weight:700;">${advMoney(r.balance)}</td>
+      <td style="white-space:nowrap;">${advDate(r.last_date)}</td>
+      <td><span class="adv-badge ${settled ? 'adv-badge-closed' : 'adv-badge-open'}">${settled ? 'Closed' : 'Open'}</span></td>
+    </tr>`;
+  }).join('') + `<tr class="adv-total-row">
+      <td>Total (${rows.length})</td>
+      <td class="num">${rows.reduce((s, r) => s + r.advance_count, 0)}</td>
+      <td class="num" style="color:#2563eb;">${advMoney(totAdv)}</td>
+      <td class="num" style="color:#16a34a;">${advMoney(totAdj)}</td>
+      <td class="num" style="color:${sumBal > 0.005 ? '#dc2626' : '#15803d'};">${advMoney(sumBal)}</td>
+      <td colspan="2"></td>
+    </tr>`;
+  document.getElementById('advEmpCount').textContent = `${rows.length} employee(s)`;
+}
+
+// ── Salary delete permissions ──────────────────────────────────────────────────
+let salaryDeletePerms = new Set({{ salary_delete_perms|tojson|safe }});
+let isSalaryDeleting = false;
+
+async function refreshSalaryDeletePerms() {
+  try {
+    const response = await fetch('{{ url_for("salary_delete_perms") }}');
+    const data = await response.json();
+    salaryDeletePerms = new Set(data.delete_perms || []);
+    console.log('Loaded salary delete perms:', Array.from(salaryDeletePerms));
+    renderSalaryDeleteButtons();
+  } catch (e) {
+    console.error('Error refreshing salary perms:', e);
+  }
+}
+
+function loadSalariesAndShowModal(isEditing, salaryType) {
+  // Store success message and reload page to fetch fresh data
+  const type = salaryType || document.getElementById('sal_type').value || 'Salary';
+  const action = isEditing ? 'Updated' : 'Added';
+  const message = `${type} ${action}`;
+  sessionStorage.setItem('salarySuccessMsg', message);
+  sessionStorage.setItem('salaryType', type);
+  location.reload();
+}
+
+// Handle hash-based tab navigation
+function handleHashNavigation() {
+  const hash = window.location.hash.substring(1) || 'salaries';
+  const validTabs = ['salaries', 'add-salary', 'commission', 'employee-advance', 'export'];
+
+  if (validTabs.includes(hash)) {
+    document.querySelectorAll('.payroll-tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.payroll-tab-button').forEach(b => b.classList.remove('active'));
+
+    const tabContent = document.getElementById(hash);
+    if (tabContent) {
+      tabContent.classList.add('active');
+      const button = document.querySelector(`button[onclick="switchTab('${hash}', event)"]`);
+      if (button) button.classList.add('active');
+    }
+  }
+}
+
+// Initialize on tab switch
+document.addEventListener('DOMContentLoaded', function() {
+  // Check hash on page load
+  handleHashNavigation();
+
+  const originalSwitchTab = window.switchTab;
+  window.switchTab = function(tabName, event) {
+    originalSwitchTab.call(this, tabName, event);
+    // Update hash when tab switches
+    window.location.hash = tabName;
+  };
+});
+
+// Listen for hash changes (browser back/forward)
+window.addEventListener('hashchange', handleHashNavigation);
+
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Salary delete modal validation
+  const salaryDeleteInput = document.getElementById('payrollSalaryDeleteText');
+  const salaryDeleteBtn = document.getElementById('payrollSalaryDeleteBtn');
+  if (salaryDeleteInput && salaryDeleteBtn) {
+    const updateSalaryDeleteButtonState = () => {
+      const isValid = salaryDeleteInput.value === 'DELETE';
+      salaryDeleteBtn.style.opacity = isValid ? '1' : '0.5';
+      salaryDeleteBtn.disabled = !isValid;
+    };
+    salaryDeleteInput.addEventListener('input', updateSalaryDeleteButtonState);
+  }
+});
+</script>
+
+<!-- ?? Delete Salary Modal ????????????????????????????????????????????????????????? -->
+<div class="modal fade" id="payrollDeleteSalaryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">Confirm Delete Salary</h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pb-2">
+        <p style="color: #475569; margin-bottom: 16px;">Type <strong style="color: #dc2626;">DELETE</strong> to confirm deletion of this salary entry:</p>
+        <input type="text" id="payrollSalaryDeleteText" placeholder="Type 'DELETE'" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box; margin-bottom: 16px;">
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="payrollSalaryDeleteBtn" class="btn btn-sm btn-danger" onclick="confirmPayrollDeleteSalary()" style="opacity: 0.5;" disabled>
+          <i class="bi bi-trash me-1"></i>Delete Salary
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include "partials/_advance_entry_modal.html" %}
+
+<!-- Success Modal: Salary Added/Updated -->
+<div class="modal fade" id="payrollSalarySuccessModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-top: 4px solid #10b981;">
+      <div class="modal-header py-3" style="background-color: #f0fdf4; border-bottom: 1px solid #d1fae5;">
+        <h6 class="modal-title" style="color: #059669;">
+          <i class="bi bi-check-circle me-2"></i><span id="salarySuccessTitle">Salary Added</span>
+        </h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-4" style="color: #475569;">
+        <p id="salarySuccessMsg">Salary entry has been successfully added.</p>
+      </div>
+      <div class="modal-footer py-3">
+        <button class="btn btn-sm btn-success" data-bs-dismiss="modal">
+          <i class="bi bi-check me-1"></i>OK
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation Modal: Delete Salary Confirm -->
+<div class="modal fade" id="payrollDeleteSalaryConfirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-top: 4px solid #ef4444;">
+      <div class="modal-header py-3" style="background-color: #fef2f2; border-bottom: 1px solid #fee2e2;">
+        <h6 class="modal-title" style="color: #dc2626;">
+          <i class="bi bi-trash me-2"></i>Delete Salary
+        </h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-4" style="color: #475569;">
+        <p>Are you sure you want to delete this salary entry? This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer py-3">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-sm btn-danger" id="confirmDeleteSalaryBtn" onclick="performDeleteSalary()">
+          <i class="bi bi-trash me-1"></i>Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ?? Commission Management JavaScript ??????????????????????????? -->
+<script>
+let allCommissions = [];
+let selectedSalesperson = null;
+
+// Calculate commission status based on remaining balance
+// A commission with $0 remaining is shown as Paid whether it was settled via a
+// direct payment or fully covered by advance deductions
+function getCommissionStatus(earned, adjusted, paid) {
+  const remaining = earned - adjusted - paid;
+  const EPSILON = 0.01;
+  return remaining <= EPSILON ? 'Paid' : 'Pending';
+}
+
+function getStatusBadgeClass(status) {
+  if (status === 'Paid') return 'badge bg-success';
+  return 'badge bg-warning text-dark'; // Pending
+}
+
+function getStatusIcon(status) {
+  if (status === 'Paid') return '<i class="bi bi-check-circle me-1"></i>';
+  if (status === 'Pending') return '<i class="bi bi-clock me-1"></i>';
+  return '';
+}
+
+function loadCommissions() {
+  fetch('{{ url_for("get_payroll_commissions") }}')
+    .then(r => r.json())
+    .then(data => {
+      allCommissions = data.commissions || [];
+      renderCommissionTable();
+      updateCommissionSummary();
+    })
+    .catch(e => {
+      console.error('Error loading commissions:', e);
+      document.getElementById('commissionTableBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#e74c3c;">Error loading commissions</td></tr>';
+    });
+}
+
+function updateCommissionSummary() {
+  let totalEarned = 0, totalAdjusted = 0, totalPaid = 0;
+  const uniqueEmployees = new Set();
+
+  allCommissions.forEach(comm => {
+    const earned = parseFloat(comm.commission_amount) || 0;
+    const adjusted = parseFloat(comm.total_deducted) || 0;
+    const paid = parseFloat(comm.paid_amount) || 0;
+
+    totalEarned += earned;
+    totalAdjusted += adjusted;
+    totalPaid += paid;
+
+    // Track unique employees
+    if (comm.salesperson) {
+      uniqueEmployees.add(comm.salesperson);
+    }
+  });
+
+  const totalOutstanding = totalEarned - totalAdjusted - totalPaid;
+  const employeeCount = uniqueEmployees.size;
+
+  document.getElementById('cardCommEmployees').textContent = employeeCount;
+  document.getElementById('cardCommEarned').textContent = CURRENCY_SYMBOL + fmt(totalEarned);
+  document.getElementById('cardCommAdjusted').textContent = CURRENCY_SYMBOL + fmt(totalAdjusted);
+  document.getElementById('cardCommPaid').textContent = CURRENCY_SYMBOL + fmt(totalPaid);
+  document.getElementById('cardCommOutstanding').textContent = CURRENCY_SYMBOL + fmt(totalOutstanding);
+}
+
+function renderCommissionTable() {
+  const tbody = document.getElementById('commissionTableBody');
+  const searchVal = document.getElementById('commSearchSalesperson').value.toLowerCase();
+  const statusVal = document.getElementById('commFilterStatus').value;
+
+  // Search filters the raw rows; the status filter is applied to the
+  // per-salesperson aggregate (below) so it matches the displayed status.
+  const filtered = allCommissions.filter(comm =>
+    (comm.salesperson || '').toLowerCase().includes(searchVal));
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:40px;">No commissions found</td></tr>';
+    updateFilteredCommissionSummary([]);
+    return;
+  }
+
+  // Update summary cards based on filtered data
+  updateFilteredCommissionSummary(filtered);
+
+  // Always show salesperson summary
+  renderSalespersonSummary(filtered, tbody, statusVal);
+}
+
+function updateFilteredCommissionSummary(filtered) {
+  let totalEarned = 0, totalAdjusted = 0, totalPaid = 0;
+  const uniqueEmployees = new Set();
+
+  filtered.forEach(comm => {
+    const earned = parseFloat(comm.commission_amount) || 0;
+    const adjusted = parseFloat(comm.total_deducted) || 0;
+    const paid = parseFloat(comm.paid_amount) || 0;
+
+    totalEarned += earned;
+    totalAdjusted += adjusted;
+    totalPaid += paid;
+
+    // Track unique employees
+    if (comm.salesperson) {
+      uniqueEmployees.add(comm.salesperson);
+    }
+  });
+
+  const totalOutstanding = totalEarned - totalAdjusted - totalPaid;
+  const employeeCount = uniqueEmployees.size;
+
+  document.getElementById('cardCommEmployees').textContent = employeeCount;
+  document.getElementById('cardCommEarned').textContent = CURRENCY_SYMBOL + fmt(totalEarned);
+  document.getElementById('cardCommAdjusted').textContent = CURRENCY_SYMBOL + fmt(totalAdjusted);
+  document.getElementById('cardCommPaid').textContent = CURRENCY_SYMBOL + fmt(totalPaid);
+  document.getElementById('cardCommOutstanding').textContent = CURRENCY_SYMBOL + fmt(totalOutstanding);
+}
+
+function renderSalespersonSummary(filtered, tbody, statusFilter) {
+  // Update table headers for salesperson summary view
+  const thead = document.querySelector('#commission thead tr');
+  if (thead) {
+    thead.innerHTML = `
+      <th>Employee Name</th>
+      <th>Projects</th>
+      <th>Revenue Generated</th>
+      <th>Commission Earned</th>
+      <th>Advance Adjusted</th>
+      <th>Commission Paid</th>
+      <th>Remaining Due</th>
+      <th>Status</th>
+    `;
+  }
+
+  // Group by salesperson and calculate totals
+  const byPerson = {};
+  filtered.forEach(comm => {
+    const person = comm.salesperson || 'Unknown';
+    if (!byPerson[person]) {
+      byPerson[person] = [];
+    }
+    byPerson[person].push(comm);
+  });
+
+  let html = '';
+  Object.keys(byPerson).sort().forEach(personName => {
+    const personComms = byPerson[personName];
+    const earned = personComms.reduce((sum, c) => sum + (parseFloat(c.commission_amount) || 0), 0);
+    const adjusted = personComms.reduce((sum, c) => sum + (parseFloat(c.total_deducted) || 0), 0);
+    const paid = personComms.reduce((sum, c) => sum + (parseFloat(c.paid_amount) || 0), 0);
+    const remaining = earned - adjusted - paid;
+
+    // Calculate revenue generated as sum of unique project contract values
+    const uniqueProjectsMap = {};
+    personComms.forEach(c => {
+      const projKey = c.project_number || c.project_id || 'Unknown';
+      if (!uniqueProjectsMap[projKey]) {
+        uniqueProjectsMap[projKey] = parseFloat(c.contract_value) || 0;
+      }
+    });
+    const revenueGenerated = Object.values(uniqueProjectsMap).reduce((sum, val) => sum + val, 0);
+
+    // Count unique projects
+    const uniqueProjects = new Set(personComms.map(c => c.project_number || c.project_id || 'Unknown'));
+    const projectCount = uniqueProjects.size;
+
+    // Status is driven purely by the aggregate remaining balance
+    // (Commission Earned − Adjusted − Amount Paid): 0 → Paid, otherwise Pending.
+    const status = remaining <= 0.01 ? 'Paid' : 'Pending';
+    if (statusFilter && status !== statusFilter) return;  // status dropdown
+    const statusBadgeClass = status === 'Paid' ? 'badge bg-success' : 'badge bg-warning text-dark';
+    const statusIcon = status === 'Paid' ? '<i class="bi bi-check-circle me-1"></i>' : '';
+
+    html += `
+      <tr style="background:white;border-top:1px solid #e2e8f0;">
+        <td style="font-weight:600;color:#0d9488;cursor:pointer;" onclick="showSalespersonProjects('${personName.replace(/'/g, "&#39;")}')"><u>${personName}</u></td>
+        <td style="font-weight:600;text-align:center;">${projectCount}</td>
+        <td style="font-weight:600;color:#0891b2;">${CURRENCY_SYMBOL}${fmt(revenueGenerated)}</td>
+        <td style="font-weight:600;">${CURRENCY_SYMBOL}${fmt(earned)}</td>
+        <td style="font-weight:600;">${CURRENCY_SYMBOL}${fmt(adjusted)}</td>
+        <td style="font-weight:600;color:#10b981;">${CURRENCY_SYMBOL}${fmt(paid)}</td>
+        <td style="font-weight:600;color:#ef4444;">${CURRENCY_SYMBOL}${fmt(remaining)}</td>
+        <td><span class="${statusBadgeClass}" style="font-size:10px;">${statusIcon}${status}</span></td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:40px;">No commissions found</td></tr>';
+}
+
+function showSalespersonProjects(personName) {
+  selectedSalesperson = personName;
+  // Navigate to commission detail page
+  window.location.href = `/commission/${encodeURIComponent(personName)}`;
+}
+
+function closeProjectDetails() {
+  selectedSalesperson = null;
+  const modal = bootstrap.Modal.getInstance(document.getElementById('commissionDetailsModal'));
+  if (modal) modal.hide();
+}
+
+function renderProjectDetailsModal(personName) {
+  const filtered = allCommissions;
+  const personComms = filtered.filter(c => c.salesperson === personName);
+
+  if (personComms.length === 0) {
+    document.getElementById('commissionDetailsModalBody').innerHTML = `<p style="color:#94a3b8;padding:20px;text-align:center;">No commissions found for ${personName}</p>`;
+    return;
+  }
+
+  // Group by project
+  const grouped = {};
+  personComms.forEach(comm => {
+    const projNum = comm.project_number || comm.project_id || "Unknown";
+    if (!grouped[projNum]) {
+      grouped[projNum] = [];
+    }
+    grouped[projNum].push(comm);
+  });
+
+  // Build table HTML
+  let html = `
+    <div class="table-wrapper">
+      <table class="payroll-table">
+        <thead>
+          <tr style="background:#1f2937;">
+            <th style="color:white;">PROJECT #</th>
+            <th style="color:white;">CLIENT</th>
+            <th style="color:white;">SALESPERSON</th>
+            <th style="color:white;">CONTRACT VALUE</th>
+            <th style="color:white;">RATE / TYPE</th>
+            <th style="color:white;">COMMISSION</th>
+            <th style="color:white;">ADJUSTED</th>
+            <th style="color:white;">REMAINING DUE</th>
+            <th style="color:white;">STATUS</th>
+            <th style="color:white;">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  Object.keys(grouped).forEach(projNum => {
+    const commissions = grouped[projNum];
+    const firstComm = commissions[0];
+    const hasMultiple = commissions.length > 1;
+    const projectTotal = commissions.reduce((sum, c) => sum + (parseFloat(c.commission_amount) || 0), 0);
+    const adjustedTotal = commissions.reduce((sum, c) => sum + (parseFloat(c.total_deducted) || 0), 0);
+    const remainingTotal = commissions.reduce((sum, c) => sum + (parseFloat(c.remaining_due) || 0), 0);
+
+    const hasProjectLink = firstComm.actual_project_id && firstComm.actual_project_id.trim() !== '';
+    const projectLink = hasProjectLink ? `/projects/${firstComm.actual_project_id}` : 'javascript:void(0)';
+    const linkStyle = hasProjectLink ? 'color:#0ea5a5;text-decoration:none;cursor:pointer;font-weight:600;' : 'color:#cbd5e1;text-decoration:none;cursor:not-allowed;';
+
+    if (hasMultiple) {
+      html += `
+        <tr style="background:#f8fafc;border-top:2px solid #e2e8f0;">
+          <td style="font-weight:600;"><a href="${projectLink}" style="${linkStyle}">${firstComm.project_number || firstComm.project_id || '—'}</a></td>
+          <td><strong>${firstComm.client_name || '—'}</strong></td>
+          <td><strong>${firstComm.salesperson || '—'}</strong></td>
+          <td>${CURRENCY_SYMBOL}${fmt(parseFloat(firstComm.contract_value) || 0)}</td>
+          <td><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#e0e7ff;color:#312e81;">Multiple</span></td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(projectTotal)}</strong></td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(adjustedTotal)}</strong></td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(remainingTotal)}</strong></td>
+          <td></td>
+          <td></td>
+        </tr>
+      `;
+
+      commissions.forEach(comm => {
+        const earned = parseFloat(comm.commission_amount) || 0;
+        const adjusted = parseFloat(comm.total_deducted) || 0;
+        const paid = parseFloat(comm.paid_amount) || 0;
+        const displayStatus = getCommissionStatus(earned, adjusted, paid);
+        const statusBadgeClass = getStatusBadgeClass(displayStatus);
+        const statusIcon = getStatusIcon(displayStatus);
+
+        html += `
+          <tr style="background:white;" data-commission-id="${comm.commission_doc_id}">
+            <td style="padding-left:60px;font-size:13px;color:#64748b;">—</td>
+            <td style="font-size:13px;color:#64748b;">—</td>
+            <td style="font-size:13px;color:#64748b;">${comm.salesperson || '—'}</td>
+            <td style="font-size:13px;color:#64748b;">—</td>
+            <td style="font-size:13px;color:#64748b;">${comm.rate_display || '—'}</td>
+            <td style="font-size:13px;">${CURRENCY_SYMBOL}${fmt(earned)}</td>
+            <td style="font-size:13px;">
+              ${adjusted > 0 ? `<div style="font-weight:600;margin-bottom:4px;">${CURRENCY_SYMBOL}${fmt(adjusted)}</div>` : '—'}
+            </td>
+            <td style="font-size:13px;"><strong>${CURRENCY_SYMBOL}${fmt(remaining)}</strong></td>
+            <td>
+              <div>
+                <span class="${statusBadgeClass}" style="font-size:10px;">${statusIcon}${displayStatus}</span>
+                ${(displayStatus === 'Paid') && comm.paid_at ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">${comm.paid_at.substring(0,10)}</div>` : ''}
+              </div>
+            </td>
+            <td>
+              <div class="d-flex gap-1" style="justify-content:center;">
+                <button type="button" class="btn btn-xs btn-outline-secondary" title="Edit" onclick="editCommission('${comm.commission_doc_id}')"><i class="bi bi-pencil"></i></button>
+                ${(comm.status === 'Pending') ? `<button type="button" class="btn btn-xs btn-outline-success" title="Mark Paid" onclick="markCommissionPaid('${comm.commission_doc_id}')"><i class="bi bi-check-circle"></i></button>` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+    } else {
+      const comm = firstComm;
+      const earned = parseFloat(comm.commission_amount) || 0;
+      const adjusted = parseFloat(comm.total_deducted) || 0;
+      const paid = parseFloat(comm.paid_amount) || 0;
+      const displayStatus = getCommissionStatus(earned, adjusted, paid);
+      const statusBadgeClass = getStatusBadgeClass(displayStatus);
+      const statusIcon = getStatusIcon(displayStatus);
+
+      html += `
+        <tr style="background:white;border-top:1px solid #e2e8f0;" data-commission-id="${comm.commission_doc_id}">
+          <td style="font-weight:600;"><a href="${projectLink}" style="${linkStyle}">${comm.project_number || comm.project_id || '—'}</a></td>
+          <td><strong>${comm.client_name || '—'}</strong></td>
+          <td>${comm.salesperson || '—'}</td>
+          <td>${CURRENCY_SYMBOL}${fmt(parseFloat(comm.contract_value) || 0)}</td>
+          <td><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#e0e7ff;color:#312e81;">${comm.rate_display || '—'}</span></td>
+          <td>${CURRENCY_SYMBOL}${fmt(earned)}</td>
+          <td style="font-size:13px;">
+            ${adjusted > 0 ? `<div style="font-weight:600;margin-bottom:4px;">${CURRENCY_SYMBOL}${fmt(adjusted)}</div>` : '—'}
+          </td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(remaining)}</strong></td>
+          <td>
+            <div>
+              <span class="${statusBadgeClass}" style="font-size:10px;">${statusIcon}${displayStatus}</span>
+              ${(displayStatus === 'Paid') && comm.paid_at ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">${comm.paid_at.substring(0,10)}</div>` : ''}
+            </div>
+          </td>
+          <td>
+            <div class="d-flex gap-1" style="justify-content:center;">
+              <button type="button" class="btn btn-xs btn-outline-secondary" title="Edit" onclick="editCommission('${comm.commission_doc_id}')"><i class="bi bi-pencil"></i></button>
+              ${(comm.status === 'Pending') ? `<button type="button" class="btn btn-xs btn-outline-success" title="Mark Paid" onclick="markCommissionPaid('${comm.commission_doc_id}')"><i class="bi bi-check-circle"></i></button>` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  document.getElementById('commissionDetailsModalBody').innerHTML = html;
+  document.getElementById('commissionDetailsModalTitle').textContent = `Commission Details — ${personName}`;
+}
+
+function renderProjectDetailsInContainer(personName, container) {
+  const filtered = allCommissions;
+  const personComms = filtered.filter(c => c.salesperson === personName);
+
+  if (personComms.length === 0) {
+    container.innerHTML = `<p style="color:#94a3b8;padding:20px;text-align:center;">No commissions found for ${personName}</p>`;
+    return;
+  }
+
+  // Group by project
+  const grouped = {};
+  personComms.forEach(comm => {
+    const projNum = comm.project_number || comm.project_id || "Unknown";
+    if (!grouped[projNum]) {
+      grouped[projNum] = [];
+    }
+    grouped[projNum].push(comm);
+  });
+
+  // Build HTML for details
+  let html = `
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-top:20px;">
+      <div style="background:#f0fdf4;padding:16px;border-bottom:2px solid #d1fae5;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:600;color:#059669;"><i class="bi bi-briefcase me-2"></i>Commission Details — ${personName} — per-project commission tracking</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeProjectDetails()"><i class="bi bi-x me-1"></i>Close</button>
+      </div>
+      <div class="table-wrapper" style="border-radius:0;border:none;margin:0;">
+        <table class="payroll-table" style="margin-bottom:0;">
+          <thead>
+            <tr style="background:#1f2937;">
+              <th style="color:white;">PROJECT #</th>
+              <th style="color:white;">CLIENT</th>
+              <th style="color:white;">SALESPERSON</th>
+              <th style="color:white;">CONTRACT VALUE</th>
+              <th style="color:white;">RATE / TYPE</th>
+              <th style="color:white;">COMMISSION</th>
+              <th style="color:white;">ADJUSTED</th>
+              <th style="color:white;">REMAINING DUE</th>
+              <th style="color:white;">STATUS</th>
+              <th style="color:white;">ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+  `;
+
+  Object.keys(grouped).forEach(projNum => {
+    const commissions = grouped[projNum];
+    const firstComm = commissions[0];
+    const hasMultiple = commissions.length > 1;
+    const projectTotal = commissions.reduce((sum, c) => sum + (parseFloat(c.commission_amount) || 0), 0);
+    const adjustedTotal = commissions.reduce((sum, c) => sum + (parseFloat(c.total_deducted) || 0), 0);
+    const remainingTotal = commissions.reduce((sum, c) => sum + (parseFloat(c.remaining_due) || 0), 0);
+
+    const hasProjectLink = firstComm.actual_project_id && firstComm.actual_project_id.trim() !== '';
+    const projectLink = hasProjectLink ? `/projects/${firstComm.actual_project_id}` : 'javascript:void(0)';
+    const linkStyle = hasProjectLink ? 'color:#0ea5a5;text-decoration:none;cursor:pointer;font-weight:600;' : 'color:#cbd5e1;text-decoration:none;cursor:not-allowed;';
+
+    if (hasMultiple) {
+      // Header row for multiple commissions
+      html += `
+        <tr style="background:#f8fafc;border-top:2px solid #e2e8f0;">
+          <td style="font-weight:600;"><a href="${projectLink}" style="${linkStyle}">${firstComm.project_number || firstComm.project_id || '—'}</a></td>
+          <td><strong>${firstComm.client_name || '—'}</strong></td>
+          <td><strong>${firstComm.salesperson || '—'}</strong></td>
+          <td>${CURRENCY_SYMBOL}${fmt(parseFloat(firstComm.contract_value) || 0)}</td>
+          <td><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#e0e7ff;color:#312e81;">Multiple</span></td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(projectTotal)}</strong></td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(adjustedTotal)}</strong></td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(remainingTotal)}</strong></td>
+          <td></td>
+          <td></td>
+        </tr>
+      `;
+
+      // Detail rows
+      commissions.forEach(comm => {
+        const earned = parseFloat(comm.commission_amount) || 0;
+        const adjusted = parseFloat(comm.total_deducted) || 0;
+        const paid = parseFloat(comm.paid_amount) || 0;
+        const displayStatus = getCommissionStatus(earned, adjusted, paid);
+        const statusBadgeClass = getStatusBadgeClass(displayStatus);
+        const statusIcon = getStatusIcon(displayStatus);
+
+        html += `
+          <tr style="background:white;" data-commission-id="${comm.commission_doc_id}">
+            <td style="padding-left:60px;font-size:13px;color:#64748b;">—</td>
+            <td style="font-size:13px;color:#64748b;">—</td>
+            <td style="font-size:13px;color:#64748b;">${comm.salesperson || '—'}</td>
+            <td style="font-size:13px;color:#64748b;">—</td>
+            <td style="font-size:13px;color:#64748b;">${comm.rate_display || '—'}</td>
+            <td style="font-size:13px;">${CURRENCY_SYMBOL}${fmt(earned)}</td>
+            <td style="font-size:13px;">
+              ${adjusted > 0 ? `<div style="font-weight:600;margin-bottom:4px;">${CURRENCY_SYMBOL}${fmt(adjusted)}</div>` : '—'}
+            </td>
+            <td style="font-size:13px;"><strong>${CURRENCY_SYMBOL}${fmt(remaining)}</strong></td>
+            <td>
+              <div>
+                <span class="${statusBadgeClass}" style="font-size:10px;">${statusIcon}${displayStatus}</span>
+                ${(displayStatus === 'Paid') && comm.paid_at ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">${comm.paid_at.substring(0,10)}</div>` : ''}
+              </div>
+            </td>
+            <td>
+              <div class="d-flex gap-1" style="justify-content:center;">
+                <button type="button" class="btn btn-xs btn-outline-secondary" title="Edit" onclick="editCommission('${comm.commission_doc_id}')"><i class="bi bi-pencil"></i></button>
+                ${(comm.status === 'Pending') ? `<button type="button" class="btn btn-xs btn-outline-success" title="Mark Paid" onclick="markCommissionPaid('${comm.commission_doc_id}')"><i class="bi bi-check-circle"></i></button>` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+    } else {
+      // Single commission
+      const comm = firstComm;
+      const earned = parseFloat(comm.commission_amount) || 0;
+      const adjusted = parseFloat(comm.total_deducted) || 0;
+      const remaining = parseFloat(comm.remaining_due) || 0;
+      const displayStatus = getCommissionStatus(earned, adjusted, paid);
+      const statusBadge = displayStatus === 'Paid' ? 'background:#dcfce7;color:#15803d;' : 'background:#fef9c3;color:#92400e;';
+
+      html += `
+        <tr style="background:white;border-top:1px solid #e2e8f0;" data-commission-id="${comm.commission_doc_id}">
+          <td style="font-weight:600;"><a href="${projectLink}" style="${linkStyle}">${comm.project_number || comm.project_id || '—'}</a></td>
+          <td><strong>${comm.client_name || '—'}</strong></td>
+          <td>${comm.salesperson || '—'}</td>
+          <td>${CURRENCY_SYMBOL}${fmt(parseFloat(comm.contract_value) || 0)}</td>
+          <td><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#e0e7ff;color:#312e81;">${comm.rate_display || '—'}</span></td>
+          <td>${CURRENCY_SYMBOL}${fmt(earned)}</td>
+          <td style="font-size:13px;">
+            ${adjusted > 0 ? `<div style="font-weight:600;margin-bottom:4px;">${CURRENCY_SYMBOL}${fmt(adjusted)}</div>` : '—'}
+          </td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(remaining)}</strong></td>
+          <td>
+            <div>
+              <span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:.68rem;font-weight:700;${statusBadge}">${displayStatus}</span>
+              ${(displayStatus === 'Paid') && comm.paid_at ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">${comm.paid_at.substring(0,10)}</div>` : ''}
+            </div>
+          </td>
+          <td>
+            <div class="d-flex gap-1" style="justify-content:center;">
+              <button type="button" class="btn btn-xs btn-outline-secondary" title="Edit" onclick="editCommission('${comm.commission_doc_id}')"><i class="bi bi-pencil"></i></button>
+              ${(comm.status === 'Pending') ? `<button type="button" class="btn btn-xs btn-outline-success" title="Mark Paid" onclick="markCommissionPaid('${comm.commission_doc_id}')"><i class="bi bi-check-circle"></i></button>` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+  });
+
+  html += `
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+  container.style.display = 'block';
+}
+
+function renderProjectDetailsByPerson(filtered, personName, tbody) {
+  // Update table headers for project detail view
+  const thead = document.querySelector('#commission thead tr');
+  if (thead) {
+    thead.innerHTML = `
+      <th>Project #</th>
+      <th>Client</th>
+      <th>Salesperson</th>
+      <th>Contract Value</th>
+      <th>Rate / Type</th>
+      <th>Commission</th>
+      <th>Adjusted</th>
+      <th>Remaining Due</th>
+      <th>Status</th>
+      <th>Actions</th>
+    `;
+  }
+
+  // Filter by selected salesperson and group by project
+  const personComms = filtered.filter(c => c.salesperson === personName);
+
+  const grouped = {};
+  personComms.forEach(comm => {
+    const projNum = comm.project_number || comm.project_id || "Unknown";
+    if (!grouped[projNum]) {
+      grouped[projNum] = [];
+    }
+    grouped[projNum].push(comm);
+  });
+
+  // Build table rows grouped by project with back button
+  let html = `
+    <tr style="background:#f0fdf4;border-bottom:2px solid #d1fae5;">
+      <td colspan="6" style="padding:12px;">
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="backToSalespersonList()"><i class="bi bi-arrow-left me-2"></i>Back to Salespeople</button>
+        <span style="margin-left:20px;font-weight:600;color:#059669;"><i class="bi bi-briefcase me-2"></i>Commission Details — ${personName} — per-project commission tracking</span>
+      </td>
+    </tr>
+  `;
+  Object.keys(grouped).forEach((projNum, index) => {
+    const commissions = grouped[projNum];
+    const firstComm = commissions[0];
+    const hasMultiple = commissions.length > 1;
+
+    const projectTotal = commissions.reduce((sum, c) => sum + (parseFloat(c.commission_amount) || 0), 0);
+    const adjustedTotal = commissions.reduce((sum, c) => sum + (parseFloat(c.total_deducted) || 0), 0);
+    const remainingTotal = commissions.reduce((sum, c) => sum + (parseFloat(c.remaining_due) || 0), 0);
+
+    if (hasMultiple) {
+      // Multiple commissions per project - show header + detail rows
+      const hasProjectLink = firstComm.actual_project_id && firstComm.actual_project_id.trim() !== '';
+      const projectLink = hasProjectLink ? `/projects/${firstComm.actual_project_id}` : 'javascript:void(0)';
+      const linkStyle = hasProjectLink ? 'color:#0ea5a5;text-decoration:none;cursor:pointer;font-weight:600;' : 'color:#cbd5e1;text-decoration:none;cursor:not-allowed;';
+
+      html += `
+        <tr style="background:#f8fafc;border-top:2px solid #e2e8f0;">
+          <td style="font-weight:600;"><a href="${projectLink}" style="${linkStyle}" title="${hasProjectLink ? 'View project details' : 'Project not found'}">${firstComm.project_number || firstComm.project_id || '—'}</a></td>
+          <td><strong>${firstComm.client_name || '—'}</strong></td>
+          <td><strong>${firstComm.salesperson || '—'}</strong></td>
+          <td>${CURRENCY_SYMBOL}${fmt(parseFloat(firstComm.contract_value) || 0)}</td>
+          <td><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#e0e7ff;color:#312e81;">Multiple</span></td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(projectTotal)}</strong></td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(adjustedTotal)}</strong></td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(remainingTotal)}</strong></td>
+          <td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:.68rem;font-weight:700;background:#fef9c3;color:#92400e;">${firstComm.status || 'Pending'}</span></td>
+          <td></td>
+        </tr>
+      `;
+
+      // Detail rows for each commission
+      commissions.forEach(comm => {
+        const earned = parseFloat(comm.commission_amount) || 0;
+        const adjusted = parseFloat(comm.total_deducted) || 0;
+        const paid = parseFloat(comm.paid_amount) || 0;
+        const remaining = parseFloat(comm.remaining_due) || 0;
+
+        // Determine display status based on remaining balance, paid amount, and adjusted amount
+        const displayStatus = getCommissionStatus(earned, adjusted, paid);
+        const statusBadgeClass = getStatusBadgeClass(displayStatus);
+        const statusIcon = getStatusIcon(displayStatus);
+
+        html += `
+          <tr style="background:white;padding-left:40px;" data-commission-id="${comm.commission_doc_id}">
+            <td style="padding-left:60px;font-size:13px;color:#64748b;">—</td>
+            <td style="font-size:13px;color:#64748b;">—</td>
+            <td style="font-size:13px;color:#64748b;">${comm.salesperson || '—'}</td>
+            <td style="font-size:13px;color:#64748b;">—</td>
+            <td style="font-size:13px;color:#64748b;">${comm.rate_display || '—'}</td>
+            <td style="font-size:13px;">${CURRENCY_SYMBOL}${fmt(earned)}</td>
+            <td style="font-size:13px;">
+              ${adjusted > 0 ? `<div style="font-weight:600;margin-bottom:4px;">${CURRENCY_SYMBOL}${fmt(adjusted)}</div>` : '—'}
+            </td>
+            <td style="font-size:13px;"><strong>${CURRENCY_SYMBOL}${fmt(remaining)}</strong></td>
+            <td>
+              <div>
+                <span class="${statusBadgeClass}" style="font-size:10px;">${statusIcon}${displayStatus}</span>
+                ${(displayStatus === 'Paid') && comm.paid_at ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">${comm.paid_at.substring(0,10)}</div>` : ''}
+              </div>
+            </td>
+            <td>
+              <div class="d-flex gap-1" style="justify-content:center;">
+                <button type="button" class="btn btn-xs btn-outline-secondary" title="Edit" onclick="editCommission('${comm.commission_doc_id}')"><i class="bi bi-pencil"></i></button>
+                ${(comm.status === 'Pending') ? `<button type="button" class="btn btn-xs btn-outline-success" title="Mark Paid" onclick="markCommissionPaid('${comm.commission_doc_id}')"><i class="bi bi-check-circle"></i></button>` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+    } else {
+      // Single commission per project - show just one row
+      const comm = firstComm;
+      const earned = parseFloat(comm.commission_amount) || 0;
+      const adjusted = parseFloat(comm.total_deducted) || 0;
+      const remaining = parseFloat(comm.remaining_due) || 0;
+
+      // Determine display status: based on remaining balance, paid amount, and adjusted amount
+      const displayStatus = getCommissionStatus(earned, adjusted, paid);
+      const statusBadge = displayStatus === 'Paid' ? 'background:#dcfce7;color:#15803d;' : 'background:#fef9c3;color:#92400e;';
+
+      const hasProjectLink = comm.actual_project_id && comm.actual_project_id.trim() !== '';
+      const projectLink = hasProjectLink ? `/projects/${comm.actual_project_id}` : 'javascript:void(0)';
+      const linkStyle = hasProjectLink ? 'color:#0ea5a5;text-decoration:none;cursor:pointer;font-weight:600;' : 'color:#cbd5e1;text-decoration:none;cursor:not-allowed;';
+
+      html += `
+        <tr style="background:white;border-top:1px solid #e2e8f0;" data-commission-id="${comm.commission_doc_id}">
+          <td style="font-weight:600;"><a href="${projectLink}" style="${linkStyle}" title="${hasProjectLink ? 'View project details' : 'Project not found'}">${comm.project_number || comm.project_id || '—'}</a></td>
+          <td><strong>${comm.client_name || '—'}</strong></td>
+          <td>${comm.salesperson || '—'}</td>
+          <td>${CURRENCY_SYMBOL}${fmt(parseFloat(comm.contract_value) || 0)}</td>
+          <td><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#e0e7ff;color:#312e81;">${comm.rate_display || '—'}</span></td>
+          <td>${CURRENCY_SYMBOL}${fmt(earned)}</td>
+          <td style="font-size:13px;">
+            ${adjusted > 0 ? `<div style="font-weight:600;margin-bottom:4px;">${CURRENCY_SYMBOL}${fmt(adjusted)}</div>` : '—'}
+          </td>
+          <td><strong>${CURRENCY_SYMBOL}${fmt(remaining)}</strong></td>
+          <td>
+            <div>
+              <span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:.68rem;font-weight:700;${statusBadge}">${displayStatus}</span>
+              ${(displayStatus === 'Paid') && comm.paid_at ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">${comm.paid_at.substring(0,10)}</div>` : ''}
+            </div>
+          </td>
+          <td>
+            <div class="d-flex gap-1" style="justify-content:center;">
+              <button type="button" class="btn btn-xs btn-outline-secondary" title="Edit" onclick="editCommission('${comm.commission_doc_id}')"><i class="bi bi-pencil"></i></button>
+              ${(comm.status === 'Pending') ? `<button type="button" class="btn btn-xs btn-outline-success" title="Mark Paid" onclick="markCommissionPaid('${comm.commission_doc_id}')"><i class="bi bi-check-circle"></i></button>` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+  });
+
+  tbody.innerHTML = html;
+}
+
+function editCommission(commissionDocId) {
+  const comm = allCommissions.find(c => c.commission_doc_id === commissionDocId);
+  if (!comm) {
+    alert('Commission not found');
+    return;
+  }
+
+  document.getElementById('commEditProjectId').value = comm.commission_doc_id;
+  document.getElementById('commEditProject').value = comm.project_number || comm.project_id || '';
+  document.getElementById('commEditSalesperson').value = comm.salesperson || '';
+  document.getElementById('commEditContractValue').value = parseFloat(comm.contract_value) || 0;
+
+  // Use actual override fields from backend (not parsed from display string)
+  let rateType = comm.commission_override_type || 'default';
+  let rateValue = comm.commission_override_value || 0;
+
+  document.getElementById('commEditRateType').value = rateType;
+  document.getElementById('commEditRateValue').value = rateValue;
+  document.getElementById('commEditEarned').value = parseFloat(comm.commission_amount) || 0;
+  document.getElementById('commEditAdjusted').value = parseFloat(comm.total_deducted) || 0;
+  document.getElementById('commEditRemainingDue').value = parseFloat(comm.remaining_due) || 0;
+  document.getElementById('commEditStatus').value = comm.status || 'Pending';
+
+  // Load paid date if available
+  if (comm.paid_at) {
+    const paidDateOnly = comm.paid_at.split('T')[0];
+    document.getElementById('commEditPaidDate').value = paidDateOnly;
+  } else {
+    document.getElementById('commEditPaidDate').value = '';
+  }
+
+  // Set up the display (hide/show fields based on rate type)
+  calcCommissionEarned();
+
+  // Show/hide paid date field based on status
+  togglePaidDate();
+
+  new bootstrap.Modal(document.getElementById('commissionEditModal')).show();
+}
+
+function togglePaidDate() {
+  const status = document.getElementById('commEditStatus').value;
+  const paidDateGroup = document.getElementById('paidDateGroup');
+  const paidDateField = document.getElementById('commEditPaidDate');
+
+  if (status === 'Paid') {
+    paidDateGroup.style.display = 'block';
+    // Auto-set date to today if not already set
+    if (!paidDateField.value) {
+      const today = new Date().toISOString().split('T')[0];
+      paidDateField.value = today;
+    }
+  } else {
+    paidDateGroup.style.display = 'none';
+  }
+}
+
+function calcCommissionEarned() {
+  const rateType = document.getElementById('commEditRateType').value;
+  const rateValue = parseFloat(document.getElementById('commEditRateValue').value) || 0;
+  const contractValue = parseFloat(document.getElementById('commEditContractValue').value) || 0;
+
+  // Hide/show rate value input based on type
+  const rateValueField = document.getElementById('commEditRateValue');
+  if (rateType === 'default') {
+    rateValueField.style.display = 'none';
+    document.querySelector('label[for="commEditRateValue"]').style.display = 'none';
+  } else {
+    rateValueField.style.display = 'block';
+    document.querySelector('label[for="commEditRateValue"]').style.display = 'block';
+  }
+
+  let earned = 0;
+
+  if (rateType === 'percent') {
+    // Percent: Commission = (Contract Value × Rate Value) / 100
+    earned = (contractValue * rateValue) / 100;
+  } else if (rateType === 'fixed') {
+    // Fixed: Commission = Rate Value
+    earned = rateValue;
+  } else {
+    // Default: Commission = 0 (or salesperson's default rate, but stored value is 0)
+    earned = 0;
+  }
+
+  document.getElementById('commEditEarned').value = Math.round(earned * 100) / 100;
+  calcRemainingDue();
+}
+
+function calcRemainingDue() {
+  const earned = parseFloat(document.getElementById('commEditEarned').value) || 0;
+  const adjusted = parseFloat(document.getElementById('commEditAdjusted').value) || 0;
+  const remaining = earned - adjusted;
+  document.getElementById('commEditRemainingDue').value = Math.round(remaining * 100) / 100;
+}
+
+function saveCommissionEdit(e) {
+  e.preventDefault();
+  const commDocId = document.getElementById('commEditProjectId').value;
+  const earnedVal = parseFloat(document.getElementById('commEditEarned').value);
+  const adjustedVal = parseFloat(document.getElementById('commEditAdjusted').value);
+  const rateType = document.getElementById('commEditRateType').value;
+  const rateValue = parseFloat(document.getElementById('commEditRateValue').value) || 0;
+  const status = document.getElementById('commEditStatus').value;
+  const paidDate = document.getElementById('commEditPaidDate').value;
+
+  if (isNaN(earnedVal)) {
+    alert('Please enter a valid commission earned amount');
+    return;
+  }
+
+  // Build rate_display string based on type
+  let rateDisplay = '0.0% (default)';
+  if (rateType === 'percent') {
+    rateDisplay = `${rateValue}% (custom)`;
+  } else if (rateType === 'fixed') {
+    rateDisplay = `Fixed amount`;
+  }
+
+  const payload = {
+    commission_amount: earnedVal,
+    total_deducted: adjustedVal || 0,
+    status: status,
+    rate_type: rateType,
+    rate_value: rateValue,
+    rate_display: rateDisplay
+  };
+
+  // Add paid_date if status is Paid
+  if ((status === 'Paid') && paidDate) {
+    payload.paid_at = paidDate;
+  }
+
+  fetch('/api/commission/project/' + commDocId + '/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok || data.success) {
+      bootstrap.Modal.getInstance(document.getElementById('commissionEditModal')).hide();
+      loadCommissions();
+      alert('Commission updated successfully');
+    } else {
+      alert('Error: ' + (data.error || 'Failed to update'));
+    }
+  })
+  .catch(e => {
+    console.error('Error:', e);
+    alert('Error updating commission');
+  });
+}
+
+function markCommissionPaid(commDocId) {
+  if (!confirm('Mark this commission as Paid?')) return;
+
+  fetch('/api/commission/project/' + commDocId + '/mark-paid', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project_id: commDocId })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok || data.success) {
+      loadCommissions();
+      alert('Commission marked as Paid');
+    } else {
+      alert('Error: ' + (data.error || 'Failed to mark as paid'));
+    }
+  })
+  .catch(e => {
+    console.error('Error:', e);
+    alert('Error marking commission as paid');
+  });
+}
+
+function markSalespersonCommissionsPaid(salespersonName, remainingAmount) {
+  if (!confirm(`Mark all commissions for ${salespersonName} as Paid? (Remaining: ${CURRENCY_SYMBOL}${fmt(remainingAmount)})`)) return;
+
+  // Get all pending commissions for this salesperson
+  const salespersonComms = allCommissions.filter(c => c.salesperson === salespersonName && (c.status === 'Pending'));
+
+  if (salespersonComms.length === 0) {
+    alert('No pending commissions found for this salesperson');
+    return;
+  }
+
+  // Mark all as paid
+  let completed = 0;
+  let failed = 0;
+
+  salespersonComms.forEach(comm => {
+    fetch('/api/commission/project/' + comm.commission_doc_id + '/mark-paid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: comm.commission_doc_id })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok || data.success) {
+        completed++;
+      } else {
+        failed++;
+      }
+
+      // If all requests completed, refresh
+      if (completed + failed === salespersonComms.length) {
+        loadCommissions();
+        if (failed === 0) {
+          alert(`All ${completed} commission(s) marked as Paid`);
+        } else {
+          alert(`Marked ${completed} as Paid, ${failed} failed`);
+        }
+      }
+    })
+    .catch(e => {
+      failed++;
+      if (completed + failed === salespersonComms.length) {
+        loadCommissions();
+        alert(`Marked ${completed} as Paid, ${failed} failed`);
+      }
+    });
+  });
+}
+
+function clearCommissionFilters() {
+  document.getElementById('commSearchSalesperson').value = '';
+  document.getElementById('commFilterStatus').value = '';
+  renderCommissionTable();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('commission')) {
+    document.getElementById('commSearchSalesperson').addEventListener('input', renderCommissionTable);
+    document.getElementById('commFilterStatus').addEventListener('change', renderCommissionTable);
+  }
+});
+
+// Load commissions on page load
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(() => { loadCommissions(); }, 500);
+});
+</script>
+
+<!-- Commission Edit Modal -->
+<div id="commissionEditNoticeModal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div style="background: #0d9488; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0; display: flex; align-items: center; gap: 12px;">
+        <i class="bi bi-check-circle-fill" style="font-size: 20px;"></i>
+        <h5 style="margin: 0; font-size: 16px; font-weight: 600;">Commission Record</h5>
+      </div>
+      <div class="modal-body" style="padding: 24px;">
+        <p style="margin: 0 0 20px 0; color: #0f172a; font-size: 15px;">
+          Commission records are managed in the <strong>"Commission Management"</strong> tab for better tracking and control.
+        </p>
+        <p style="margin: 0 0 20px 0; color: #64748b; font-size: 14px;">
+          Update the paid date below for this commission:
+        </p>
+        <form id="commissionQuickEditForm" onsubmit="saveCommissionQuickEdit(event)">
+          <input type="hidden" id="commissionQuickEditId">
+          <input type="hidden" id="commissionQuickEditEmployee">
+          <input type="hidden" id="commissionQuickEditDate">
+          <input type="hidden" id="commissionQuickEditAmount">
+          <input type="hidden" id="commissionQuickEditRegion">
+          <input type="hidden" id="commissionQuickEditStatus">
+          <input type="hidden" id="commissionQuickEditNotes">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="commissionQuickEditPaidDate" style="font-weight: 600; color: #0f172a; margin-bottom: 8px; display: block; font-size: 14px;">Paid Date</label>
+            <input type="date" id="commissionQuickEditPaidDate" class="form-control form-control-sm" required style="border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px;" />
+          </div>
+        </form>
+      </div>
+      <div style="padding: 0 24px 24px; display: flex; gap: 10px; justify-content: center;">
+        <button type="button" style="background: #e2e8f0; color: #0f172a; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;" onclick="closeCommissionEditModal()">Close</button>
+        <button type="button" style="background: #0d9488; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;" onclick="document.getElementById('commissionQuickEditForm').dispatchEvent(new Event('submit'))">Save Paid Date</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showCommissionEditModal(id, employee, date, amount, region, status, notes, paidDate) {
+  document.getElementById('commissionQuickEditId').value = id;
+  document.getElementById('commissionQuickEditEmployee').value = employee;
+  document.getElementById('commissionQuickEditDate').value = date;
+  document.getElementById('commissionQuickEditAmount').value = amount;
+  document.getElementById('commissionQuickEditRegion').value = region;
+  document.getElementById('commissionQuickEditStatus').value = status || 'Pending';
+  document.getElementById('commissionQuickEditNotes').value = notes || '';
+
+  // Auto-fill paid date: use provided paidDate, or if Paid status use commission date as default
+  const paidDateField = document.getElementById('commissionQuickEditPaidDate');
+  if (paidDate && paidDate.trim()) {
+    paidDateField.value = paidDate;
+  } else if (status === 'Paid') {
+    // If status is Paid but no paid_at date, use the commission date as default
+    paidDateField.value = date || '';
+  } else {
+    paidDateField.value = '';
+  }
+
+  const modal = new bootstrap.Modal(document.getElementById('commissionEditNoticeModal'));
+  modal.show();
+}
+
+function closeCommissionEditModal() {
+  const modal = bootstrap.Modal.getInstance(document.getElementById('commissionEditNoticeModal'));
+  if (modal) modal.hide();
+}
+
+function showToast(message, type = 'success') {
+  const toastId = 'commission-toast-' + Date.now();
+  const bgColor = type === 'success' ? '#10b981' : '#dc2626';
+  const toast = document.createElement('div');
+  toast.id = toastId;
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${bgColor};
+    color: white;
+    padding: 14px 20px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 9999;
+    animation: slideIn 0.3s ease-out;
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease-out';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+function saveCommissionQuickEdit(event) {
+  event.preventDefault();
+  const saveBtn = event.target.querySelector('button[type="submit"]') || document.querySelector('button[onclick*="commissionQuickEditForm"]');
+  const id = document.getElementById('commissionQuickEditId').value;
+  const paidDate = document.getElementById('commissionQuickEditPaidDate').value;
+
+  if (!id) {
+    showToast('Commission ID is missing', 'error');
+    return;
+  }
+
+  if (!paidDate) {
+    showToast('Please select a paid date', 'error');
+    return;
+  }
+
+  // Disable button to prevent multiple clicks
+  const buttons = document.querySelectorAll('button[onclick*="commissionQuickEditForm"]');
+  buttons.forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    btn.style.cursor = 'not-allowed';
+  });
+
+  const data = {
+    employee_name: document.getElementById('commissionQuickEditEmployee').value,
+    date: paidDate,  // Use paid date as the transaction date
+    amount: parseFloat(document.getElementById('commissionQuickEditAmount').value),
+    region: document.getElementById('commissionQuickEditRegion').value,
+    salary_status: document.getElementById('commissionQuickEditStatus').value,
+    salary_type: 'Commission',
+    notes: document.getElementById('commissionQuickEditNotes').value
+  };
+
+  console.log('Saving commission:', data);
+
+  fetch('/api/payroll/salaries/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(res => {
+    console.log('Backend response:', res);
+    if (res.success) {
+      showToast('Paid date updated successfully!');
+      closeCommissionEditModal();
+      // Reload after a short delay to show the toast
+      setTimeout(() => location.reload(), 300);
+    } else {
+      showToast('Error: ' + (res.error || 'Failed to save'), 'error');
+      // Re-enable button on error
+      buttons.forEach(btn => {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      });
+    }
+  })
+  .catch(e => {
+    console.error('Fetch error:', e);
+    showToast('Error saving commission: ' + e.message, 'error');
+  });
+}
+</script>
+
+{% endblock %}

@@ -1,4 +1,4 @@
-"""MABS PIMS - Flask Web Application"""
+"""SKT PIMS - Flask Web Application"""
 import os
 import re
 import json
@@ -1598,7 +1598,7 @@ def login():
                         log.info("Login: %s (%s) pages=%s", email, role, custom_pages or "role-default")
                         return redirect(url_for(first_page(role, custom_pages)))
 
-    return render_template("login.html", error=error)
+    return render_template("auth/login.html", error=error)
 
 @app.route("/logout")
 def logout():
@@ -1798,7 +1798,7 @@ def reset_password():
                 error = "An error occurred. Please try again later."
                 log.error("Reset password error: %s", str(e))
 
-    return render_template("reset_password.html", email=email, error=error, message=message, valid_token=valid_token)
+    return render_template("auth/reset_password.html", email=email, error=error, message=message, valid_token=valid_token)
 
 # ── Routes: Dashboard ─────────────────────────────────────────────────────────
 @app.route("/")
@@ -1822,7 +1822,7 @@ def portfolio():
     github_username = "archengservices2022"
     featured_repo = "SKT_Innovations_PIMS"
     return render_template(
-        "portfolio.html",
+        "admin/portfolio.html",
         github_username=github_username,
         github_profile_url=f"https://github.com/{github_username}",
         github_repo_url=f"https://github.com/{github_username}/{featured_repo}",
@@ -1877,7 +1877,7 @@ def _administration_dashboard():
     pending_time_off_all = [r for r in all_time_off if r.get("status") == "Pending"]
     pending_time_off_all.sort(key=lambda r: r.get("requested_at", ""), reverse=True)
 
-    return render_template("administration_dashboard.html",
+    return render_template("admin/administration_dashboard.html",
         proj_status_counts=proj_status_counts,
         proj_total=len(proj_list),
         inv_status_counts=inv_status_counts,
@@ -2478,7 +2478,7 @@ def dashboard():
                 except Exception:
                     pass
 
-    return render_template("dashboard.html",
+    return render_template("admin/dashboard.html",
         cur_year=cur_year,
         carryover_count=carryover_count,
         carryover_value=carryover_value,
@@ -2684,7 +2684,7 @@ def sales_dashboard():
         "outstanding": _adv_outstanding,
     }
 
-    return render_template("sales_dashboard.html",
+    return render_template("sales/sales_dashboard.html",
         my_quotes=my_quotes,
         open_quotes=open_quotes,
         converted=converted,
@@ -3021,7 +3021,7 @@ def quotes():
             pc["rate_display"] = _rd
             project_commissions.append(pc)
 
-    return render_template("quotes.html", quotes=items, statuses=statuses,
+    return render_template("sales/quotes.html", quotes=items, statuses=statuses,
                            search=search, status_filter=status_filter,
                            year_filter=year_filter, month_filter=month_filter,
                            date_from=date_from, date_to=date_to,
@@ -3460,7 +3460,7 @@ def quotes_new():
             existing_quote, _ = _find_quote_by_number(job_num)
             if existing_quote:
                 flash(f"Quote number {job_num} already exists. Please use a different number.", "danger")
-                return render_template("quote_form.html", quote=data, clients=clients,
+                return render_template("sales/quote_form.html", quote=data, clients=clients,
                                      sales_people=sales_ppl, is_new=True,
                                      next_num=_next_quote_number())
 
@@ -3473,7 +3473,7 @@ def quotes_new():
         else:
             flash("Quote saved locally (Firebase offline).", "warning")
         return redirect(url_for("quotes"))
-    return render_template("quote_form.html", quote=None, clients=clients,
+    return render_template("sales/quote_form.html", quote=None, clients=clients,
                            sales_people=sales_ppl, is_new=True,
                            next_num=_next_quote_number())
 
@@ -3520,7 +3520,7 @@ def quote_detail(quote_id):
     _has_q_del_perm = _role in ("admin", "accountant") or bool(
         _has_approved_delete_request(_uid, "quote", quote_id)
     )
-    return render_template("quote_detail.html", quote=data,
+    return render_template("sales/quote_detail.html", quote=data,
                            linked_project=linked_project, linked_invoice=linked_invoice,
                            ai_enabled=bool(_get_ai_client()),
                            user_has_delete_perm=_has_q_del_perm)
@@ -3587,7 +3587,7 @@ def quote_edit(quote_id):
         flash("Quote updated.", "success")
         page = request.form.get('page', '1')
         return redirect(url_for("quote_detail", quote_id=quote_id, page=page))
-    return render_template("quote_form.html", quote=data, clients=clients,
+    return render_template("sales/quote_form.html", quote=data, clients=clients,
                            sales_people=sales_ppl, is_new=False)
 
 @app.route("/quotes/<quote_id>/delete", methods=["POST"])
@@ -3691,7 +3691,7 @@ def project_to_quote(project_id):
         "salesperson":  project.get("assigned_to", ""),
         "job_number":   "",
     }
-    return render_template("quote_form.html", quote=prefill, clients=clients,
+    return render_template("sales/quote_form.html", quote=prefill, clients=clients,
                            sales_people=sales_ppl, is_new=True,
                            next_num=_next_quote_number(),
                            from_project=project)
@@ -3889,7 +3889,7 @@ def projects():
         key=lambda x: x.get("deleted_at", ""), reverse=True
     )
 
-    return render_template("projects.html", projects=items, statuses=statuses,
+    return render_template("projects/projects.html", projects=items, statuses=statuses,
                            search=search, status_filter=status_filter,
                            overdue_filter=overdue_filter, overdue_count=overdue_count,
                            date_from=date_from, date_to=date_to,
@@ -4319,7 +4319,7 @@ def project_new():
                     # Preserve form data and re-render
                     sales_people = _load_sales_people()
                     next_proj_num = _next_project_number()
-                    return render_template("project_form.html", project=data, clients=clients,
+                    return render_template("projects/project_form.html", project=data, clients=clients,
                                          sales_people=sales_people, prefill_quote="",
                                          prefill_quote_id="", prefill_quote_data={},
                                          is_new=True, next_proj_num=next_proj_num)
@@ -4338,7 +4338,7 @@ def project_new():
                         data["po_wo_number"] = ""
                         sales_people = _load_sales_people()
                         next_proj_num = _next_project_number()
-                        return render_template("project_form.html", project=data, clients=clients,
+                        return render_template("projects/project_form.html", project=data, clients=clients,
                                              sales_people=sales_people, prefill_quote="",
                                              prefill_quote_id="", prefill_quote_data={},
                                              is_new=True, next_proj_num=next_proj_num)
@@ -4403,7 +4403,7 @@ def project_new():
               f"{prefill_quote_data.get('linked_project_num','')}.", "info")
         return redirect(url_for("project_detail", project_id=prefill_quote_data["linked_project_id"]))
     next_proj_num = _next_project_number()
-    return render_template("project_form.html", project=None, clients=clients,
+    return render_template("projects/project_form.html", project=None, clients=clients,
                            sales_people=sales_people, prefill_quote=prefill_quote,
                            prefill_quote_id=prefill_quote_id or "",
                            prefill_quote_data=prefill_quote_data or {},
@@ -4821,7 +4821,7 @@ def project_detail(project_id):
         key=lambda x: x.get("changed_at", ""), reverse=True
     ) if isinstance(_raw_history, dict) else []
 
-    return render_template("project_detail.html", project=data,
+    return render_template("projects/project_detail.html", project=data,
                            project_invoices=project_invoices,
                            project_expenses=project_expenses,
                            inv_total=inv_total, inv_paid=inv_paid,
@@ -5657,7 +5657,7 @@ def project_edit(project_id):
         url = url_for('project_detail', project_id=project_id) + f"?page={page}"
         return redirect(url)
     sales_people = [p.get("name","") for p in _load_sales_people() if p.get("name","")]
-    return render_template("project_form.html", project=data, clients=clients,
+    return render_template("projects/project_form.html", project=data, clients=clients,
                            sales_people=sales_people, prefill_quote="", is_new=False)
 
 @app.route("/projects/<project_id>/status", methods=["POST"])
@@ -6716,7 +6716,7 @@ def invoicing():
         key=lambda x: x.get("deleted_at", ""), reverse=True
     )
 
-    return render_template("invoicing.html", invoices=items, statuses=statuses,
+    return render_template("invoicing/invoicing.html", invoices=items, statuses=statuses,
                            search=search, status_filter=status_filter,
                            date_from=date_from, date_to=date_to,
                            client_filter=client_filter, inv_clients=inv_clients,
@@ -7870,7 +7870,7 @@ def invoice_new():
     settings = load_settings()
     default_tax_rate = settings.get("company", {}).get("default_tax_rate", 0)
 
-    return render_template("invoice_form.html", invoice=None, clients=clients,
+    return render_template("invoicing/invoice_form.html", invoice=None, clients=clients,
                            projects=projects, next_num=next_num, is_new=True,
                            invoice_stage_options=_invoice_form_stage_options(projects, raw_inv),
                            prefill_proj=prefill_proj, prefill_client=prefill_client,
@@ -8416,7 +8416,7 @@ def invoice_detail(invoice_id):
     _has_inv_del_perm = _role in ("admin", "accountant") or bool(
         _has_approved_delete_request(_uid, "invoice", invoice_id)
     )
-    return render_template("invoice_detail.html", invoice=data, company=company_info(),
+    return render_template("invoicing/invoice_detail.html", invoice=data, company=company_info(),
                            today_date=datetime.now(COMPANY_TZ).strftime("%Y-%m-%d"),
                            linked_project=linked_project, linked_projects=linked_projects,
                            source_quote=source_quote, enriched_payment_log=enriched_payment_log,
@@ -8867,7 +8867,7 @@ def invoice_edit(invoice_id):
                 pass
 
     # Pass invoice data to form with is_new=False to indicate editing
-    return render_template("invoice_form.html",
+    return render_template("invoicing/invoice_form.html",
                          invoice=invoice_data,
                          invoice_stage_options=_invoice_form_stage_options(projects, _pending_check_invoices, invoice_id),
                          clients=clients,
@@ -9952,7 +9952,7 @@ def clients():
                         _r.get("entity_type") == "client" and
                         _r.get("status") == "approved"):
                     _client_del_perms.add(_r.get("entity_id", ""))
-    return render_template("clients.html", clients=items, active_tab=active_tab,
+    return render_template("sales/clients.html", clients=items, active_tab=active_tab,
                            search=search, tag_filter=tag_filter, all_tags=all_tags,
                            client_delete_perms=_client_del_perms)
 
@@ -10493,7 +10493,7 @@ def client_new():
         # At least one of company_name or client_name must be provided
         if not company_name and not client_name:
             flash("Either Company Name or Client Name is required.", "danger")
-            return render_template("client_form.html", client=None, is_new=True)
+            return render_template("sales/client_form.html", client=None, is_new=True)
 
         # Track if company_name was explicitly provided
         has_explicit_company = bool(company_name)
@@ -10523,7 +10523,7 @@ def client_new():
                 if isinstance(existing_data, dict) and existing_data.get("email", "").strip().lower() == email.lower():
                     flash(f"Email address '{email}' is already in use by another client.", "danger")
                     form_data["email"] = ""
-                    return render_template("client_form.html", client=form_data, is_new=True)
+                    return render_template("sales/client_form.html", client=form_data, is_new=True)
 
         # Check for duplicate phone
         if phone:
@@ -10532,7 +10532,7 @@ def client_new():
                 if isinstance(existing_data, dict) and existing_data.get("phone", "").strip() == phone:
                     flash(f"Phone number '{phone}' is already in use by another client.", "danger")
                     form_data["phone"] = ""
-                    return render_template("client_form.html", client=form_data, is_new=True)
+                    return render_template("sales/client_form.html", client=form_data, is_new=True)
 
         raw_tags = request.form.get("tags", "")
         tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
@@ -10555,7 +10555,7 @@ def client_new():
         fb_update(f"/clients/{primary_id}", data)
         flash("Client saved.", "success")
         return redirect(url_for("clients", tab="all-clients"))
-    return render_template("client_form.html", client=None, is_new=True)
+    return render_template("sales/client_form.html", client=None, is_new=True)
 
 @app.route("/clients/<company_name>/edit", methods=["GET", "POST"])
 @role_required("clients")
@@ -10575,7 +10575,7 @@ def client_edit(company_name):
         # At least one of company_name or client_name must be provided
         if not company_name and not new_client_name:
             flash("Either Company Name or Client Name is required.", "danger")
-            return render_template("client_form.html", client=data, is_new=False)
+            return render_template("sales/client_form.html", client=data, is_new=False)
 
         # Track if company_name was explicitly provided during edit
         has_explicit_company = bool(company_name)
@@ -10606,7 +10606,7 @@ def client_edit(company_name):
                     if existing_data.get("email", "").strip().lower() == email.lower():
                         flash(f"Email address '{email}' is already in use by another client.", "danger")
                         form_data["email"] = ""
-                        return render_template("client_form.html", client=form_data, is_new=False)
+                        return render_template("sales/client_form.html", client=form_data, is_new=False)
 
         # Check for duplicate phone (excluding current client)
         if phone:
@@ -10616,7 +10616,7 @@ def client_edit(company_name):
                     if existing_data.get("phone", "").strip() == phone:
                         flash(f"Phone number '{phone}' is already in use by another client.", "danger")
                         form_data["phone"] = ""
-                        return render_template("client_form.html", client=form_data, is_new=False)
+                        return render_template("sales/client_form.html", client=form_data, is_new=False)
 
         raw_tags = request.form.get("tags", "")
         tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
@@ -10646,7 +10646,7 @@ def client_edit(company_name):
 
         flash("Client updated.", "success")
         return redirect(url_for("clients"))
-    return render_template("client_form.html", client=data, is_new=False)
+    return render_template("sales/client_form.html", client=data, is_new=False)
 
 @app.route("/clients/<company_name>/delete", methods=["POST"])
 @role_required("clients")
@@ -11098,7 +11098,7 @@ def payroll():
     # Per-employee Advance & Commission Adjustment summary for the payroll tab
     advance_summary = _build_advance_employee_summary()
 
-    return render_template("payroll.html",
+    return render_template("finance/payroll.html",
         employee_filter=employee_filter,
         year_filter=year_filter,
         region_filter=region_filter,
@@ -11279,7 +11279,7 @@ def commission_detail(salesperson_name):
     commissions.sort(key=lambda c: sort_project_number(c.get("project_number", "")))
 
     return render_template(
-        "commission_detail.html",
+        "finance/commission_detail.html",
         salesperson_name=salesperson_name,
         commissions=commissions,
         currency_symbol=CURRENCY_SYMBOL,
@@ -14853,7 +14853,7 @@ def advance_employee_detail(employee_name):
     if not _employee_advances(employee_name, reconcile=False):
         abort(404)
     return render_template(
-        "advance_employee.html",
+        "employees/advance_employee.html",
         employee_name=employee_name,
         adjustment_types=ADVANCE_ADJUSTMENT_TYPES,
         type_labels=ADJUSTMENT_TYPE_LABELS,
@@ -17455,7 +17455,7 @@ def financial():
     # the dashboard route's ar_data so the two stay identical.
     ar_flagged_projects = _compute_ar_entries(projects_list, invoices)
 
-    return render_template("financial.html",
+    return render_template("finance/financial.html",
         total_invoiced=total_invoiced,
         invoiced_count=invoiced_count,
         invoiced_years=invoiced_years,
@@ -17886,7 +17886,7 @@ def view_expense_details(exp_id):
 
         bdt_exchange_rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 110)) or 110
 
-        return render_template("expense_details.html",
+        return render_template("finance/expense_details.html",
             expense=expense_data,
             expense_types=expense_types,
             categories_by_type=categories_by_type,
@@ -17953,7 +17953,7 @@ def view_expense_group(group_id):
         all_vendors = sorted(set(e.get("vendor", "") for e in expenses.values() if isinstance(e, dict) and e.get("vendor", "").strip()))
         projects_list = _load_projects_list()
 
-        return render_template("expense_group_details.html",
+        return render_template("finance/expense_group_details.html",
             group=group_data,
             expense_types=expense_types,
             categories_by_type=categories_by_type,
@@ -20504,7 +20504,7 @@ def employee_profile(uid):
         flash("Employee not found.", "danger")
         return redirect(url_for("employees"))
 
-    return render_template("employee_profile.html", is_admin=is_admin, **data)
+    return render_template("employees/employee_profile.html", is_admin=is_admin, **data)
 
 
 @app.route("/employee_profile/<uid>/pdf")
@@ -21366,7 +21366,7 @@ def employee_all_timesheets(uid):
     submitted_count = len([s for s in emp_timesheets if s.get("status") == "Submitted"])
     rejected_count = len([s for s in emp_timesheets if s.get("status") == "Rejected"])
 
-    return render_template("employee_timesheets_all.html",
+    return render_template("employees/employee_timesheets_all.html",
         uid=uid, name=name, timesheets=paginated_timesheets, is_admin=is_admin,
         page=page, total_pages=total_pages, total_records=total,
         total_hours=total_hours, approved_count=approved_count, approved_hours=approved_hours,
@@ -21409,7 +21409,7 @@ def employee_all_time_off(uid):
     rejected_count = len([t for t in emp_time_off if t.get("status") == "Rejected"])
     pending_count = len([t for t in emp_time_off if t.get("status") == "Pending"])
 
-    return render_template("employee_time_off_all.html",
+    return render_template("employees/employee_time_off_all.html",
         uid=uid, name=name, time_off=paginated_time_off, is_admin=is_admin,
         page=page, total_pages=total_pages, total_records=total,
         total_days=total_days, approved_count=approved_count, approved_days=approved_days,
@@ -21454,7 +21454,7 @@ def employee_all_expenses(uid):
     pending_count = len([e for e in emp_expenses if e.get("status", "").lower() == "pending"])
     rejected_count = len([e for e in emp_expenses if e.get("status", "").lower() == "rejected"])
 
-    return render_template("employee_expenses_all.html",
+    return render_template("employees/employee_expenses_all.html",
         uid=uid, name=name, expenses=paginated_expenses, is_admin=is_admin,
         page=page, total_pages=total_pages, total_records=total,
         total_amount=total_amount, approved_count=approved_count, approved_amount=approved_amount,
@@ -21505,7 +21505,7 @@ def employee_all_medical(uid):
     pending_count = len([m for m in emp_medical if m.get("status", "").lower() == "pending"])
     rejected_count = len([m for m in emp_medical if m.get("status", "").lower() == "rejected"])
 
-    return render_template("employee_medical_all.html",
+    return render_template("employees/employee_medical_all.html",
         uid=uid, name=name, medical=paginated_medical, is_admin=is_admin,
         page=page, total_pages=total_pages, total_records=total,
         total_claimed=total_claimed, approved_count=approved_count, approved_amount=approved_amount,
@@ -21550,7 +21550,7 @@ def employee_all_payroll(uid):
     pending_count = len([p for p in emp_payroll if p.get("salary_status") == "Pending"])
     pending_amount = sum([float(str(p.get("amount", 0) or 0).replace(",", "")) for p in emp_payroll if p.get("salary_status") == "Pending"])
 
-    return render_template("employee_payroll_all.html",
+    return render_template("employees/employee_payroll_all.html",
         uid=uid, name=name, payroll=paginated_payroll, is_admin=is_admin,
         page=page, total_pages=total_pages, total_records=total,
         total_salary_amount=total_salary_amount, total_bonus_amount=total_bonus_amount,
@@ -21607,7 +21607,7 @@ def employee_all_advances(uid):
     ])
     outstanding_count = len([a for a in emp_advances if float(str(a.get("amount", 0) or 0).replace(",", "")) - float(str(a.get("adjusted", 0) or 0).replace(",", "")) > 0])
 
-    return render_template("employee_advances_all.html",
+    return render_template("employees/employee_advances_all.html",
         uid=uid, name=name, advances=paginated_advances, is_admin=is_admin,
         page=page, total_pages=total_pages, total_records=total,
         total_advanced=total_advanced, total_recovered=total_recovered,
@@ -21696,7 +21696,7 @@ def employee_all_projects(uid):
     active_projects = len([p for p in emp_projects if p.get("status", "").lower() in ("active", "on_going")])
     completed_projects = len([p for p in emp_projects if p.get("status", "").lower() == "completed"])
 
-    return render_template("employee_projects_all.html",
+    return render_template("employees/employee_projects_all.html",
         uid=uid, name=name, projects=paginated_projects, is_admin=is_admin,
         page=page, total_pages=total_pages, total_records=total,
         total_projects_count=total_projects_count, total_hours=total_hours,
@@ -22082,12 +22082,12 @@ def employees():
     context["my_ledger"] = _build_employee_advance_ledger(
         session.get("user_name", ""), advances=[(a["firebase_id"], a) for a in my_advances], with_commission=False)
 
-    return render_template("employees.html", **context)
+    return render_template("employees/employees.html", **context)
 
 @app.route("/employees/medical-claims/form")
 @role_required("employees")
 def medical_claim_form_download():
-    return render_template("medical_claim_form.html",
+    return render_template("employees/medical_claim_form.html",
                            user_name=session.get("user_name", ""),
                            today=datetime.now(COMPANY_TZ).strftime("%Y-%m-%d"))
 
@@ -23646,7 +23646,7 @@ def reviews():
         if not _r.get("employee_name") and _r.get("employee_uid"):
             _r["employee_name"] = _uid_to_name.get(_r["employee_uid"], "")
     periods   = _review_periods()
-    return render_template("reviews.html", reviews=displayed, all_users=all_users,
+    return render_template("employees/reviews.html", reviews=displayed, all_users=all_users,
                            periods=periods, role=role, my_uid=uid)
 
 def _push_notification(uid, notif_type, title, message, link=""):
@@ -23690,7 +23690,7 @@ def reviews_new():
                     break
         if not emp_uid or not period:
             flash("Please select an employee and review period.", "danger")
-            return render_template("reviews.html", view="new", all_users=all_users,
+            return render_template("employees/reviews.html", view="new", all_users=all_users,
                                    periods=periods, role="admin", reviews=[],
                                    my_uid=session.get("user_uid", ""))
         now_ts = datetime.now(timezone.utc).isoformat()
@@ -23715,7 +23715,7 @@ def reviews_new():
         )
         flash(f"Review initiated for {emp_name} ({period}). They will now complete their self-assessment.", "success")
         return redirect(url_for("review_detail", review_id=rid))
-    return render_template("reviews.html", view="new", all_users=all_users,
+    return render_template("employees/reviews.html", view="new", all_users=all_users,
                            periods=periods, role="admin", reviews=[],
                            my_uid=session.get("user_uid", ""))
 
@@ -23734,7 +23734,7 @@ def review_detail(review_id):
     data["firebase_id"] = review_id
     all_users = _load_all_users() if role == "admin" else []
     periods   = _review_periods()
-    return render_template("reviews.html", view="detail", review=data,
+    return render_template("employees/reviews.html", view="detail", review=data,
                            all_users=all_users, periods=periods,
                            role=role, my_uid=uid, reviews=[],
                            weights=_REVIEW_WEIGHTS)
@@ -24100,7 +24100,7 @@ def settings():
                     _perm_reqs.append(_rd)
         _perm_reqs.sort(key=lambda x: x.get("requested_at", ""), reverse=True)
     active_tab = request.args.get("tab", "company")
-    return render_template("settings.html", users=all_users, settings=settings_data,
+    return render_template("admin/settings.html", users=all_users, settings=settings_data,
                            role_pages=ROLE_PAGES, all_pages=ALL_PAGES, page_labels=PAGE_LABELS,
                            activity_summary=_act_summary,
                            act_max_open=_act_max_open, act_max_oper=_act_max_oper,
@@ -24309,7 +24309,7 @@ def approvals():
     _company_settings = _settings.get("company", {})
     bdt_exchange_rate = _safe_float(_company_settings.get("bdt_exchange_rate", 110)) or 110
 
-    return render_template("approvals.html",
+    return render_template("admin/approvals.html",
                            permission_requests=_perm_reqs,
                            pending_permission_requests=_perm_reqs_pending,
                            all_employee_items=all_employee_items,
@@ -31514,7 +31514,7 @@ def timesheets():
         kpi_approved  = sum(1 for s in week_sheets if s.get("status") == "Approved")
         kpi_hours     = sum(_safe_float(s.get("total_hours", 0)) for s in week_sheets)
 
-        return render_template("timesheets.html",
+        return render_template("employees/timesheets.html",
             view="admin", week_of=week_of, week_label=week_label,
             week_dates=week_dates, day_labels=day_labels,
             prev_week=prev_week, next_week=next_week,
@@ -31561,7 +31561,7 @@ def timesheets():
         stat_pending       = sum(1 for s in my_sheets if s.get("status") == "Submitted")
 
         current_week = _week_monday()
-        return render_template("timesheets.html",
+        return render_template("employees/timesheets.html",
             view="my", my_sheets=my_sheets,
             week_of=week_of, week_label=week_label,
             week_dates=week_dates, day_labels=day_labels,
@@ -31618,7 +31618,7 @@ def timesheets_submit():
         for i in range(7)
     ]
 
-    return render_template("timesheet_submit.html",
+    return render_template("employees/timesheet_submit.html",
         week_of=week_of, week_label=week_label,
         week_days=week_days, active_projects=active_projects,
         existing_sheet=existing_sheet, is_admin=is_admin, current_uid=current_uid)
@@ -31658,7 +31658,7 @@ def timesheet_detail(sheet_id):
             by_date[d] = []
         by_date[d].append(entry)
 
-    return render_template("timesheet_detail.html",
+    return render_template("employees/timesheet_detail.html",
         sheet=sheet, by_date=by_date, is_admin=is_admin)
 
 

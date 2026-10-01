@@ -1,0 +1,2848 @@
+﻿{% extends "base.html" %}
+{% block title %}Project {{ project.get('project_number','') }}{% endblock %}
+{% block page_title %}Project Detail{% endblock %}
+
+{% block content %}
+{% set can_manage_projects = user_role in ('admin', 'projects', 'administration', 'accountant') %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="d-flex align-items-center gap-2">
+    <a href="{{ url_for('projects') }}{% if request.args.get('page') %}?page={{ request.args.get('page') }}{% endif %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <h5 class="mb-0">{{ project.get('project_number','') }} — {{ project.get('project_name','') }}</h5>
+    <button class="btn btn-xs btn-outline-secondary" title="Copy project number"
+            onclick="copyNumber('{{ project.get('project_number','') }}', this)">
+      <i class="bi bi-copy"></i>
+    </button>
+    <span class="badge status-{{ project.get('status','Not Started')|lower|replace(' ','-') }}">
+      {{ project.get('status','Not Started') }}
+    </span>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if 'invoicing' in allowed_pages %}
+    {% if has_pending_stage %}
+    <a href="{{ url_for('invoice_new') }}?project={{ project.get('project_number','') }}&client={{ (project.get('company_name') or project.get('client_name','')) }}&stage_idx={{ next_stage_idx }}&stage_name={{ next_stage_name|urlencode }}&stage_amount={{ next_stage_amount }}{% if request.args.get('page') %}&page={{ request.args.get('page') }}{% endif %}"
+       class="btn btn-sm btn-teal"
+       data-bs-toggle="tooltip" data-bs-placement="bottom"
+       title="Create invoice for next payment stage">
+      <i class="bi bi-receipt me-1"></i>Create Invoice
+    </a>
+    {% elif not project.get('payment_stages') %}
+    <a href="{{ url_for('invoice_new') }}?project={{ project.get('project_number','') }}&client={{ (project.get('company_name') or project.get('client_name','')) }}{% if request.args.get('page') %}&page={{ request.args.get('page') }}{% endif %}"
+       class="btn btn-sm btn-teal"
+       data-bs-toggle="tooltip" data-bs-placement="bottom"
+       title="Create a manual invoice for this project">
+      <i class="bi bi-receipt me-1"></i>Create Invoice
+    </a>
+    {% else %}
+    <span class="btn btn-sm btn-teal opacity-50" style="cursor: not-allowed;"
+          data-bs-toggle="tooltip" data-bs-placement="bottom"
+          title="All payment stages have been invoiced">
+      <i class="bi bi-receipt me-1"></i>Create Invoice
+    </span>
+    {% endif %}
+    {% endif %}
+    <a href="{{ url_for('project_edit', project_id=project.firebase_id) }}{% if request.args.get('page') %}?page={{ request.args.get('page') }}{% endif %}" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-pencil me-1"></i>Edit
+    </a>
+    {% if user_has_delete_perm %}
+    <button type="button" class="btn btn-sm btn-outline-danger" onclick="openDeleteModal()">
+      <i class="bi bi-trash me-1"></i>Delete
+    </button>
+    {% else %}
+    <button type="button" class="btn btn-sm btn-outline-warning"
+            data-proj-id="{{ project.firebase_id }}"
+            data-proj-num="{{ project.get('project_number','') }}"
+            data-proj-client="{{ project.get('client_name','') or project.get('company_name','') }}"
+            onclick="openDeleteRequestModal('project',this.dataset.projId,'Project #'+this.dataset.projNum+' — '+this.dataset.projClient)">
+      <i class="bi bi-send me-1"></i>Request Delete
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+{% set wf_step = 2 %}
+{% set wf_quote = source_quote %}
+{% set wf_quote_id = source_quote.firebase_id if source_quote else '' %}
+{% set wf_project = project %}
+{% set wf_project_id = project.firebase_id %}
+{% set wf_invoice = project_invoices[0] if project_invoices else None %}
+{% set wf_invoice_id = project_invoices[0].firebase_id if project_invoices else '' %}
+{% include 'partials/_workflow_tracker.html' %}
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" id="projDetailTabs">
+  <li class="nav-item">
+    <a class="nav-link active" data-bs-toggle="tab" href="#tab-overview">
+      <i class="bi bi-info-circle me-1"></i>Overview
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-pnl">
+      <i class="bi bi-graph-up me-1"></i>P&amp;L
+      {% if project_invoices %}
+      <span class="badge bg-secondary ms-1">{{ project_invoices|length }}</span>
+      {% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-change-orders">
+      <i class="bi bi-arrow-repeat me-1"></i>Change Orders
+      {% if change_orders %}
+      {% set pending_cos = change_orders | selectattr('status', 'in', ['Draft','Submitted']) | list %}
+      {% if pending_cos %}
+      <span class="badge bg-warning text-dark ms-1">{{ pending_cos|length }}</span>
+      {% else %}
+      <span class="badge bg-secondary ms-1">{{ change_orders|length }}</span>
+      {% endif %}
+      {% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-notes" id="notesTabLink">
+      <i class="bi bi-journal-text me-1"></i>Notes
+      {% set _log = project.get('activity_log') or [] %}
+      {% if _log %}
+      <span class="badge bg-secondary ms-1">{{ _log|length }}</span>
+      {% endif %}
+    </a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- ?? Overview Tab ????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade show active" id="tab-overview">
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div class="card-panel mb-3">
+          <h6 class="section-heading">Project Info</h6>
+          <div class="row g-2">
+            <div class="col-sm-4"><div class="info-label">Client</div><div class="info-value">{{ project.get('company_name') or project.get('company') or project.get('client_name','—') }}</div></div>
+            <div class="col-sm-4"><div class="info-label">Start Date</div><div class="info-value">{{ project.get('start_date','—') | format_date }}</div></div>
+            <div class="col-sm-4"><div class="info-label">End Date</div><div class="info-value">{{ (project.get('end_date','—') | format_date) if project.get('end_date') else '—' }}</div></div>
+            <div class="col-sm-4"><div class="info-label">Sales Person</div><div class="info-value">{{ project.get('sales') or project.get('assigned_to','—') or '—' }}</div></div>
+            {% set svcs = project.get('service_types') or [] %}
+            {% if svcs %}
+            <div class="col-12">
+              <div class="info-label">Service Types</div>
+              <div class="info-value">
+                {% for svc in svcs %}
+                  {% if svc.startswith('Other:') %}
+                    <span class="badge me-1 mb-1"
+                          style="background:#FEF9C3;color:#854D0E;border:1px solid #FDE68A;">
+                      <i class="bi bi-pencil-square me-1"></i>{{ svc }}
+                    </span>
+                  {% else %}
+                    <span class="badge bg-secondary me-1 mb-1">{{ svc }}</span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+            <div class="col-sm-4"><div class="info-label">Payment Stage</div><div class="info-value">{{ project.get('payment_category','—') or '—' }}</div></div>
+            {% if project.get('quote_number') or project.get('job_number') %}
+            <div class="col-sm-4"><div class="info-label">Quote Number</div><div class="info-value">{{ project.get('quote_number') or project.get('job_number') }}</div></div>
+            {% endif %}
+            {% if project.get('po_wo_number') %}
+            <div class="col-sm-4"><div class="info-label">PO / WO Number</div><div class="info-value">{{ project.get('po_wo_number') }}</div></div>
+            {% endif %}
+            {% if project.get('date_received') %}
+            <div class="col-sm-4"><div class="info-label">Date Received</div><div class="info-value">{{ project.get('date_received') | format_date }}</div></div>
+            {% endif %}
+            {% if project.get('plant') or project.get('plant_location') %}
+            <div class="col-sm-4"><div class="info-label">Plant (State)</div><div class="info-value">{{ project.get('plant') or project.get('plant_location') }}</div></div>
+            {% endif %}
+            {% if project.get('site_address') or project.get('project_site_address') %}
+            <div class="col-sm-8"><div class="info-label">Site Address</div><div class="info-value">{{ project.get('site_address') or project.get('project_site_address') }}</div></div>
+            {% endif %}
+            {% if project.get('mail_address') or project.get('client_address') %}
+            <div class="col-sm-8"><div class="info-label">Mail Address</div><div class="info-value">{{ project.get('mail_address') or project.get('client_address') }}</div></div>
+            {% endif %}
+            {% if project.get('scope_of_work') %}
+            <div class="col-12"><div class="info-label">Scope of Work</div><div class="info-value">{{ project.get('scope_of_work') }}</div></div>
+            {% endif %}
+            {% if project.get('expedite') == 'Yes' %}
+            <div class="col-sm-4"><div class="info-label">Expedite</div><div class="info-value"><span class="badge bg-warning text-dark">Yes ? +50% Extra</span></div></div>
+            {% endif %}
+            {% if project.get('description') %}
+            <div class="col-12"><div class="info-label">Description</div><div class="info-value">{{ project.get('description') }}</div></div>
+            {% endif %}
+            {% if project.get('notes') %}
+            <div class="col-12"><div class="info-label">Notes</div><div class="info-value">{{ project.get('notes') }}</div></div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card-panel">
+          <h6 class="section-heading">Financial Summary</h6>
+          {% if change_orders and co_approved_total > 0 %}
+          <div class="d-flex align-items-center gap-2 mb-3 p-2 rounded" style="background:#F0FDF4;border:1px solid #BBF7D0;">
+            <i class="bi bi-arrow-repeat text-success"></i>
+            <span class="small text-muted">Base <strong>{{ currency_symbol }}{{ "{:,.0f}".format(base_contract) }}</strong></span>
+            <span class="small text-muted">+</span>
+            <span class="small text-success fw-600">COs {{ currency_symbol }}{{ "{:,.0f}".format(co_contract_increase) }}</span>
+            <span class="small text-muted">=</span>
+            <span class="small fw-bold text-teal">{{ currency_symbol }}{{ "{:,.0f}".format(project.get('contract_value',0)|float) }}</span>
+          </div>
+          {% endif %}
+          <div class="row g-3">
+            <div class="col-4 text-center">
+              <div class="fs-4 fw-bold text-teal">{{ currency_symbol }}{{ "{:,.0f}".format(project.get('contract_value',0)|float) }}</div>
+              <div class="text-muted small">Contract Value</div>
+            </div>
+            <div class="col-4 text-center">
+              <div class="fs-4 fw-bold text-success">{{ currency_symbol }}{{ "{:,.0f}".format(project.get('amount_paid',0)|float) }}</div>
+              <div class="text-muted small">Amount Paid</div>
+            </div>
+            <div class="col-4 text-center">
+              {% set outstanding = project.get('contract_value',0)|float - project.get('amount_paid',0)|float %}
+              <div class="fs-4 fw-bold {{ 'text-danger' if outstanding > 0 else 'text-success' }}">{{ currency_symbol }}{{ "{:,.0f}".format(outstanding) }}</div>
+              <div class="text-muted small">Outstanding</div>
+            </div>
+          </div>
+          {% if project.get('contract_value',0)|float > 0 %}
+          {% set amount_paid = project.get('amount_paid',0)|float %}
+          {% set contract_val = project.get('contract_value',0)|float %}
+          {% set pct = (amount_paid / contract_val * 100) if contract_val > 0 else 0 %}
+          {% set pct = [pct, 100]|min %}
+          <div class="mt-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>Payment Progress</span><span>{{ "%.1f"|format(pct) }}%</span>
+            </div>
+            <div class="progress" style="height:8px;">
+              <div class="progress-bar bg-teal" style="width:{{ "%.1f"|format(pct) }}%"></div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Commission Card -->
+        {% if project.get('sales') %}
+        {% set comm_type   = project.get('commission_override_type', 'default') %}
+        {% set comm_val    = project.get('commission_override_value', 0)|float %}
+        {% set cv          = project.get('contract_value', 0)|float %}
+        {% set comm_amount = (cv * comm_val / 100) if comm_type == 'percent' else (comm_val if comm_type == 'fixed' else 0) %}
+        <div class="card-panel mt-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="section-heading mb-0"><i class="bi bi-cash-coin me-1"></i>Commission</h6>
+            <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#commissionEditModal" style="font-size:11px;">
+              <i class="bi bi-pencil me-1"></i>Edit
+            </button>
+          </div>
+          <div class="row g-2 align-items-center">
+            <div class="col-sm-5">
+              <div class="text-muted small">Salesperson</div>
+              <div class="fw-semibold">{{ project.get('sales') }}</div>
+            </div>
+            <div class="col-sm-4">
+              <div class="text-muted small">Rate / Type</div>
+              <div class="fw-semibold">
+                {% if comm_type == 'percent' %}
+                  {{ comm_val }}% <span class="badge" style="background:#7C3AED;font-size:10px;">Custom</span>
+                {% elif comm_type == 'fixed' %}
+                  Fixed {{ currency_symbol }}{{ "{:,.2f}".format(comm_val) }} <span class="badge" style="background:#7C3AED;font-size:10px;">Custom</span>
+                {% else %}
+                  Default rate
+                {% endif %}
+              </div>
+            </div>
+            {% if comm_amount > 0 %}
+            <div class="col-sm-3 text-sm-end">
+              <div class="text-muted small">Commission</div>
+              <div class="fw-bold" style="color:#7C3AED;font-size:1.1rem;">{{ currency_symbol }}{{ "{:,.2f}".format(comm_amount) }}</div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Commission Change History -->
+        {% if comm_history %}
+        <div class="mt-2">
+          <button class="btn btn-xs btn-link text-muted p-0" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#commHistoryCollapse"
+                  style="font-size:11px;">
+            <i class="bi bi-clock-history me-1"></i>{{ comm_history|length }} change{{ 's' if comm_history|length != 1 }} — view history
+          </button>
+          <div class="collapse mt-2" id="commHistoryCollapse">
+            <table class="table table-sm mb-0" style="font-size:11px;background:#f8fafc;border-radius:6px;">
+              <thead>
+                <tr style="background:#f1f5f9;">
+                  <th class="ps-2">Date</th>
+                  <th>Changed By</th>
+                  <th class="text-end">From</th>
+                  <th class="text-center">→</th>
+                  <th>To</th>
+                  <th class="text-end pe-2">New Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for h in comm_history %}
+                <tr>
+                  <td class="ps-2 text-muted">{{ h.get('changed_at','')[:10] }}</td>
+                  <td>{{ h.get('changed_by','—') }}</td>
+                  <td class="text-end text-muted">
+                    {% if h.get('old_type') == 'fixed' %}Fixed ${{ "{:,.2f}".format(h.get('old_value',0)|float) }}
+                    {% elif h.get('old_type') == 'percent' %}{{ h.get('old_value',0) }}%
+                    {% else %}Default{% endif %}
+                  </td>
+                  <td class="text-center text-muted">→</td>
+                  <td>
+                    {% if h.get('new_type') == 'fixed' %}Fixed ${{ "{:,.2f}".format(h.get('new_value',0)|float) }}
+                    {% elif h.get('new_type') == 'percent' %}{{ h.get('new_value',0) }}%
+                    {% else %}Default{% endif %}
+                  </td>
+                  <td class="text-end pe-2 fw-semibold" style="color:#7C3AED;">
+                    {{ currency_symbol }}{{ "{:,.2f}".format(h.get('new_amount',0)|float) }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Commission Edit Modal -->
+        <div class="modal fade" id="commissionEditModal" tabindex="-1">
+          <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+              <form method="POST" action="{{ url_for('project_commission_update', project_id=project.firebase_id) }}">
+                <div class="modal-header py-2">
+                  <h6 class="modal-title mb-0"><i class="bi bi-cash-coin me-1"></i>Edit Commission</h6>
+                  <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <label class="form-label small fw-semibold">Commission Type</label>
+                    <select name="commission_override_type" id="commModalType" class="form-select form-select-sm" onchange="toggleCommModal()">
+                      <option value="default" {{ 'selected' if comm_type == 'default' }}>Default (salesperson rate)</option>
+                      <option value="percent" {{ 'selected' if comm_type == 'percent' }}>Custom Percentage (%)</option>
+                      <option value="fixed"   {{ 'selected' if comm_type == 'fixed' }}>Fixed Amount ($)</option>
+                    </select>
+                  </div>
+                  <div class="mb-2" id="commModalValueRow" style="{{ 'display:none' if comm_type == 'default' else '' }}">
+                    <label class="form-label small fw-semibold" id="commModalValueLabel">
+                      {% if comm_type == 'fixed' %}Amount ($){% else %}Percentage (%){% endif %}
+                    </label>
+                    <input type="number" name="commission_override_value" id="commModalValue"
+                           class="form-control form-control-sm" step="0.01" min="0"
+                           value="{{ comm_val if comm_type != 'default' else '' }}"
+                           placeholder="{{ '5' if comm_type == 'percent' else '1500' }}">
+                  </div>
+                  <div class="text-muted" style="font-size:11px;">
+                    Contract value: {{ currency_symbol }}{{ "{:,.2f}".format(cv) }}
+                  </div>
+                </div>
+                <div class="modal-footer py-2">
+                  <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% set stages = project.get('payment_stages') or [] %}
+        {% if stages %}
+        {% set ns = namespace(first_pending=none, down_payment_count=0, installment_count=0, current_installment_num=0) %}
+        {# Count down payment and installment stages #}
+        {% for s in stages %}
+          {% if s.get('co_number') or ('CO' in s.get('name','') and ' – ' in s.get('name','')) %}
+            {# Skip CO stages #}
+          {% elif 'Down Payment' in s.get('name','') %}
+            {% set ns.down_payment_count = ns.down_payment_count + 1 %}
+          {% else %}
+            {% set ns.installment_count = ns.installment_count + 1 %}
+          {% endif %}
+          {% if ns.first_pending is none and s.get('status') == 'Pending Invoice' %}
+            {% set ns.first_pending = loop.index0 %}
+          {% endif %}
+        {% endfor %}
+        <div class="card-panel mt-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="section-heading mb-0">Payment Plan</h6>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-xs btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPaymentPlanModal"
+                      title="Edit all payment stage amounts">
+                <i class="bi bi-pencil me-1"></i>Edit All Amounts
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Stage</th>
+                  <th class="text-end">Amount</th>
+                  <th>Status</th>
+                  <th class="text-end">Paid Amount</th>
+                  <th>Invoice Number</th>
+                  <th class="text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% set status_class = {'Pending Invoice':'not-started','Invoiced':'invoiced','Partially Paid':'partial','Paid':'paid','Overdue':'overdue'} %}
+                {% set invoice_map = {} %}
+                {% for inv in project_invoices %}
+                  {% if inv.firebase_id not in invoice_map %}
+                    {% set _ = invoice_map.update({inv.firebase_id: {'number': inv.get('meta', {}).get('invoice_number', ''), 'paid': inv.get('meta', {}).get('amount_paid', 0), 'total': inv.get('meta', {}).get('total', 0)}}) %}
+                  {% endif %}
+                {% endfor %}
+                {% for s in stages %}
+                {% set st = s.get('_display_status') or s.get('status') or 'Pending Invoice' %}
+                {% set inv_id = s.get('invoice_id', '') %}
+                {% set inv_num = s.get('invoice_number', '') %}
+                {% set inv_data = invoice_map.get(inv_id, {}) %}
+                {% set stage_name = s.get('name','') %}
+                {# If this is a change order stage, display only the CO number #}
+                {% if s.get('co_number') %}
+                  {% set display_stage_name = s.get('co_number') %}
+                {% elif 'CO' in stage_name and ' – ' in stage_name %}
+                  {# For legacy stages, extract CO number (before the dash) #}
+                  {% set co_part = stage_name.split(' – ')[0].strip() %}
+                  {% set display_stage_name = co_part %}
+                {% elif 'Down Payment' in stage_name %}
+                  {# Down payment stage - display with percentage #}
+                  {% set contract_val = project.get('contract_value',0)|float %}
+                  {% set stage_amount = s.get('amount',0)|float %}
+                  {% if contract_val > 0 and stage_amount > 0 %}
+                    {% set pct = ((stage_amount / contract_val) * 100)|round|int %}
+                    {% set display_stage_name = 'Down Payment (' + pct|string + '%)' %}
+                  {% else %}
+                    {% set display_stage_name = stage_name %}
+                  {% endif %}
+                {% else %}
+                  {# Installment stages #}
+                  {% set ns.current_installment_num = ns.current_installment_num + 1 %}
+
+                  {# Determine display format based on total installments #}
+                  {% if ns.installment_count == 1 and ns.down_payment_count > 0 %}
+                    {# Single installment with down payment = Final Payment #}
+                    {% set display_stage_name = 'Final Payment' %}
+                  {% elif ns.installment_count == 1 %}
+                    {# Single installment without down payment = Final Payment #}
+                    {% set display_stage_name = 'Final Payment' %}
+                  {% elif ns.down_payment_count > 0 %}
+                    {# Multiple installments with down payment = "Installment X of Y" #}
+                    {% set display_stage_name = 'Installment ' + ns.current_installment_num|string + ' of ' + ns.installment_count|string %}
+                  {% else %}
+                    {# Multiple installments without down payment = "Installment X of Y" #}
+                    {% set display_stage_name = 'Installment ' + ns.current_installment_num|string + ' of ' + ns.installment_count|string %}
+                  {% endif %}
+                {% endif %}
+                <tr>
+                  <td>{{ display_stage_name }}</td>
+                  <td class="text-end">
+                    <span id="amountDisplay_{{ loop.index0 }}" style="display:inline-flex; align-items:center; gap:8px;">
+                      <span id="stageAmount_{{ loop.index0 }}" style="cursor:pointer;" onclick="{% if st == 'Pending Invoice' %}toggleInlineEdit({{ loop.index0 }}, '{{ s.get('name','') }}', {{ s.get('amount',0)|float }}, '{{ st }}', '{{ inv_id }}'){% endif %}">
+                        {{ currency_symbol }}{{ "{:,.2f}".format(s.get('amount',0)|float) }}
+                      </span>
+                      {% if st in ('Pending Invoice', 'Invoiced', 'Partially Paid', 'Overdue') %}
+                      <button type="button" class="btn btn-xs btn-outline-primary"
+                              onclick="toggleInlineEdit({{ loop.index0 }}, '{{ s.get('name','') }}', {{ s.get('amount',0)|float }}, '{{ st }}', '{{ inv_id }}')"
+                              title="Edit amount (click or press Enter)">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      {% endif %}
+                    </span>
+                    <span id="amountEdit_{{ loop.index0 }}" style="display:none; align-items:center;">
+                      $<input type="number" id="amountInput_{{ loop.index0 }}" class="form-control form-control-sm"
+                             step="0.01" min="0" value="{{ s.get('amount',0)|float }}" style="width:80px; display:inline-block;"
+                             data-original="{{ s.get('amount',0)|float }}"
+                             onkeydown="handleEditKeydown(event, {{ loop.index0 }}, '{{ st }}', '{{ inv_id }}')"
+                             onblur="saveInlineEdit({{ loop.index0 }}, '{{ st }}', '{{ inv_id }}')">
+                    </span>
+                  </td>
+                  <td><span class="badge status-{{ status_class.get(st, st|lower|replace(' ','-')) }}">{{ st }}</span></td>
+                  <td class="text-end">{% set paid_amount = s.get('amount_paid', 0)|float %}{% if paid_amount > 0 %}{{ currency_symbol }}{{ "{:,.2f}".format(paid_amount) }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                  <td>{% if inv_id %}<a href="{{ url_for('invoice_detail', invoice_id=inv_id) }}" class="text-decoration-none" title="View invoice">{{ inv_num or inv_data.get('number') or '' }}</a>{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                  <td class="text-center">
+                    {% if st == 'Pending Invoice' %}
+                    <button type="button" class="btn btn-xs btn-outline-teal" onclick="quickInvoiceStage({{ loop.index0 }}, '{{ s.get('name','') }}', {{ s.get('amount',0)|float }}, '{{ project.firebase_id }}')"
+                            title="Create invoice for this stage">
+                      <i class="bi bi-receipt"></i>
+                    </button>
+                    {% elif st in ('Invoiced', 'Partially Paid', 'Overdue') and not inv_id and (s.get('amount_paid',0)|float) <= 0 %}
+                    <button type="button" class="btn btn-xs btn-outline-secondary" onclick="resetStageStatus({{ loop.index0 }}, '{{ project.firebase_id }}')" title="No real invoice is linked to this stage — reset it back to Pending Invoice">
+                      <i class="bi bi-arrow-counterclockwise"></i> Reset
+                    </button>
+                    {% elif st == 'Invoiced' %}
+                    <button type="button" class="btn btn-xs btn-outline-warning" onclick="quickUpdateInvoicedStage({{ loop.index0 }}, '{{ inv_id }}', {{ s.get('amount',0)|float }}, '{{ project.get('project_number','') }}')" title="Update invoiced amount">
+                      <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    {% elif st == 'Partially Paid' %}
+                    <button type="button" class="btn btn-xs btn-outline-warning" onclick="quickUpdateInvoicedStage({{ loop.index0 }}, '{{ inv_id }}', {{ s.get('amount',0)|float }}, '{{ project.get('project_number','') }}')" title="Update invoiced amount">
+                      <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    {% elif st == 'Overdue' %}
+                    <button type="button" class="btn btn-xs btn-outline-danger" onclick="quickUpdateInvoicedStage({{ loop.index0 }}, '{{ inv_id }}', {{ s.get('amount',0)|float }}, '{{ project.get('project_number','') }}')" title="Update invoiced amount (overdue)">
+                      <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="col-lg-4">
+        {% if source_quote %}
+        <div class="card-panel mb-3">
+          <h6 class="section-heading"><i class="bi bi-file-earmark-text me-1 text-teal"></i>Source Quote</h6>
+          <a href="{{ url_for('quote_detail', quote_id=source_quote.firebase_id) }}" class="fw-bold text-teal text-decoration-none d-block">
+            {{ source_quote.get('job_number','') }}
+          </a>
+          <div class="text-muted small">{{ source_quote.get('project_name','') }}</div>
+          <div class="text-muted small">Client: {{ source_quote.get('company_name') or source_quote.get('client_name','') }}</div>
+          {% set _sq_raw = source_quote.get('status','') %}
+          {% set _sq_display = 'Won' if _sq_raw in ('Invoiced','Converted') else _sq_raw %}
+          {% set _sq_cls = 'paid' if _sq_raw in ('Invoiced','Converted') else _sq_raw|lower|replace(' ','-') %}
+          <span class="badge status-{{ _sq_cls }} mt-1">{{ _sq_display }}</span>
+        </div>
+        {% endif %}
+        <div class="card-panel mb-3">
+          <h6 class="section-heading">Update Status</h6>
+          <form id="statusForm" method="POST" action="{{ url_for('project_status', project_id=project.firebase_id) }}">
+            <input type="hidden" name="page" id="statusPageInput" value="1">
+            <select id="statusSelect" name="status" class="form-select form-select-sm mb-2">
+              {% for s in ['Not Started','In Progress','Sent out_Not Invoiced','Sent out_Invoiced','Partially Invoiced_Not paid','Partially Invoiced_paid','Fully Invoiced_Not paid','Fully Invoiced_Partially paid','Fully Invoiced_Fully paid','On Hold','Scope Disagreement','Project Completion Issue','Cancelled'] %}
+              <option value="{{ s }}" {{ 'selected' if project.get('status') == s }}>{{ s }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" onclick="handleStatusUpdate()" class="btn btn-sm btn-teal w-100">Update Status</button>
+          </form>
+        </div>
+
+        <!-- Invoice prompt modal — shown when status set to Sent out_Not Invoiced -->
+        <div class="modal fade" id="invoicePromptModal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+              <div class="modal-header border-0 pb-1">
+                <h6 class="modal-title fw-bold">Create Invoice?</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body pt-1 pb-2">
+                <p class="text-muted small mb-0">
+                  You're marking this project as <strong>Sent Out — Not Invoiced</strong>.<br>
+                  Do you want to create the invoice now?
+                </p>
+              </div>
+              <div class="modal-footer border-0 pt-1 gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="submitStatusOnly()">Update Status Only</button>
+                <a id="invoicePromptLink" href="#" class="btn btn-sm btn-teal">
+                  <i class="bi bi-receipt me-1"></i>Create Invoice
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-panel">
+          <h6 class="section-heading">Metadata</h6>
+          <div class="info-label">Created</div>
+          <div class="info-value small">{{ project.get('created_at','—')[:10] | format_date }}</div>
+          <div class="info-label mt-2">Updated</div>
+          <div class="info-value small">{{ project.get('updated_at','—')[:10] | format_date }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? P&L Tab ?????????????????????????????????????????????????????????? -->
+  <div class="tab-pane fade" id="tab-pnl">
+
+    <!-- P&L KPI row -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-teal">
+          <div class="kpi-top"><span class="kpi-label">Total Invoiced</span><i class="bi bi-receipt-cutoff kpi-icon-sm"></i></div>
+          <div class="kpi-value">{{ currency_symbol }}{{ "{:,.0f}".format(inv_total) }}</div>
+          <div class="kpi-sub">{{ project_invoices|length }} invoice{{ 's' if project_invoices|length != 1 }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-green">
+          <div class="kpi-top"><span class="kpi-label">Collected</span><i class="bi bi-check-circle-fill kpi-icon-sm"></i></div>
+          <div class="kpi-value">{{ currency_symbol }}{{ "{:,.0f}".format(inv_paid) }}</div>
+          <div class="kpi-sub">{{ "%.0f"|format((inv_paid/inv_total*100) if inv_total > 0 else 0) }}% collected</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-amber">
+          <div class="kpi-top"><span class="kpi-label">Expenses</span><i class="bi bi-arrow-down-circle kpi-icon-sm"></i></div>
+          <div class="kpi-value">{{ currency_symbol }}{{ "{:,.0f}".format(exp_total) }}</div>
+          <div class="kpi-sub">{{ project_expenses|length }} entr{{ 'ies' if project_expenses|length != 1 else 'y' }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="kpi-card {{ 'kpi-green' if gross_profit >= 0 else 'kpi-blue' }}">
+          <div class="kpi-top"><span class="kpi-label">Gross Profit</span><i class="bi bi-graph-up-arrow kpi-icon-sm"></i></div>
+          <div class="kpi-value {{ 'text-success' if gross_profit >= 0 else 'text-danger' }}">{{ currency_symbol }}{{ "{:,.0f}".format(gross_profit) }}</div>
+          <div class="kpi-sub">collected minus expenses</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Labor KPI row (from Employees time tracking) -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-amber">
+          <div class="kpi-top"><span class="kpi-label">Labor Cost</span><i class="bi bi-person-badge kpi-icon-sm"></i></div>
+          <div class="kpi-value">{{ currency_symbol }}{{ "{:,.0f}".format(labor_total_cost) }}</div>
+          <div class="kpi-sub">{{ "%.1f"|format(labor_total_minutes/60) }} hrs logged</div>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="kpi-card {{ 'kpi-green' if net_profit >= 0 else 'kpi-blue' }}">
+          <div class="kpi-top"><span class="kpi-label">Net Profit</span><i class="bi bi-graph-up kpi-icon-sm"></i></div>
+          <div class="kpi-value {{ 'text-success' if net_profit >= 0 else 'text-danger' }}">{{ currency_symbol }}{{ "{:,.0f}".format(net_profit) }}</div>
+          <div class="kpi-sub">gross profit minus labor</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Budget vs Actual (only shown if any budget was set) -->
+    {% set b_labor = project.get('budget_labor', 0)|float %}
+    {% set b_exp   = project.get('budget_expenses', 0)|float %}
+    {% set b_sub   = project.get('budget_subcontractor', 0)|float %}
+    {% set b_total = b_labor + b_exp + b_sub %}
+    {% if b_total > 0 %}
+    {% set a_total = labor_total_cost + exp_total %}
+    <div class="card-panel mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="panel-title mb-0"><i class="bi bi-bar-chart-line me-1"></i>Budget vs Actual</h6>
+        {% set overall_pct = [a_total / b_total * 100, 100]|min if b_total > 0 else 0 %}
+        <span class="badge {{ 'bg-danger' if a_total > b_total else ('bg-warning text-dark' if a_total > b_total * 0.8 else 'bg-success') }}">
+          {{ "%.0f"|format(a_total / b_total * 100 if b_total > 0 else 0) }}% of budget used
+        </span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>Category</th>
+              <th class="text-end">Budget</th>
+              <th class="text-end">Actual</th>
+              <th class="text-end">Remaining</th>
+              <th style="min-width:140px;">Usage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Labor row -->
+            {% if b_labor > 0 %}
+            {% set l_pct = [labor_total_cost / b_labor * 100, 100]|min if b_labor > 0 else 0 %}
+            {% set l_over = labor_total_cost > b_labor %}
+            <tr>
+              <td>
+                <i class="bi bi-person-badge me-1 text-muted"></i>Labor
+                {% if manual_labor_cost > 0 and labor_total_minutes == 0 %}
+                <span class="badge bg-light text-secondary border ms-1" title="Manually entered — no time entries logged">manual</span>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ currency_symbol }}{{ "{:,.0f}".format(b_labor) }}</td>
+              <td class="text-end {{ 'text-danger fw-bold' if l_over else 'text-success' }}">{{ currency_symbol }}{{ "{:,.0f}".format(labor_total_cost) }}</td>
+              <td class="text-end {{ 'text-danger' if l_over else '' }}">
+                {{ ('?$' + "{:,.0f}".format(labor_total_cost - b_labor)) if l_over else (CURRENCY_SYMBOL + "{:,.0f}".format(b_labor - labor_total_cost)) }}
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="flex-grow-1 rounded" style="height:8px;background:#e2e8f0;">
+                    <div class="rounded" style="height:8px;width:{{ l_pct }}%;background:{{ '#ef4444' if l_over else ('#f59e0b' if l_pct > 80 else '#10b981') }};transition:width .3s;"></div>
+                  </div>
+                  <span class="small text-muted" style="white-space:nowrap;">{{ "%.0f"|format(l_pct) }}%</span>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+            <!-- Expenses row -->
+            {% if b_exp > 0 %}
+            {% set e_pct = [exp_total / b_exp * 100, 100]|min if b_exp > 0 else 0 %}
+            {% set e_over = exp_total > b_exp %}
+            <tr>
+              <td><i class="bi bi-receipt me-1 text-muted"></i>Expenses</td>
+              <td class="text-end">{{ currency_symbol }}{{ "{:,.0f}".format(b_exp) }}</td>
+              <td class="text-end {{ 'text-danger fw-bold' if e_over else 'text-success' }}">{{ currency_symbol }}{{ "{:,.0f}".format(exp_total) }}</td>
+              <td class="text-end {{ 'text-danger' if e_over else '' }}">
+                {{ ('?$' + "{:,.0f}".format(exp_total - b_exp)) if e_over else (CURRENCY_SYMBOL + "{:,.0f}".format(b_exp - exp_total)) }}
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="flex-grow-1 rounded" style="height:8px;background:#e2e8f0;">
+                    <div class="rounded" style="height:8px;width:{{ e_pct }}%;background:{{ '#ef4444' if e_over else ('#f59e0b' if e_pct > 80 else '#10b981') }};transition:width .3s;"></div>
+                  </div>
+                  <span class="small text-muted" style="white-space:nowrap;">{{ "%.0f"|format(e_pct) }}%</span>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+            <!-- Subcontractor row (budget only — no tracking yet) -->
+            {% if b_sub > 0 %}
+            <tr>
+              <td><i class="bi bi-people me-1 text-muted"></i>Subcontractor</td>
+              <td class="text-end">{{ currency_symbol }}{{ "{:,.0f}".format(b_sub) }}</td>
+              <td class="text-end text-muted">—</td>
+              <td class="text-end text-muted">—</td>
+              <td><span class="small text-muted">Not tracked yet</span></td>
+            </tr>
+            {% endif %}
+          </tbody>
+          <tfoot class="table-light fw-bold">
+            <tr>
+              <td>Total</td>
+              <td class="text-end">{{ currency_symbol }}{{ "{:,.0f}".format(b_total) }}</td>
+              <td class="text-end {{ 'text-danger' if a_total > b_total else 'text-success' }}">{{ currency_symbol }}{{ "{:,.0f}".format(a_total) }}</td>
+              <td class="text-end {{ 'text-danger' if a_total > b_total else '' }}">
+                {% if a_total > b_total %}
+                  <span class="text-danger">{{ currency_symbol }}{{ "{:,.0f}".format(a_total - b_total) }} over</span>
+                {% else %}
+                  {{ currency_symbol }}{{ "{:,.0f}".format(b_total - a_total) }} left
+                {% endif %}
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="flex-grow-1 rounded" style="height:8px;background:#e2e8f0;">
+                    {% set t_pct = [a_total / b_total * 100, 100]|min if b_total > 0 else 0 %}
+                    <div class="rounded" style="height:8px;width:{{ t_pct }}%;background:{{ '#ef4444' if a_total > b_total else ('#f59e0b' if t_pct > 80 else '#10b981') }};transition:width .3s;"></div>
+                  </div>
+                  <span class="small text-muted" style="white-space:nowrap;">{{ "%.0f"|format(t_pct) }}%</span>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-3">
+      <!-- Invoices for this project -->
+      <div class="col-lg-7">
+        <div class="card-panel">
+          <div class="panel-header d-flex justify-content-between align-items-center">
+            <h6 class="panel-title mb-0">Invoices</h6>
+          </div>
+          {% if project_invoices %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th class="text-end">Total</th>
+                  <th class="text-end">Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for inv in project_invoices %}
+                {% set m = inv.get('meta', {}) %}
+                {% set share = inv.get('_project_share', 1.0) %}
+                {% set tax_paid = inv.get('tax_payments',[])|map(attribute='amount')|map('float')|sum %}
+                <tr onclick="location.href='{{ url_for('invoice_detail', invoice_id=inv.firebase_id) }}'"
+                    style="cursor:pointer;">
+                  <td>
+                    <span class="fw-bold text-teal">{{ m.get('invoice_number','—') }}</span>
+                    {% if share < 0.999 %}
+                    <span class="badge bg-secondary ms-1" title="This invoice spans multiple projects — only this project's share is counted here">
+                      {{ "%.0f"|format(share * 100) }}% share
+                    </span>
+                    {% endif %}
+                  </td>
+                  <td>{{ m.get('invoice_date','—') | format_date }}</td>
+                  <td><span class="badge status-{{ inv.get('_display_status', m.get('status','Draft'))|lower|replace(' ','-') }}">{{ inv.get('_display_status', m.get('status','Draft')) }}</span></td>
+                  <td class="text-end">
+                    {{ currency_symbol }}{{ "{:,.0f}".format(m.get('total',0)|float * share) }}
+                    {% if share < 0.999 %}
+                    <div class="text-muted" style="font-size:0.75em;">of {{ currency_symbol }}{{ "{:,.0f}".format(m.get('total',0)|float) }} invoice total</div>
+                    {% endif %}
+                  </td>
+                  <td class="text-end text-success">{{ currency_symbol }}{{ "{:,.0f}".format(inv.get('_project_paid', 0)|float) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-light fw-bold">
+                <tr>
+                  <td colspan="3">Totals</td>
+                  <td class="text-end">{{ currency_symbol }}{{ "{:,.0f}".format(inv_total) }}</td>
+                  <td class="text-end text-success">{{ currency_symbol }}{{ "{:,.0f}".format(inv_paid) }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {% else %}
+          <div class="empty-state py-3"><i class="bi bi-receipt fs-2 d-block mb-2"></i>No invoices for this project.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Expenses for this project -->
+      <div class="col-lg-5">
+        <div class="card-panel">
+          <div class="panel-header d-flex justify-content-between align-items-center">
+            <h6 class="panel-title mb-0">Expenses</h6>
+            {% if 'financial' in allowed_pages %}
+            <a href="{{ url_for('financial') }}" class="text-teal small">Add expense</a>
+            {% endif %}
+          </div>
+          {% if project_expenses %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Category</th>
+                  <th class="text-end">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for exp in project_expenses %}
+                <tr>
+                  <td>{{ exp.get('date','—') | format_date }}</td>
+                  <td>{{ exp.get('description','—') }}</td>
+                  <td><span class="badge bg-light text-dark border">{{ exp.get('category','—') }}</span></td>
+                  <td class="text-end text-danger">{{ currency_symbol }}{{ "{:,.0f}".format(exp.get('amount',0)|float) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-light fw-bold">
+                <tr>
+                  <td colspan="3">Total</td>
+                  <td class="text-end text-danger">{{ currency_symbol }}{{ "{:,.0f}".format(exp_total) }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {% else %}
+          <div class="empty-state py-3"><i class="bi bi-receipt fs-2 d-block mb-2"></i>No expenses linked to this project.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Labor hours/cost for this project -->
+    <div class="row g-3 mt-3">
+      <div class="col-12">
+        <div class="card-panel">
+          <div class="panel-header d-flex justify-content-between align-items-center">
+            <h6 class="panel-title mb-0">Labor</h6>
+            {% if 'employees' in allowed_pages %}
+            <a href="{{ url_for('employees') }}#tab-time-off" class="text-teal small">Employees</a>
+            {% endif %}
+          </div>
+          {% if labor_by_employee %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th class="text-end">Hours</th>
+                  <th class="text-end">Rate</th>
+                  <th class="text-end">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for emp, d in labor_by_employee.items() %}
+                <tr>
+                  <td>{{ emp }}</td>
+                  <td class="text-end">{{ "%.1f"|format(d.minutes/60) }} h</td>
+                  <td class="text-end">{{ currency_symbol }}{{ "{:,.2f}".format(d.rate) }}/h</td>
+                  <td class="text-end text-danger">{{ currency_symbol }}{{ "{:,.0f}".format(d.cost) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-light fw-bold">
+                <tr>
+                  <td>Total</td>
+                  <td class="text-end">{{ "%.1f"|format(labor_total_minutes/60) }} h</td>
+                  <td></td>
+                  <td class="text-end text-danger">{{ currency_symbol }}{{ "{:,.0f}".format(labor_total_cost) }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {% else %}
+          <div class="empty-state py-3"><i class="bi bi-clock-history fs-2 d-block mb-2"></i>No time logged against this project yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? Change Orders Tab ?????????????????????????????????????????????????? -->
+  <div class="tab-pane fade" id="tab-change-orders">
+    <div class="row g-3">
+      <div class="col-lg-8">
+
+        <!-- Summary bar -->
+        {% if change_orders %}
+        <div class="row g-2 mb-3">
+          {% set co_draft = change_orders | selectattr('status','equalto','Draft') | list | length %}
+          {% set co_submitted = change_orders | selectattr('status','equalto','Submitted') | list | length %}
+          {% set co_approved = change_orders | selectattr('status','equalto','Approved') | list | length %}
+          {% set co_rejected = change_orders | selectattr('status','equalto','Rejected') | list | length %}
+          <div class="col-3"><div class="card-panel text-center py-2">
+            <div class="fw-bold fs-5">{{ change_orders|length }}</div><div class="text-muted small">Total</div>
+          </div></div>
+          <div class="col-3"><div class="card-panel text-center py-2">
+            <div class="fw-bold fs-5 text-success">{{ co_approved }}</div><div class="text-muted small">Approved</div>
+          </div></div>
+          <div class="col-3"><div class="card-panel text-center py-2">
+            <div class="fw-bold fs-5 text-warning">{{ co_submitted }}</div><div class="text-muted small">Pending</div>
+          </div></div>
+          <div class="col-3"><div class="card-panel text-center py-2">
+            <div class="fw-bold fs-5 text-teal">{{ currency_symbol }}{{ "{:,.0f}".format(co_approved_total) }}</div><div class="text-muted small">Approved $</div>
+          </div></div>
+        </div>
+        {% endif %}
+
+        <!-- CO list -->
+        <div class="card-panel">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="section-heading mb-0">Change Orders</h6>
+            {% if can_manage_projects %}
+            <button class="btn btn-sm btn-teal" data-bs-toggle="modal" data-bs-target="#newCOModal">
+              <i class="bi bi-plus-lg me-1"></i>New Change Order
+            </button>
+            {% endif %}
+          </div>
+
+          {% if change_orders %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>CO #</th>
+                  <th>Title</th>
+                  <th class="text-end">Amount</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  {% if can_manage_projects %}<th></th>{% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for co in change_orders %}
+                {% set co_idx = loop.index0 %}
+                <tr>
+                  <td class="fw-600 text-teal" style="min-width:120px;">
+                    {% if can_manage_projects %}
+                    <input type="text" name="new_co_number" form="coAmountForm{{ co_idx }}"
+                           value="{{ co.get('co_number','') }}"
+                           class="form-control form-control-sm fw-600 mb-1 w-100"
+                           placeholder="CO #">
+                    <input type="text" name="po_wo_number" form="coAmountForm{{ co_idx }}"
+                           value="{{ co.get('po_wo_number','') }}"
+                           class="form-control form-control-sm w-100"
+                           placeholder="PO/WO #">
+                    {% else %}
+                    {{ co.get('co_number','—') }}
+                    {% if co.get('po_wo_number') %}
+                    <div class="text-muted small fw-400">{{ co.get('po_wo_number') }}</div>
+                    {% endif %}
+                    {% endif %}
+                  </td>
+                  <td style="min-width:200px;">
+                    {% if can_manage_projects %}
+                    <input type="text" name="title" form="coAmountForm{{ co_idx }}"
+                           value="{{ co.get('title','') }}"
+                           class="form-control form-control-sm fw-500 mb-1 w-100" placeholder="Title">
+                    <input type="text" name="description" form="coAmountForm{{ co_idx }}"
+                           value="{{ co.get('description','') }}"
+                           class="form-control form-control-sm w-100" style="font-size:0.82em;"
+                           placeholder="Description (optional)">
+                    {% else %}
+                    <div class="fw-500">{{ co.get('title','—') }}</div>
+                    {% if co.get('description') %}
+                    <div class="text-muted small">{{ co.get('description') }}</div>
+                    {% endif %}
+                    {% endif %}
+                    {% if can_manage_projects %}
+                    <div class="mt-1">
+                      <span class="text-muted small co-addr-display" id="addrDisplay{{ co_idx }}">
+                        <i class="bi bi-geo-alt"></i>
+                        {{ co.get('shipping_address') or 'Add shipping address' }}
+                        <button type="button" class="btn btn-link btn-sm p-0 ms-1" style="font-size:11px;"
+                                onclick="toggleCoAddr({{ co_idx }})" title="Edit shipping address">
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                      </span>
+                      <textarea name="shipping_address" form="coAmountForm{{ co_idx }}"
+                                class="form-control form-control-sm mt-1 d-none"
+                                id="addrEdit{{ co_idx }}" rows="2"
+                                placeholder="Shipping address for this CO">{{ co.get('shipping_address','') }}</textarea>
+                    </div>
+                    {% elif co.get('shipping_address') %}
+                    <div class="text-muted small mt-1"><i class="bi bi-geo-alt me-1"></i>{{ co.get('shipping_address') }}</div>
+                    {% endif %}
+                  </td>
+                  <td class="text-end fw-600">
+                    {% if can_manage_projects %}
+                    <form id="coAmountForm{{ co_idx }}" method="POST" action="{{ url_for('co_update_amount', project_id=project.firebase_id, co_idx=co_idx) }}" class="d-inline-flex align-items-center justify-content-end gap-1">
+                      <span class="text-muted">{{ currency_symbol }}</span>
+                      <input type="number" name="amount" min="0" step="0.01" value="{{ '%.2f'|format(co.get('amount',0)|float) }}" class="form-control form-control-sm text-end" style="width:110px;">
+                      <input type="hidden" name="co_firebase_id" value="{{ co.get('firebase_id','') }}">
+                    </form>
+                    {% else %}
+                    {{ currency_symbol }}{{ "{:,.0f}".format(co.get('amount',0)|float) }}
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if co.get('status') == 'Approved' %}
+                    <span class="badge" style="background:#DCFCE7;color:#166534;">Approved</span>
+                    {% elif co.get('status') == 'Submitted' %}
+                    <span class="badge" style="background:#FEF9C3;color:#854D0E;">Submitted</span>
+                    {% elif co.get('status') == 'Rejected' %}
+                    <span class="badge" style="background:#FEE2E2;color:#991B1B;">Rejected</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Draft</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if can_manage_projects %}
+                    <input type="date" name="co_date" form="coAmountForm{{ co_idx }}"
+                           value="{{ co.get('created_at','')[:10] }}"
+                           class="form-control form-control-sm" style="width:130px;">
+                    {% else %}
+                    <span class="text-muted small">{{ co.get('created_at','')[:10] | format_date }}</span>
+                    {% endif %}
+                  </td>
+                  {% if can_manage_projects %}
+                  <td>
+                    <div class="d-flex align-items-center flex-wrap gap-1">
+                    <button type="submit" form="coAmountForm{{ co_idx }}" class="btn btn-xs btn-outline-primary" title="Save CO amount">
+                      <i class="bi bi-floppy"></i>
+                    </button>
+                    {% if co.get('status') == 'Draft' %}
+                    <form method="POST" action="{{ url_for('co_status', project_id=project.firebase_id, co_idx=co_idx) }}">
+                      <input type="hidden" name="status" value="Submitted">
+                      <input type="hidden" name="co_firebase_id" value="{{ co.get('firebase_id','') }}">
+                      <button class="btn btn-xs btn-outline-warning" title="Submit to client">Submit</button>
+                    </form>
+                    {% elif co.get('status') == 'Submitted' %}
+                    <form id="approveCoForm{{ co_idx }}" method="POST" action="{{ url_for('co_status', project_id=project.firebase_id, co_idx=co_idx) }}">
+                      <input type="hidden" name="status" value="Approved">
+                      <input type="hidden" name="co_firebase_id" value="{{ co.get('firebase_id','') }}">
+                      <button type="button" class="btn btn-xs btn-success" title="Approve — adds to contract value"
+                              onclick="confirmApproveCo('approveCoForm{{ co_idx }}', '{{ co.get("co_number","CO") }}', {{ co.get("amount",0)|float }})">
+                        Approve
+                      </button>
+                    </form>
+                    <button type="button" class="btn btn-xs btn-outline-danger reject-co-btn"
+                            data-project-id="{{ project.firebase_id }}"
+                            data-co-idx="{{ co_idx }}"
+                            data-co-firebase-id="{{ co.get('firebase_id','') }}"
+                            data-co-number="{{ co.get('co_number','CO') }}"
+                            title="Reject this change order">
+                      Reject
+                    </button>
+                    {% endif %}
+                    <a href="{{ url_for('co_pdf', project_id=project.firebase_id, co_idx=co_idx, co_firebase_id=co.get('firebase_id','')) }}"
+                       target="_blank" class="btn btn-xs btn-outline-secondary" title="Download CO PDF">
+                      <i class="bi bi-file-earmark-pdf"></i>
+                    </a>
+                    {% if user_role in ('admin', 'accountant') %}
+                    <form method="POST" action="{{ url_for('co_delete', project_id=project.firebase_id, co_idx=co_idx) }}"
+                          onsubmit="return confirm('Delete {{ co.get("co_number","CO") }} on project {{ project.get("project_number","") }}? This will update the contract value and financial totals.');">
+                      <input type="hidden" name="co_firebase_id" value="{{ co.get('firebase_id','') }}">
+                      <button class="btn btn-xs btn-outline-danger" title="Delete CO">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                    {% elif user_role == 'administration' %}
+                    <button type="button" class="btn btn-xs btn-outline-danger"
+                            onclick="requestDeletePermission('change_order', '{{ project.firebase_id }}_{{ co_idx }}', 'Request admin approval to delete {{ co.get("co_number","CO") }} (Project: {{ project.get("project_number","") }})', '{{ url_for("project_detail", project_id=project.firebase_id) }}#tab-change-orders'); return false;"
+                            title="Request admin approval to delete">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                    {% endif %}
+                    </div>
+                  </td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+              {% if co_approved_total > 0 %}
+              <tfoot>
+                <tr class="table-light fw-bold">
+                  <td colspan="2">Approved Total</td>
+                  <td class="text-end text-success">{{ currency_symbol }}{{ "{:,.0f}".format(co_approved_total) }}</td>
+                  <td colspan="{{ 3 if can_manage_projects else 2 }}"></td>
+                </tr>
+              </tfoot>
+              {% endif %}
+            </table>
+          </div>
+          {% else %}
+          <div class="empty-state py-4">
+            <i class="bi bi-arrow-repeat fs-2 d-block mb-2 text-muted"></i>
+            <div class="text-muted">No change orders yet.</div>
+            {% if can_manage_projects %}
+            <div class="text-muted small mt-1">Click "New Change Order" to add one.</div>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+
+      </div>
+      <div class="col-lg-4">
+        <div class="card-panel">
+          <h6 class="section-heading">How It Works</h6>
+          <div class="d-flex flex-column gap-2">
+            <div class="d-flex gap-2 align-items-start">
+              <span class="badge bg-secondary mt-1">1</span>
+              <span class="small text-muted">Create a Draft CO with title, description, and amount.</span>
+            </div>
+            <div class="d-flex gap-2 align-items-start">
+              <span class="badge" style="background:#FEF9C3;color:#854D0E;margin-top:2px;">2</span>
+              <span class="small text-muted">Submit to client for approval.</span>
+            </div>
+            <div class="d-flex gap-2 align-items-start">
+              <span class="badge" style="background:#DCFCE7;color:#166534;margin-top:2px;">3</span>
+              <span class="small text-muted">Approve — contract value updates automatically and a new payment stage is added for invoicing.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?? Notes / Activity Log Tab ??????????????????????????????????????????? -->
+  <div class="tab-pane fade" id="tab-notes">
+    <div class="row g-3">
+      <div class="col-lg-8">
+
+        <!-- Add note form -->
+        <div class="card-panel mb-3">
+          <form method="POST" action="{{ url_for('project_note_add', project_id=project.firebase_id) }}">
+            <label class="form-label fw-600">Add Note</label>
+            <div class="d-flex gap-2">
+              <textarea name="note_text" class="form-control" rows="2"
+                        placeholder="Log a call, site visit, submission, client update?" required></textarea>
+              <button type="submit" class="btn btn-teal px-4 align-self-end">
+                <i class="bi bi-plus-lg me-1"></i>Add
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Activity log -->
+        {% set activity_log = project.get('activity_log') or [] %}
+        {% if activity_log %}
+        <div class="card-panel">
+          {% for note in activity_log|reverse %}
+          {% set note_idx = (activity_log|length - 1) - loop.index0 %}
+          <div class="d-flex gap-3 {{ 'pb-3 mb-3 border-bottom' if not loop.last }}">
+            <div class="flex-shrink-0">
+              <div style="width:34px;height:34px;border-radius:50%;background:#0D9488;color:#fff;
+                          display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;">
+                {{ (note.get('created_by','—')[0])|upper }}
+              </div>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <span class="fw-600 small">{{ note.get('created_by','—') }}</span>
+                  <span class="text-muted small ms-2">
+                    {{ note.get('created_at','')[:10] | format_date }}
+                    {{ note.get('created_at','')[11:16] }}
+                  </span>
+                </div>
+                <form method="POST" action="{{ url_for('project_note_delete', project_id=project.firebase_id, idx=note_idx) }}"
+                      onsubmit="return confirm('Delete this note?')">
+                  <button type="submit" class="btn btn-xs btn-outline-danger">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+              <div class="mt-1" style="white-space:pre-wrap;">{{ note.get('text','') }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="card-panel text-center text-muted py-4">
+          <i class="bi bi-journal-text fs-2 d-block mb-2"></i>
+          No notes yet. Add your first note above.
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ?? New Change Order Modal ?????????????????????????????????????????????? -->
+<div class="modal fade" id="newCOModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-arrow-repeat me-2 text-teal"></i>New Change Order</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('co_new', project_id=project.firebase_id) }}">
+        <input type="hidden" name="page" class="form-page-input" value="1">
+        <div class="modal-body">
+          <div class="row g-3 mb-3">
+            <div class="col-md-5">
+              <label class="form-label fw-600">CO Number <span class="text-danger">*</span></label>
+              <input type="text" name="co_number" class="form-control" placeholder="e.g. CO-001" autocomplete="off" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-600">Amount ($) <span class="text-danger">*</span></label>
+              <input type="number" name="amount" class="form-control" step="0.01" min="0" placeholder="0.00" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-600">Date</label>
+              <input type="date" name="co_date" class="form-control" value="{{ today_date }}">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-600">Title</label>
+            <input type="text" name="title" class="form-control" placeholder="e.g. Additional MEP Calculations">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-600">PO / WO Number <span class="text-danger">*</span></label>
+            <input type="text" name="po_wo_number" class="form-control" placeholder="Enter PO or WO number" required autocomplete="off">
+            <div class="form-text">Must be unique — different from the project PO/WO and all other change orders.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-600">Shipping Address</label>
+            <textarea name="shipping_address" class="form-control" rows="2"
+                      placeholder="Shipping address for this change order"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-600">Description</label>
+            <textarea name="description" class="form-control" rows="2"
+                      placeholder="Describe the additional scope of work"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-600">Notes</label>
+            <input type="text" name="notes" class="form-control" placeholder="Internal notes">
+          </div>
+          <div class="alert alert-info py-2 small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            CO will be created as <strong>Draft</strong>. Submit it to the client, then Approve to update the contract value.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-teal"><i class="bi bi-plus-lg me-1"></i>Create Change Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ?? Delete Confirmation Modal ??????????????????????????????????????????? -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Delete Project</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="fw-bold mb-1">You are about to delete the entire project:</p>
+        <div class="p-3 bg-light rounded mb-3">
+          <div class="fw-bold text-teal">{{ project.get('project_number','') }}</div>
+          <div>{{ project.get('project_name','') }}</div>
+          <div class="text-muted small">Client: {{ project.get('company_name') or project.get('client_name','—') }}</div>
+          <div class="text-muted small">Contract: {{ currency_symbol }}{{ "{:,.0f}".format(project.get('contract_value',0)|float) }}</div>
+        </div>
+        {% if project_invoices %}
+        <div class="alert alert-warning py-2 mb-3">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          <strong>Warning:</strong> This project has {{ project_invoices|length }} linked invoice{{ 's' if project_invoices|length != 1 }}. Invoices will NOT be deleted but will lose their project link.
+        </div>
+        {% endif %}
+        <p class="text-muted small mb-2">Type the project number to confirm this project deletion:</p>
+        <input type="text" id="deleteConfirmInput" class="form-control mb-1"
+               name="confirm_project_number"
+               form="projectDeleteForm"
+               placeholder="{{ project.get('project_number','') }}"
+               oninput="checkDeleteInput(this)">
+        <div class="text-muted small">Type: <strong>{{ project.get('project_number','') }}</strong></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg me-1"></i>Cancel — Keep Project
+        </button>
+        <form id="projectDeleteForm" method="POST" action="{{ url_for('project_delete', project_id=project.firebase_id) }}">
+          <button type="submit" id="deleteConfirmBtn" class="btn btn-danger" disabled>
+            <i class="bi bi-trash me-1"></i>Yes, Delete Project
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Edit Payment Plan Modal -->
+<div class="modal fade" id="editPaymentPlanModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Payment Plan</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editPaymentForm">
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label class="form-label mb-0">Down Payment Amount ($)</label>
+              <span class="badge status-not-started" id="downPaymentBadge" style="display:none;"></span>
+            </div>
+            <input type="number" id="editDownPaymentAmount" class="form-control" step="0.01" min="0"
+                   oninput="updateRemainingStages()">
+            <small class="text-muted" id="downPaymentPercentageDisplay"></small>
+            <small class="text-muted d-block mt-1" id="downPaymentMessage" style="display:none !important;">
+              <i class="bi bi-lock-fill"></i> This stage is <span id="downPaymentStatus"></span> and cannot be edited
+            </small>
+          </div>
+          <div id="editRemainingStagesContainer"></div>
+          <div class="alert alert-info small mt-3">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>Total Plan:</strong> <span id="editPlanTotal">$0.00</span> / <span id="editContractValue">$0.00</span>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveEditedPaymentPlan()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Update Invoiced Stage Modal -->
+<div class="modal fade" id="updateInvoicedStageModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-arrow-repeat me-2"></i>Update Invoiced Amount</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="updateInvoicedStageForm">
+          <div class="mb-3">
+            <label class="form-label">Stage</label>
+            <input type="text" id="updateInvoicedStageName" class="form-control" disabled>
+          </div>
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label">Original Amount ($)</label>
+              <input type="number" id="updateInvoicedOriginalAmount" class="form-control" disabled>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">New Amount ($)</label>
+              <input type="number" id="updateInvoicedNewAmount" class="form-control" step="0.01" min="0"
+                     oninput="updateRedistributionPreview()">
+            </div>
+          </div>
+          <div class="alert alert-info small mt-3">
+            <strong>?? Redistribution Preview:</strong>
+            <div id="redistributionPreview" class="mt-2"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning" onclick="updateInvoicedStage()">Update & Redistribute</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Update Stage Payment Modal -->
+<div class="modal fade" id="updateStageModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-arrow-repeat me-2"></i>Update Payment Amount</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="updateStageForm">
+          <div class="mb-3">
+            <label class="form-label">Stage</label>
+            <input type="text" id="updateStageName" class="form-control" disabled>
+          </div>
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label">Original Amount ($)</label>
+              <input type="number" id="updateStageOriginalAmount" class="form-control" disabled>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Already Paid ($)</label>
+              <input type="number" id="updateStagePaidAmount" class="form-control" disabled>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">New Amount ($)</label>
+            <input type="number" id="updateStageNewAmount" class="form-control" step="0.01" min="0"
+                   oninput="updateRemainingForStage()">
+            <small class="text-muted" id="updateStageRemainingDisplay"></small>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="updateStagedPayment()">Update</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* Hide number input spinner arrows */
+#amountInput_0::-webkit-outer-spin-button,
+#amountInput_0::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+</style>
+<script>
+const projectId = '{{ project.firebase_id }}';
+const contractValue = {{ project.get('contract_value', 0)|float }};
+let currentStages = {{ project.get('payment_stages', [])|tojson }};
+
+// Auto-open tab from URL hash (e.g. #tab-notes after adding a note)
+// But prefer sessionStorage if we just saved payment plan edits
+document.addEventListener('DOMContentLoaded', function () {
+  // Check if we have a saved tab from payment plan edit
+  const savedTab = sessionStorage.getItem('lastActiveTab');
+  if (savedTab) {
+    // Use saved tab and clear hash to prevent override
+    const link = document.querySelector(`.nav-link[href="${savedTab}"]`);
+    if (link) new bootstrap.Tab(link).show();
+    // Clear hash from URL
+    window.history.replaceState({}, '', window.location.pathname + window.location.search);
+    sessionStorage.removeItem('lastActiveTab');
+  } else {
+    // If URL has a tab hash (e.g. redirect after CO save), activate that tab first
+    const hash = window.location.hash;
+    if (hash) {
+      const link = document.querySelector(`.nav-link[href="${hash}"]`);
+      if (link) new bootstrap.Tab(link).show();
+    }
+    // Then clear hash from URL
+    window.history.replaceState({}, '', window.location.pathname + window.location.search);
+  }
+
+  // Set up edit payment plan modal
+  const editModal = document.getElementById('editPaymentPlanModal');
+  if (editModal) {
+    editModal.addEventListener('show.bs.modal', openEditPaymentPlanModal);
+  }
+
+  // Refresh invoice status from API to show latest status
+  const invoiceStatusBadge = document.getElementById('wfInvoiceStatus');
+  if (invoiceStatusBadge) {
+    const invoiceId = invoiceStatusBadge.getAttribute('data-invoice-id');
+    if (invoiceId) {
+      fetch(`/api/invoices/${invoiceId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.meta && data.meta.status) {
+            const newStatus = data.meta.status;
+            const oldStatus = invoiceStatusBadge.textContent;
+            if (newStatus !== oldStatus) {
+              invoiceStatusBadge.textContent = newStatus;
+              invoiceStatusBadge.className = 'badge status-' + newStatus.toLowerCase().replace(/ /g, '-');
+            }
+          }
+        })
+        .catch(e => console.log('Could not refresh invoice status:', e));
+    }
+  }
+
+  // Restore last active tab from sessionStorage (after payment plan edit)
+  // This runs after Bootstrap initializes, ensuring it takes precedence
+  const lastTab = sessionStorage.getItem('lastActiveTab');
+  if (lastTab) {
+    setTimeout(() => {
+      const tabLink = document.querySelector(`.nav-link[href="${lastTab}"]`);
+      if (tabLink) {
+        // Deactivate all tabs first
+        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('show', 'active'));
+
+        // Activate the saved tab
+        tabLink.classList.add('active');
+        const targetPane = document.querySelector(lastTab);
+        if (targetPane) {
+          targetPane.classList.add('show', 'active');
+        }
+      }
+      sessionStorage.removeItem('lastActiveTab');
+    }, 100);
+  }
+});
+
+function toggleAmtEdit(idx) {
+  const form = document.getElementById('amtForm_' + idx);
+  const disp = document.getElementById('amtDisplay_' + idx);
+  const open = form.style.display === 'none' || form.style.display === '';
+  form.style.display = open ? '' : 'none';
+  disp.style.display = open ? 'none' : '';
+  if (open) form.querySelector('input').focus();
+}
+
+window._userCanDelete = {{ 'true' if user_has_delete_perm else 'false' }};
+function openDeleteModal() {
+  _guardedDelete('Delete project {{ project.get("project_number","") }}', function () {
+    document.getElementById('deleteConfirmInput').value = '';
+    document.getElementById('deleteConfirmBtn').disabled = true;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+  });
+}
+function checkDeleteInput(input) {
+  const expected = '{{ project.get("project_number","") }}';
+  document.getElementById('deleteConfirmBtn').disabled = input.value.trim() !== expected;
+}
+
+// Payment Plan Edit Functions
+function openEditPaymentPlanModal() {
+  if (!currentStages || currentStages.length === 0) return;
+
+  const downPaymentStage = currentStages[0];
+  const downPaymentInput = document.getElementById('editDownPaymentAmount');
+  downPaymentInput.value = (downPaymentStage.amount || 0).toFixed(2);
+
+  // Disable down payment input ONLY if it's Paid or Overdue (not just Invoiced)
+  // Down Payment should be editable if it's just Invoiced but not Paid
+  const isDownPaymentPaid = ['Paid', 'Overdue'].includes(downPaymentStage.status);
+  downPaymentInput.disabled = isDownPaymentPaid;
+
+  // Show badge and message ONLY if Paid or Overdue
+  const badgeEl = document.getElementById('downPaymentBadge');
+  const messageEl = document.getElementById('downPaymentMessage');
+  const statusSpan = document.getElementById('downPaymentStatus');
+
+  // Always hide message by default - only show if explicitly locked
+  messageEl.style.setProperty('display', 'none', 'important');
+  badgeEl.style.display = 'none';
+
+  // Only show if actually locked AND has a status
+  if (isDownPaymentPaid && downPaymentStage.status) {
+    badgeEl.textContent = downPaymentStage.status;
+    badgeEl.className = 'badge status-invoiced';
+    badgeEl.style.display = 'inline-block';
+    statusSpan.textContent = downPaymentStage.status;
+    messageEl.style.setProperty('display', 'block', 'important');
+  }
+
+  document.getElementById('editContractValue').textContent = CURRENCY_SYMBOL + contractValue.toFixed(2);
+
+  updateRemainingStages();
+}
+
+function updateRemainingStages() {
+  const downPaymentAmount = parseFloat(document.getElementById('editDownPaymentAmount').value) || 0;
+
+  // Update down payment percentage
+  const dpPercentage = Math.round((downPaymentAmount / contractValue) * 100);
+  document.getElementById('downPaymentPercentageDisplay').textContent = `${dpPercentage}%`;
+
+  // Generate editable inputs for all stages
+  let html = '';
+  for (let i = 1; i < currentStages.length; i++) {
+    const isInvoiced = ['Invoiced', 'Paid', 'Partially Paid', 'Overdue'].includes(currentStages[i].status);
+    const amount = currentStages[i].amount || 0;
+
+    html += `
+      <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <label class="form-label mb-0">${currentStages[i].name}</label>
+          <span class="badge status-${isInvoiced ? 'invoiced' : 'not-started'}">${currentStages[i].status || 'Pending Invoice'}</span>
+        </div>
+        <input type="number" class="form-control stageAmountInput" data-index="${i}" value="${amount.toFixed(2)}"
+               step="0.01" oninput="calculateEditPlanTotal()" ${isInvoiced ? 'disabled' : ''}/>
+        ${isInvoiced ? '<small class="text-muted d-block mt-1"><i class="bi bi-lock-fill"></i> This stage is ' + currentStages[i].status + ' and cannot be edited</small>' : ''}
+      </div>
+    `;
+  }
+  document.getElementById('editRemainingStagesContainer').innerHTML = html;
+
+  calculateEditPlanTotal();
+}
+
+function autoRedistributeStages(changedIndex) {
+  // Get the changed amount (either down payment or a stage)
+  let changedAmount = 0;
+  let originalAmount = 0;
+
+  if (changedIndex === 0) {
+    // Down payment changed
+    changedAmount = parseFloat(document.getElementById('editDownPaymentAmount').value) || 0;
+    originalAmount = currentStages[0].amount || 0;
+  } else {
+    // A stage changed
+    const input = document.querySelector(`.stageAmountInput[data-index="${changedIndex}"]`);
+    changedAmount = parseFloat(input?.value) || 0;
+    originalAmount = currentStages[changedIndex].amount || 0;
+  }
+
+  const delta = changedAmount - originalAmount;
+
+  // Only redistribute if a non-invoiced stage was changed
+  // Invoiced stages can be edited but don't trigger redistribution
+  const changedStageIsInvoiced = changedIndex > 0 && currentStages[changedIndex].status !== 'Pending Invoice';
+  if (changedStageIsInvoiced) {
+    calculateEditPlanTotal();
+    return;
+  }
+
+  // Find NON-INVOICED stages only (excluding the one that was just changed)
+  const nonInvoicedIndices = [];
+  for (let i = 1; i < currentStages.length; i++) {
+    const isInvoiced = currentStages[i].status !== 'Pending Invoice';
+    if (!isInvoiced && i !== changedIndex) {
+      nonInvoicedIndices.push(i);
+    }
+  }
+
+  // If no other non-invoiced stages to adjust, just update total
+  if (nonInvoicedIndices.length === 0) {
+    calculateEditPlanTotal();
+    return;
+  }
+
+  // Distribute the delta equally among remaining NON-INVOICED stages
+  const deltaPerStage = delta / nonInvoicedIndices.length;
+
+  nonInvoicedIndices.forEach((idx, position) => {
+    const input = document.querySelector(`.stageAmountInput[data-index="${idx}"]`);
+    if (input) {
+      const currentValue = parseFloat(input.value) || currentStages[idx].amount || 0;
+      const newAmount = currentValue - deltaPerStage;
+      input.value = Math.max(0, newAmount).toFixed(2);
+    }
+  });
+
+  // Fix any rounding error by setting the last redistributed stage to exactly
+  // whatever is needed so that all stages sum to contractValue
+  if (nonInvoicedIndices.length > 0) {
+    const lastIdx = nonInvoicedIndices[nonInvoicedIndices.length - 1];
+    const lastInput = document.querySelector(`.stageAmountInput[data-index="${lastIdx}"]`);
+    if (lastInput) {
+      const dpAmount = parseFloat(document.getElementById('editDownPaymentAmount').value) || 0;
+      let othersSum = dpAmount;
+      document.querySelectorAll('.stageAmountInput').forEach(inp => {
+        if (parseInt(inp.dataset.index) !== lastIdx) othersSum += parseFloat(inp.value) || 0;
+      });
+      lastInput.value = Math.max(0, Math.round((contractValue - othersSum) * 100) / 100).toFixed(2);
+    }
+  }
+
+  calculateEditPlanTotal();
+}
+
+function calculateEditPlanTotal() {
+  const downPaymentAmount = parseFloat(document.getElementById('editDownPaymentAmount').value) || 0;
+  let total = downPaymentAmount;
+  document.querySelectorAll('.stageAmountInput').forEach(input => {
+    total += parseFloat(input.value) || 0;
+  });
+
+  // Update down payment percentage
+  const dpPercentage = Math.round((downPaymentAmount / contractValue) * 100);
+  document.getElementById('downPaymentPercentageDisplay').textContent = `${dpPercentage}%`;
+
+  const totalEl = document.getElementById('editPlanTotal');
+  const totalText = CURRENCY_SYMBOL + total.toFixed(2);
+  totalEl.textContent = totalText;
+
+  if (Math.abs(total - contractValue) > 0.01) {
+    totalEl.classList.add('text-danger');
+    totalEl.classList.remove('text-success');
+  } else {
+    totalEl.classList.remove('text-danger');
+    totalEl.classList.add('text-success');
+  }
+}
+
+function saveEditedPaymentPlan() {
+  const downPaymentAmount = parseFloat(document.getElementById('editDownPaymentAmount').value) || 0;
+  let total = downPaymentAmount;
+  const amounts = [{ index: 0, amount: downPaymentAmount }];
+
+  document.querySelectorAll('.stageAmountInput').forEach(input => {
+    const amount = parseFloat(input.value) || 0;
+    total += amount;
+    amounts.push({ index: parseInt(input.dataset.index), amount: amount });
+  });
+
+  if (Math.abs(total - contractValue) > 0.01) {
+    alert(`? Error: Total (${CURRENCY_SYMBOL}${total.toFixed(2)}) must equal contract value (${CURRENCY_SYMBOL}${contractValue.toFixed(2)})`);
+    return;
+  }
+
+  // Send update to backend with skipAutoAdjust flag for manual edit all
+  fetch(`/api/projects/${projectId}/payment-plan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amounts: amounts, skipAutoAdjust: true })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      // Close modal immediately
+      const modal = bootstrap.Modal.getInstance(document.getElementById('editPaymentPlanModal'));
+      if (modal) modal.hide();
+
+      // Update page display immediately - preserve current tab
+      setTimeout(() => {
+        // Store current active tab before reload
+        const activeTab = document.querySelector('.nav-tabs .nav-link.active');
+        if (activeTab) {
+          const tabHref = activeTab.getAttribute('href');
+          sessionStorage.setItem('lastActiveTab', tabHref);
+          // Remove hash and tab parameter from URL before reload to prevent override
+          const url = new URL(window.location);
+          url.hash = '';
+          url.searchParams.delete('tab');
+          window.history.replaceState({}, '', url);
+        }
+        location.reload();
+      }, 300);
+    } else {
+      alert('? Error: ' + (data.error || 'Could not update'));
+    }
+  })
+  .catch(e => {
+    console.error('Payment plan update error:', e);
+    alert('? Error: ' + e.message);
+  });
+}
+
+function prepareUpdateStage(idx, name, amount, paidAmount) {
+  document.getElementById('updateStageName').value = name;
+  document.getElementById('updateStageOriginalAmount').value = amount.toFixed(2);
+  document.getElementById('updateStagePaidAmount').value = paidAmount.toFixed(2);
+  document.getElementById('updateStageNewAmount').value = amount.toFixed(2);
+  document.getElementById('updateStageNewAmount').dataset.stageIndex = idx;
+  updateRemainingForStage();
+}
+
+function updateRemainingForStage() {
+  const originalAmount = parseFloat(document.getElementById('updateStageOriginalAmount').value) || 0;
+  const newAmount = parseFloat(document.getElementById('updateStageNewAmount').value) || 0;
+  const diff = originalAmount - newAmount;
+
+  const remainingEl = document.getElementById('updateStageRemainingDisplay');
+  if (diff > 0.01) {
+    remainingEl.innerHTML = `<span class="text-warning">?? Amount reduced by $${diff.toFixed(2)}</span>`;
+  } else if (diff < -0.01) {
+    remainingEl.innerHTML = `<span class="text-danger">?? Amount increased by $${Math.abs(diff).toFixed(2)}</span>`;
+  } else {
+    remainingEl.textContent = 'No change';
+  }
+}
+
+// ?? Quick Update Invoiced Stage ????????????????????????????????????????????
+async function quickUpdateInvoicedStage(stageIdx, invoiceId, newAmount, projectNumber) {
+  if (!invoiceId) { alert('? No invoice linked'); return; }
+
+  try {
+    const form = new FormData();
+    form.append('new_amount', newAmount);
+    form.append('project_number', projectNumber);
+    form.append('stage_idx', stageIdx);
+
+    const resp = await fetch(`/api/invoices/${invoiceId}/update-amount`, {
+      method: 'POST',
+      body: form
+    });
+
+    if (resp.ok) {
+      // Redirect to invoice details
+      setTimeout(() => {
+        window.location.href = `/invoicing/${invoiceId}`;
+      }, 100);
+    } else {
+      const data = await resp.json();
+      alert('? Error: ' + (data.error || 'Could not update invoice'));
+    }
+  } catch (e) {
+    alert('? Error: ' + e.message);
+  }
+}
+
+async function resetStageStatus(stageIdx, projId) {
+  if (!confirm('Reset this stage back to "Pending Invoice"? Use this only if it was never actually invoiced (e.g. the status came in from an Excel import).')) return;
+
+  try {
+    const resp = await fetch(`/api/projects/${projId}/stage/${stageIdx}/reset-status`, { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('? Error: ' + (data.error || 'Could not reset stage status'));
+    }
+  } catch (e) {
+    alert('? Error: ' + e.message);
+  }
+}
+
+function updateStagedPayment() {
+  const stageIdx = parseInt(document.getElementById('updateStageNewAmount').dataset.stageIndex);
+  const originalAmount = parseFloat(document.getElementById('updateStageOriginalAmount').value) || 0;
+  const paidAmount = parseFloat(document.getElementById('updateStagePaidAmount').value) || 0;
+  const newAmount = parseFloat(document.getElementById('updateStageNewAmount').value) || 0;
+
+  fetch(`/api/projects/${projectId}/stage/${stageIdx}/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      originalAmount: originalAmount,
+      newAmount: newAmount,
+      paidAmount: paidAmount
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      alert('? Payment updated successfully');
+      bootstrap.Modal.getInstance(document.getElementById('updateStageModal')).hide();
+      // Preserve current tab before reload
+      const activeTab = document.querySelector('.nav-tabs .nav-link.active');
+      if (activeTab) {
+        sessionStorage.setItem('lastActiveTab', activeTab.getAttribute('href'));
+        const url = new URL(window.location);
+        url.hash = '';
+        window.history.replaceState({}, '', url);
+      }
+      location.reload();
+    } else {
+      alert('? Error: ' + (data.error || 'Could not update'));
+    }
+  })
+  .catch(e => alert('? Error: ' + e.message));
+}
+
+function toggleInlineEdit(idx, name, amount, status, invoiceId) {
+  const displaySpan = document.getElementById(`amountDisplay_${idx}`);
+  const editSpan = document.getElementById(`amountEdit_${idx}`);
+  const input = document.getElementById(`amountInput_${idx}`);
+
+  // Use current amount from currentStages (reflects any edits), fallback to parameter
+  const currentAmount = currentStages[idx] ? (currentStages[idx].amount || amount) : amount;
+
+  // Hide display, show edit
+  displaySpan.style.display = 'none';
+  editSpan.style.display = 'inline-flex';
+  input.value = currentAmount.toFixed(2);
+  input.focus();
+  input.select();
+
+  // Store original values
+  input.dataset.originalAmount = currentAmount;
+  input.dataset.status = status;
+  input.dataset.invoiceId = invoiceId;
+}
+
+function handleEditKeydown(event, idx, status, invoiceId) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    saveInlineEdit(idx, status, invoiceId);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    const displaySpan = document.getElementById(`amountDisplay_${idx}`);
+    const editSpan = document.getElementById(`amountEdit_${idx}`);
+    displaySpan.style.display = 'inline-flex';
+    editSpan.style.display = 'none';
+  }
+}
+
+function saveInlineEdit(idx, status, invoiceId) {
+  const input = document.getElementById(`amountInput_${idx}`);
+  const displaySpan = document.getElementById(`amountDisplay_${idx}`);
+  const editSpan = document.getElementById(`amountEdit_${idx}`);
+  const stageAmountDisplay = document.getElementById(`stageAmount_${idx}`);
+  const newAmount = parseFloat(input.value) || 0;
+  const originalAmount = parseFloat(input.dataset.originalAmount) || 0;
+
+  // If amount unchanged, just close edit mode
+  if (Math.abs(newAmount - originalAmount) < 0.01) {
+    displaySpan.style.display = 'inline-flex';
+    editSpan.style.display = 'none';
+    return;
+  }
+
+  // Save original amounts BEFORE any changes
+  const oldAmount = currentStages[idx].amount || 0;
+  const originalStageAmounts = currentStages.map(s => s.amount || 0);
+
+  const difference = newAmount - oldAmount;  // Positive if increase, negative if decrease
+
+  // Allow editing any non-invoiced stage - no redistribution validation needed
+  // The contract value will be recalculated automatically when stages are edited
+  // (This was old redistribution logic that is no longer used)
+
+  // Now update stage locally only if validation passed
+  currentStages[idx].amount = newAmount;
+
+  // Recalculate down payment percentage for first stage if it's the down payment
+  if (idx === 0 && currentStages[idx].name && currentStages[idx].name.includes('Down Payment')) {
+    const dpPercent = Math.round((newAmount / contractValue) * 100);
+    const baseName = currentStages[idx].name.split('(')[0].trim();
+    currentStages[idx].name = `${baseName} (${dpPercent}%)`;
+  }
+
+  // Save with permission check if needed
+  saveAmountChangeWithPermission(idx, contractValue, input.dataset.original || input.defaultValue, editSpan, displaySpan, stageAmountDisplay, input, newAmount);
+}
+
+function prepareUpdateInvoicedStage(idx, name, amount, invoiceId) {
+  document.getElementById('updateInvoicedStageName').value = name;
+  document.getElementById('updateInvoicedOriginalAmount').value = amount.toFixed(2);
+  document.getElementById('updateInvoicedNewAmount').value = amount.toFixed(2);
+  document.getElementById('updateInvoicedNewAmount').dataset.stageIndex = idx;
+  document.getElementById('updateInvoicedNewAmount').dataset.invoiceId = invoiceId;
+  updateRedistributionPreview();
+}
+
+function updateRedistributionPreview() {
+  const idx = parseInt(document.getElementById('updateInvoicedNewAmount').dataset.stageIndex);
+  const originalAmount = parseFloat(document.getElementById('updateInvoicedOriginalAmount').value) || 0;
+  const newAmount = parseFloat(document.getElementById('updateInvoicedNewAmount').value) || 0;
+  const difference = originalAmount - newAmount;
+
+  // Update stage name with new percentage if it's the down payment (first stage)
+  if (idx === 0 && currentStages[0] && currentStages[0].name.includes('Down Payment')) {
+    const contractValue = contractValue || 1; // fallback to prevent division by zero
+    const newPercentage = Math.round((newAmount / contractValue) * 100);
+    const stageName = document.getElementById('updateInvoicedStageName');
+    if (stageName) {
+      stageName.value = `Down Payment (${newPercentage}%)`;
+    }
+  }
+
+  let preview = '';
+  if (difference > 0.01) {
+    preview = `<div class="text-success">? Reducing by $${difference.toFixed(2)}</div>`;
+    preview += '<div class="text-muted small mt-2">This amount will be distributed equally among remaining non-invoiced stages:</div>';
+
+    const uninvoicedStages = currentStages.filter((s, i) => i > idx && s.status === 'Pending Invoice');
+    if (uninvoicedStages.length > 0) {
+      const perStage = difference / uninvoicedStages.length;
+      uninvoicedStages.forEach(s => {
+        const newStageAmount = (s.amount || 0) + perStage;
+        preview += `<div class="text-muted small">• ${s.name}: $${(s.amount || 0).toFixed(2)} → $${newStageAmount.toFixed(2)}</div>`;
+      });
+    }
+  } else if (difference < -0.01) {
+    preview = `<div class="text-danger">Increasing by $${Math.abs(difference).toFixed(2)}</div>`;
+    preview += '<div class="text-muted small mt-2">This amount will be subtracted equally from remaining non-invoiced stages.</div>';
+  } else {
+    preview = '<div class="text-secondary">No change</div>';
+  }
+
+  document.getElementById('redistributionPreview').innerHTML = preview;
+}
+
+function updateInvoicedStage() {
+  const idx = parseInt(document.getElementById('updateInvoicedNewAmount').dataset.stageIndex);
+  const invoiceId = document.getElementById('updateInvoicedNewAmount').dataset.invoiceId;
+  const originalAmount = parseFloat(document.getElementById('updateInvoicedOriginalAmount').value) || 0;
+  const newAmount = parseFloat(document.getElementById('updateInvoicedNewAmount').value) || 0;
+
+  if (Math.abs(newAmount - originalAmount) < 0.01) {
+    // Just close the modal silently if amount hasn't changed
+    bootstrap.Modal.getInstance(document.getElementById('updateInvoicedStageModal')).hide();
+    return;
+  }
+
+  // Update stage locally
+  const oldAmount = currentStages[idx].amount || 0;
+  const difference = oldAmount - newAmount;
+  currentStages[idx].amount = newAmount;
+
+  // Redistribute difference to remaining non-invoiced stages
+  const uninvoicedIndices = currentStages
+    .map((s, i) => i > idx && s.status === 'Pending Invoice' ? i : -1)
+    .filter(i => i >= 0);
+
+  if (uninvoicedIndices.length > 0) {
+    const perStage = difference / uninvoicedIndices.length;
+    uninvoicedIndices.forEach(i => {
+      currentStages[i].amount = (currentStages[i].amount || 0) + perStage;
+    });
+  }
+
+  // Close modal
+  bootstrap.Modal.getInstance(document.getElementById('updateInvoicedStageModal')).hide();
+
+  // Send to backend
+  fetch(`/api/projects/${projectId}/stage/${idx}/update-invoiced`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      invoiceId: invoiceId,
+      originalAmount: originalAmount,
+      newAmount: newAmount,
+      stages: currentStages.map((s, i) => ({ index: i, amount: s.amount }))
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      // Redirect to invoice detail page
+      window.location.href = `/invoicing/${invoiceId}`;
+    } else {
+      alert('? Error: ' + (data.error || 'Could not update'));
+    }
+  })
+  .catch(e => alert('? Error: ' + e.message));
+}
+
+function quickInvoiceStage(idx, stageName, amount, projectId) {
+  fetch(`/api/projects/${projectId}/stage/${idx}/invoice`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stageIndex: idx, stageName: stageName, amount: amount })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      // Clear page parameter to prevent redirect back to project list, then go to invoice detail
+      sessionStorage.removeItem('projects_page');
+      console.log('[quickInvoiceStage] Invoice created:', data.invoice_id, 'Redirecting to invoice detail...');
+      window.location.href = `/invoicing/${data.invoice_id}`;
+    } else {
+      alert('? Error: ' + (data.error || 'Could not create invoice'));
+    }
+  })
+  .catch(e => alert('? Error: ' + e.message));
+}
+
+// ?? Permission Modal Handler ????????????????????????????????????????????
+function showContractValuePermission(message, newContractValue, onApprove, onDeny, inputEl) {
+  // Disable input blur to prevent re-triggering save
+  if (inputEl) {
+    inputEl._blurHandler = inputEl.onblur;
+    inputEl.onblur = null;
+  }
+
+  // Create and show permission modal
+  const modalHtml = `
+    <div class="modal fade" id="contractValuePermissionModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-warning bg-opacity-10 border-bottom-2 border-warning">
+            <h5 class="modal-title">
+              <i class="bi bi-exclamation-circle text-warning me-2"></i>Confirm Contract Value Change
+            </h5>
+            <button type="button" class="btn-close" id="contractValueModalClose"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted mb-3">${message}</p>
+            <div class="alert alert-warning alert-sm mb-0">
+              <strong>New Contract Value:</strong> $${newContractValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="contractValueCancelBtn">
+              <i class="bi bi-x-circle me-1"></i>Cancel
+            </button>
+            <button type="button" class="btn btn-warning" id="contractValueContinueBtn">
+              <i class="bi bi-check-circle me-1"></i>Continue
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Remove existing modal if any
+  const existingModal = document.getElementById('contractValuePermissionModal');
+  if (existingModal) existingModal.remove();
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // Show modal
+  const modalEl = document.getElementById('contractValuePermissionModal');
+  const modal = new bootstrap.Modal(modalEl);
+
+  // Attach event handlers
+  document.getElementById('contractValueContinueBtn').onclick = () => {
+    // Restore input blur handler
+    if (inputEl && inputEl._blurHandler) {
+      inputEl.onblur = inputEl._blurHandler;
+    }
+    onApprove();
+    modal.hide();
+    // Clean up backdrop
+    setTimeout(() => {
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+    }, 150);
+  };
+
+  document.getElementById('contractValueCancelBtn').onclick = () => {
+    // Restore input blur handler
+    if (inputEl && inputEl._blurHandler) {
+      inputEl.onblur = inputEl._blurHandler;
+    }
+    // Revert immediately before hiding modal
+    onDeny();
+    modal.hide();
+    // Clean up backdrop
+    setTimeout(() => {
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+    }, 150);
+  };
+
+  document.getElementById('contractValueModalClose').onclick = () => {
+    // Restore input blur handler
+    if (inputEl && inputEl._blurHandler) {
+      inputEl.onblur = inputEl._blurHandler;
+    }
+    // Revert immediately before hiding modal
+    onDeny();
+    modal.hide();
+    // Clean up backdrop
+    setTimeout(() => {
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+    }, 150);
+  };
+
+  modal.show();
+}
+
+// Handle inline edit save with permission check
+function saveAmountChangeWithPermission(idx, contractValue, originalAmount, editSpan, displaySpan, stageAmountDisplay, input, newAmount) {
+  const payload = {
+    amounts: currentStages.map((s, i) => ({ index: i, amount: s.amount }))
+  };
+
+  fetch(`/api/projects/${projectId}/payment-plan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      // Update UI and reload
+      stageAmountDisplay.textContent = CURRENCY_SYMBOL + newAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      input.dataset.originalAmount = newAmount;
+      displaySpan.style.display = 'inline-flex';
+      editSpan.style.display = 'none';
+      setTimeout(() => {
+        // Preserve current tab before reload
+        const activeTab = document.querySelector('.nav-tabs .nav-link.active');
+        if (activeTab) {
+          sessionStorage.setItem('lastActiveTab', activeTab.getAttribute('href'));
+          const url = new URL(window.location);
+          url.hash = '';
+          window.history.replaceState({}, '', url);
+        }
+        location.reload();
+      }, 300);
+    } else if (data.needs_permission) {
+      // Show permission modal
+      showContractValuePermission(
+        data.message,
+        data.new_contract_value,
+        () => {
+          // User approved - send with permission flag
+          const payloadWithPermission = {
+            ...payload,
+            permissionGranted: true
+          };
+
+          fetch(`/api/projects/${projectId}/payment-plan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadWithPermission)
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              stageAmountDisplay.textContent = CURRENCY_SYMBOL + newAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+              input.dataset.originalAmount = newAmount;
+              displaySpan.style.display = 'inline-flex';
+              editSpan.style.display = 'none';
+              setTimeout(() => {
+                // Preserve current tab before reload
+                const activeTab = document.querySelector('.nav-tabs .nav-link.active');
+                if (activeTab) {
+                  sessionStorage.setItem('lastActiveTab', activeTab.getAttribute('href'));
+                  const url = new URL(window.location);
+                  url.hash = '';
+                  window.history.replaceState({}, '', url);
+                }
+                location.reload();
+              }, 300);
+            } else {
+              alert('? Error: ' + (data.error || 'Could not update'));
+              displaySpan.style.display = 'inline-flex';
+              editSpan.style.display = 'none';
+            }
+          })
+          .catch(e => {
+            alert('? Error: ' + e.message);
+            displaySpan.style.display = 'inline-flex';
+            editSpan.style.display = 'none';
+          });
+        },
+        () => {
+          // User denied - revert changes
+          input.value = originalAmount;
+          currentStages[idx].amount = originalAmount;
+          displaySpan.style.display = 'inline-flex';
+          editSpan.style.display = 'none';
+        },
+        input
+      );
+    } else {
+      alert('? Error: ' + (data.error || 'Could not update'));
+      displaySpan.style.display = 'inline-flex';
+      editSpan.style.display = 'none';
+    }
+  })
+  .catch(e => {
+    alert('? Error: ' + e.message);
+    displaySpan.style.display = 'inline-flex';
+    editSpan.style.display = 'none';
+  });
+}
+
+function handleStatusUpdate() {
+  const pageParam = new URLSearchParams(window.location.search).get('page') || '1';
+  document.getElementById('statusPageInput').value = pageParam;
+
+  const status = document.getElementById('statusSelect').value;
+  if (status === 'Sent out_Not Invoiced') {
+    {% if has_pending_stage %}
+    let invoiceUrl = '{{ url_for("invoice_new") }}?project={{ project.get("project_number","") }}&client={{ (project.get("company_name") or project.get("client_name",""))|urlencode }}&stage_idx={{ next_stage_idx }}&stage_name={{ next_stage_name|urlencode }}&stage_amount={{ next_stage_amount }}';
+    {% elif not project.get('payment_stages') %}
+    let invoiceUrl = '{{ url_for("invoice_new") }}?project={{ project.get("project_number","") }}&client={{ (project.get("company_name") or project.get("client_name",""))|urlencode }}';
+    {% else %}
+    let invoiceUrl = null;
+    {% endif %}
+    if (invoiceUrl) {
+      invoiceUrl += '&page=' + pageParam + '&project_id={{ project.firebase_id }}';
+      document.getElementById('invoicePromptLink').href = invoiceUrl;
+      new bootstrap.Modal(document.getElementById('invoicePromptModal')).show();
+      return;
+    }
+  }
+  document.getElementById('statusForm').submit();
+}
+
+function submitStatusOnly() {
+  const modal = bootstrap.Modal.getInstance(document.getElementById('invoicePromptModal'));
+  if (modal) modal.hide();
+  document.getElementById('statusForm').submit();
+}
+
+function toggleCoAddr(idx) {
+  const display = document.getElementById('addrDisplay' + idx);
+  const edit    = document.getElementById('addrEdit'    + idx);
+  display.classList.toggle('d-none');
+  edit.classList.toggle('d-none');
+  if (!edit.classList.contains('d-none')) edit.focus();
+}
+
+function requestDeletePermission(entityType, entityId, entityLabel, redirectUrl) {
+  // For change orders, check if already approved
+  if (entityType === 'change_order') {
+    const parts = entityId.split('_');
+    if (parts.length >= 2) {
+      const projectId = parts.slice(0, -1).join('_');
+      const coIdx = parts[parts.length - 1];
+
+      // Check approval status
+      fetch('/api/change-orders/' + projectId + '/' + coIdx + '/check-delete-approval')
+      .then(r => r.json())
+      .then(d => {
+        if (d.approved) {
+          // Already approved! Show confirm delete modal directly
+          showDeleteConfirmModal(projectId, coIdx, entityLabel);
+        } else {
+          // Not approved, show request modal
+          showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl);
+        }
+      })
+      .catch(() => {
+        // On error, show request modal
+        showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl);
+      });
+      return;
+    }
+  }
+
+  showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl);
+}
+
+function showDeleteConfirmModal(projectId, coIdx, coNumber) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  `;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-width: 500px;
+    width: 90%;
+    overflow: hidden;
+  `;
+
+  modal.dataset.projectId = projectId;
+  modal.dataset.coIdx = coIdx;
+
+  modal.innerHTML = `
+    <div style="background: white; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 600; color: #1e293b;">
+      <i class="bi bi-exclamation-triangle" style="font-size: 18px; color: #dc2626;"></i>
+      Confirm Delete
+      <button style="margin-left: auto; background: none; border: none; font-size: 24px; cursor: pointer; color: #94a3b8;">✕</button>
+    </div>
+    <div style="padding: 24px;">
+      <p style="color: #475569; margin-bottom: 16px;">Type <strong style="color: #dc2626;">Delete</strong> to confirm deletion of ${coNumber || 'this change order'}:</p>
+      <input type="text" id="confirmText" placeholder="Type 'Delete'" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box; margin-bottom: 16px;">
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button style="padding: 9px 18px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #334155; font-weight: 600; cursor: pointer;">Cancel</button>
+        <button id="confirmDeleteBtn" style="padding: 9px 18px; border: none; border-radius: 6px; background: #dc2626; color: white; font-weight: 600; cursor: pointer; opacity: 0.5;">Delete</button>
+      </div>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  const confirmInput = modal.querySelector('#confirmText');
+  const deleteBtn = modal.querySelector('#confirmDeleteBtn');
+  const cancelBtn = modal.querySelector('button:not(#confirmDeleteBtn)');
+  const closeBtn = modal.querySelector('button:nth-child(2)');
+
+  const updateButtonState = () => {
+    const isValid = confirmInput.value === 'Delete';
+    deleteBtn.style.opacity = isValid ? '1' : '0.5';
+    deleteBtn.style.cursor = isValid ? 'pointer' : 'not-allowed';
+  };
+
+  updateButtonState();
+  confirmInput.addEventListener('input', updateButtonState);
+
+  // Delete button handler
+  deleteBtn.onclick = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirmInput.value !== 'Delete') {
+      alert('Please type "Delete" (with capital D) to confirm');
+      return;
+    }
+    const projectId = modal.dataset.projectId;
+    const coIdx = parseInt(modal.dataset.coIdx);
+    overlay.remove();
+    deleteChangeOrder(projectId, coIdx);
+  };
+
+  // Cancel button handler
+  const buttons = modal.querySelectorAll('button');
+  buttons[0].onclick = () => overlay.remove();
+  if (buttons.length > 1) buttons[1].onclick = () => overlay.remove();
+}
+
+function deleteChangeOrder(projectId, coIdx) {
+  // Use form submission which handles redirects properly and shows flash messages
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/projects/' + projectId + '/change-orders/' + coIdx + '/delete';
+  form.style.display = 'none';
+
+  // Add page parameter to preserve pagination
+  const urlParams = new URLSearchParams(window.location.search);
+  const pageNum = urlParams.get('page');
+  if (pageNum) {
+    const pageInput = document.createElement('input');
+    pageInput.type = 'hidden';
+    pageInput.name = 'page';
+    pageInput.value = pageNum;
+    form.appendChild(pageInput);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  `;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-width: 500px;
+    width: 90%;
+    overflow: hidden;
+  `;
+
+  const header = document.createElement('div');
+  header.style.cssText = `
+    background: white;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+  `;
+  header.innerHTML = `<i class="bi bi-shield-check" style="font-size: 18px; color: #f59e0b;"></i> Request Delete Permission`;
+
+  const closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '✕';
+  closeBtn.style.cssText = `
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #94a3b8;
+  `;
+  closeBtn.onclick = () => overlay.remove();
+  header.appendChild(closeBtn);
+
+  const body = document.createElement('div');
+  body.style.cssText = `
+    padding: 16px;
+    color: #475569;
+  `;
+
+  const description = document.createElement('p');
+  description.style.cssText = `
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #64748b;
+  `;
+  description.textContent = 'An admin or accountant will review your request to delete:';
+
+  const entityName = document.createElement('div');
+  entityName.style.cssText = `
+    margin-bottom: 12px;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 6px;
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 13px;
+    border-left: 3px solid #f59e0b;
+  `;
+  entityName.textContent = entityLabel;
+
+  const reasonLabel = document.createElement('label');
+  reasonLabel.style.cssText = `
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 12px;
+    color: #1e293b;
+  `;
+  reasonLabel.textContent = 'Reason (optional)';
+
+  const reasonField = document.createElement('textarea');
+  reasonField.placeholder = 'Why do you need to delete this record?';
+  reasonField.style.cssText = `
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    resize: vertical;
+    min-height: 50px;
+    box-sizing: border-box;
+  `;
+
+  body.appendChild(description);
+  body.appendChild(entityName);
+  body.appendChild(reasonLabel);
+  body.appendChild(reasonField);
+
+  const footer = document.createElement('div');
+  footer.style.cssText = `
+    padding: 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+  `;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = `
+    padding: 9px 18px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: white;
+    color: #475569;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  `;
+  cancelBtn.onmouseover = () => cancelBtn.style.background = '#f1f5f9';
+  cancelBtn.onmouseout = () => cancelBtn.style.background = 'white';
+  cancelBtn.onclick = () => overlay.remove();
+
+  const sendBtn = document.createElement('button');
+  sendBtn.innerHTML = '<i class="bi bi-check-circle" style="margin-right: 6px;"></i>Send Request';
+  sendBtn.style.cssText = `
+    padding: 9px 18px;
+    border: none;
+    border-radius: 6px;
+    background: #f59e0b;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  `;
+  sendBtn.onmouseover = () => sendBtn.style.background = '#d97706';
+  sendBtn.onmouseout = () => sendBtn.style.background = '#f59e0b';
+  sendBtn.onclick = () => {
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<i class="bi bi-hourglass-split" style="margin-right: 6px;"></i>Sending...';
+
+    const reason = reasonField.value.trim();
+
+    fetch('/api/permission-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: entityLabel,
+        entity_type: entityType,
+        entity_id: entityId,
+        entity_label: '',
+        page_url: window.location.href,
+        notes: reason
+      })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        overlay.remove();
+        if (d.approved) {
+          // Already approved - show delete confirmation modal
+          const parts = entityId.split('_');
+          if (parts.length >= 2) {
+            const projectId = parts.slice(0, -1).join('_');
+            const coIdx = parts[parts.length - 1];
+            showDeleteConfirmModal(projectId, coIdx, entityLabel);
+          }
+        } else {
+          // Request sent for approval - show success toast
+          const toast = document.createElement('div');
+          toast.className = 'alert alert-success';
+          toast.style.cssText = `
+            position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+            padding: 12px 16px; border-radius: 4px; font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            min-width: 300px; animation: slideIn 0.3s ease-out;
+          `;
+          toast.innerHTML = '<i class="bi bi-check-circle" style="margin-right: 8px;"></i>Delete request sent to admin for approval.';
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 4000);
+        }
+      } else {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="bi bi-check-circle" style="margin-right: 6px;"></i>Send Request';
+        alert('Error: ' + (d.error || 'Failed to send request'));
+      }
+    })
+    .catch(err => {
+      console.error('Request failed:', err);
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = '<i class="bi bi-check-circle" style="margin-right: 6px;"></i>Send Request';
+      alert('Network error. Please try again.');
+    });
+  };
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(sendBtn);
+
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+// Styled confirm dialog (same look as the Approve/Reject Time Off modal)
+function showConfirmationModal(title, message, action, headerBg, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); display: flex; align-items: center;
+    justify-content: center; z-index: 9999;
+  `;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-width: 450px; width: 90%; overflow: hidden;
+  `;
+
+  const header = document.createElement('div');
+  header.style.cssText = `background: ${headerBg}; color: white; padding: 18px 24px; font-weight: 700; font-size: 16px;`;
+  header.textContent = title;
+
+  const body = document.createElement('div');
+  body.style.cssText = `padding: 24px; color: #334155; font-size: 14px; line-height: 1.6;`;
+  body.innerHTML = `<p>${message}</p>`;
+
+  const footer = document.createElement('div');
+  footer.style.cssText = `padding: 18px 24px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e2e8f0;`;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = `padding: 9px 18px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #334155; font-weight: 600; cursor: pointer; font-size: 13px;`;
+  cancelBtn.onclick = () => overlay.remove();
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.textContent = action;
+  confirmBtn.style.cssText = `padding: 9px 18px; border: none; border-radius: 6px; background: ${headerBg}; color: white; font-weight: 600; cursor: pointer; font-size: 13px;`;
+  confirmBtn.onclick = () => {
+    overlay.remove();
+    onConfirm();
+  };
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(confirmBtn);
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function confirmApproveCo(formId, coNumber, amount) {
+  showConfirmationModal(
+    'Approve Change Order',
+    `You are about to <strong>approve</strong> <strong>${coNumber}</strong> (${CURRENCY_SYMBOL}${parseFloat(amount).toFixed(2)}). This will add it to the contract value and create a new payment stage.`,
+    'Approve',
+    '#10b981',
+    () => document.getElementById(formId).submit()
+  );
+}
+
+// Change Order Approval/Rejection Dialogs
+var currentCoData = null;
+
+function submitCoStatus(status) {
+  if (!currentCoData) return;
+
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = `/projects/${currentCoData.projectId}/change-orders/${currentCoData.coIdx}/status`;
+
+  var input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'status';
+  input.value = status;
+
+  form.appendChild(input);
+
+  if (currentCoData.coFirebaseId) {
+    var fbIdInput = document.createElement('input');
+    fbIdInput.type = 'hidden';
+    fbIdInput.name = 'co_firebase_id';
+    fbIdInput.value = currentCoData.coFirebaseId;
+    form.appendChild(fbIdInput);
+  }
+
+  // Add page parameter to preserve pagination
+  const urlParams = new URLSearchParams(window.location.search);
+  const pageNum = urlParams.get('page');
+  if (pageNum) {
+    const pageInput = document.createElement('input');
+    pageInput.type = 'hidden';
+    pageInput.name = 'page';
+    pageInput.value = pageNum;
+    form.appendChild(pageInput);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function confirmRejectChangeOrder() {
+  if (!currentCoData) return;
+  var reason = document.getElementById('rejectReason').value.trim();
+  bootstrap.Modal.getInstance(document.getElementById('rejectCoModal')).hide();
+  submitCoStatus('Rejected');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const projectId = '{{ project.firebase_id }}';
+  const tabStorageKey = 'project_active_tab_' + projectId;
+
+  // Store active tab when it changes
+  const tabButtons = document.querySelectorAll('[data-bs-toggle="tab"]');
+  tabButtons.forEach(tab => {
+    tab.addEventListener('shown.bs.tab', function() {
+      const tabName = this.getAttribute('href').replace('#tab-', '');
+      sessionStorage.setItem(tabStorageKey, tabName);
+    });
+  });
+
+  // Restore previously active tab for this project only
+  const activeTab = sessionStorage.getItem(tabStorageKey);
+  if (activeTab) {
+    const tabLink = document.querySelector(`[href="#tab-${activeTab}"]`);
+    if (tabLink) {
+      const tab = new bootstrap.Tab(tabLink);
+      tab.show();
+    }
+  }
+
+  document.querySelectorAll('.reject-co-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      currentCoData = {
+        projectId: this.dataset.projectId,
+        coIdx: this.dataset.coIdx,
+        coFirebaseId: this.dataset.coFirebaseId,
+        coNumber: this.dataset.coNumber
+      };
+      document.getElementById('rejectReason').value = '';
+      new bootstrap.Modal(document.getElementById('rejectCoModal')).show();
+    });
+  });
+
+  // Preserve pagination state - add page parameter to all forms
+  const urlParams = new URLSearchParams(window.location.search);
+  let pageNum = urlParams.get('page');
+
+  // If page in URL, store it in sessionStorage
+  if (pageNum) {
+    // Store in form for submission
+  } else {
+    // Page not in URL - use URL parameter only
+    pageNum = urlParams.get('page');
+  }
+
+  if (pageNum) {
+    // Populate existing form-page-input fields
+    document.querySelectorAll('.form-page-input').forEach(function(input) {
+      input.value = pageNum;
+    });
+    // Add hidden page input to all forms that don't have one
+    document.querySelectorAll('form').forEach(function(form) {
+      if (!form.querySelector('input[name="page"]')) {
+        const pageInput = document.createElement('input');
+        pageInput.type = 'hidden';
+        pageInput.name = 'page';
+        pageInput.value = pageNum;
+        form.appendChild(pageInput);
+      }
+    });
+  }
+});
+
+function toggleCommModal() {
+  const type  = document.getElementById('commModalType').value;
+  const row   = document.getElementById('commModalValueRow');
+  const label = document.getElementById('commModalValueLabel');
+  const input = document.getElementById('commModalValue');
+  if (type === 'default') {
+    row.style.display = 'none';
+  } else {
+    row.style.display = '';
+    if (type === 'percent') {
+      label.textContent = 'Percentage (%)';
+      input.placeholder = 'e.g. 5';
+    } else {
+      label.textContent = 'Amount ($)';
+      input.placeholder = 'e.g. 1500';
+    }
+  }
+}
+</script>
+
+<!-- ?? Change Order - Reject Modal ???????????????????????????????????? -->
+<div class="modal fade" id="rejectCoModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">Reject Change Order</h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pb-2">
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:12px;">Reason for Rejection <span class="text-muted fw-normal">(optional)</span></label>
+          <textarea id="rejectReason" class="form-control form-control-sm" placeholder="e.g., Not approved by client" rows="3" style="font-size:12px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-sm btn-danger" onclick="confirmRejectChangeOrder()">
+          <i class="bi bi-x-circle me-1"></i>Reject
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
