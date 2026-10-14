@@ -24684,15 +24684,26 @@ def _ai_structured(content, schema: dict, effort: str = "low", max_tokens: int =
     if not client:
         raise RuntimeError("No Anthropic API key configured. Add it in Settings → AI.")
     # Streaming keeps long replies (a busy month's statement) clear of HTTP timeouts
-    with client.beta.messages.stream(
-        model="claude-opus-5-5",
-        max_tokens=max_tokens,
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-        output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
-        messages=[{"role": "user", "content": content}],
-    ) as stream:
-        resp = stream.get_final_message()
+    try:
+        with client.beta.messages.stream(
+            model="claude-opus-5-5",
+            max_tokens=max_tokens,
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
+            messages=[{"role": "user", "content": content}],
+        ) as stream:
+            resp = stream.get_final_message()
+    except _anthropic.AuthenticationError:
+        raise RuntimeError("The Anthropic API key was rejected. Check the key in Settings → AI or ANTHROPIC_API_KEY.")
+    except _anthropic.RateLimitError:
+        raise RuntimeError("The AI is busy right now (rate limit). Wait a minute and try again.")
+    except _anthropic.APIStatusError as e:
+        if "credit balance" in str(e).lower():
+            raise RuntimeError("Your Anthropic account is out of credit. Add credits at console.anthropic.com → Billing, then try again.")
+        raise RuntimeError(f"The AI service returned an error ({e.status_code}). Try again shortly.")
+    except _anthropic.APIConnectionError:
+        raise RuntimeError("Couldn't reach the AI service. Check the internet connection and try again.")
     if resp.stop_reason == "refusal":
         raise RuntimeError("The AI declined to read this document.")
     if resp.stop_reason == "max_tokens":
@@ -24916,6 +24927,58 @@ def _suggest_expense_fields(rows, expense_types, categories_by_type):
                 rows[i].update({k: s.get(k, "") for k in ("expense_name", "expense_type", "category", "vendor")})
 
 
+# Keyword rules used when AI isn't available. First match wins, so specific rules come first.
+_CATEGORY_RULES = [
+    ("Bank Charges", r"CHARGES?|CHRG|CHGS?|ANNUAL FEE|PENALTY|MIN BAL|AMC FEE|STAMP DUTY"),
+    ("Tax Expenses/Tax Deductions", r"GST PAYMENT|CBIC|GSTN|TDS|INCOME TAX|ADVANCE TAX|PROFESSIONAL TAX"),
+    ("Salary/Bonuses", r"SALARY|SAL CR|BONUS|PAYROLL|WAGES"),
+    ("Professional Services", r"CA|ASSOCIATES|CONSULT\w*|LEGAL|ADVOCATE|AUDIT\w*|CHARTERED"),
+    ("Insurance & Compliance", r"LIC|INSURANCE|PREMIUM|POLICY"),
+    ("Facilities & Utilities", r"RENT|ELECTRICITY|APSPDCL|APEPDCL|APCPDCL|TSSPDCL|TSNPDCL|BESCOM|POWER|WATER|"
+                               r"BROADBAND|FIBERNET|INTERNET|JIO|AIRTEL|BSNL|VI POSTPAID|HP GAS|INDANE|BHARAT GAS|"
+                               r"CYLINDER|MAINTENANCE|HOUSEKEEPING|CLEANING"),
+    ("Engineering Software & IT", r"AUTODESK|MICROSOFT|GOOGLE|ADOBE|AWS|AMAZON WEB|ZOOM|SOFTWARE|GODADDY|HOSTINGER|"
+                                  r"BENTLEY|BLUEBEAM|SUBSCRIPTION|DROPBOX|CANVA|OPENAI"),
+    ("Travel, Site Visits & Vehicles", r"IRCTC|OLA|UBER|RAPIDO|FUEL|PETROL|DIESEL|INDIAN OIL|IOCL|HPCL|BPCL|FASTAG|"
+                                       r"TOLL|MAKEMYTRIP|GOIBIBO|INDIGO|AIR INDIA|REDBUS|SITE VISIT|TRAVEL|PARKING"),
+    ("Meals & Entertainment", r"SWIGGY|ZOMATO|RESTAURANT|HOTEL|CAFE|LUNCH|DINNER|BREAKFAST|FOOD|DOMINOS|KFC"),
+    ("Computer & Office Equipment", r"CROMA|RELIANCE DIGITAL|VIJAY SALES|PRINTER|LAPTOP|COMPUTER|MONITOR|DELL|LENOVO"),
+    ("Safety & Field Supplies", r"HARDWARE|TOOLS|SAFETY|HELMET|PPE"),
+    ("Medical/Benefits", r"HOSPITAL|PHARMACY|APOLLO|MEDPLUS|MEDICAL|CLINIC|DIAGNOSTIC"),
+    ("Marketing & Business Development", r"ADVERTIS\w*|FACEBOOK|META ADS|GOOGLE ADS|MARKETING|PRINTING|BANNER"),
+    ("Office & Admin Overhead", r"AMAZON|FLIPKART|STATIONERY|COURIER|DTDC|BLUEDART|DELHIVERY|INDIA POST|PANTRY|"
+                                r"BIGBASKET|BLINKIT|ZEPTO|DMART|OFFICE"),
+    ("Donations", r"DONATION|CHARITY|TRUST"),
+]
+_CATEGORY_RULES = [(cat, re.compile(rf"\b(?:{pat})\b", re.I)) for cat, pat in _CATEGORY_RULES]
+
+# Bank prefixes in front of the payee name, e.g. "UPI-", "POS 4512XXXX4421 ", "NEFT DR-", "CHQ PAID-000145-"
+_TXN_PREFIX = re.compile(r"^(?:UPI|IMPS(?:-P2A)?|NEFT(?: ?(?:DR|CR))?|RTGS(?: ?(?:DR|CR))?|ACH ?D|ECS|NACH|"
+                         r"POS(?: \d+X+\d+)?|CHQ PAID(?:-\d+)?|BIL(?:PAY)?|ATW|ATM)[-/ ]+", re.I)
+
+
+def _rule_based_suggestions(rows, categories_by_type):
+    """Fill blank expense_name/type/category/vendor from the bank description using keyword rules."""
+    type_of = {c: t for t, cats in categories_by_type.items() if isinstance(cats, list) for c in cats}
+    for r in rows:
+        desc = r.get("description", "")
+        rest = _TXN_PREFIX.sub("", desc, count=1)
+        parts = [p.strip() for p in re.split(r"\s*[-/]\s*", rest) if p.strip()]
+        # Drop reference numbers and bank codes such as 428812345 or ICIC0000123
+        parts = [p for p in parts if not re.fullmatch(r"[A-Z]{4}0\w{6}|\w*\d{6,}\w*", p, re.I)]
+        vendor = parts[0].title() if rest != desc and parts else ""
+        name = " - ".join(parts[1:] if vendor and len(parts) > 1 else parts).title()
+        if not r.get("vendor"):
+            r["vendor"] = vendor
+        if not r.get("expense_name") or r.get("expense_name") == desc[:80]:
+            r["expense_name"] = (name or desc)[:80]
+        if not r.get("category"):
+            for cat, pattern in _CATEGORY_RULES:
+                if cat in type_of and pattern.search(desc):
+                    r["category"], r["expense_type"] = cat, type_of[cat]
+                    break
+
+
 def _statement_rows_from_pdf(raw: bytes, expense_types, categories_by_type):
     """Have Claude read every transaction in a PDF statement; keeps only money going out."""
     txn = _suggestion_schema(expense_types, categories_by_type, {
@@ -24973,7 +25036,10 @@ def bank_statement_parse():
                     _suggest_expense_fields(rows, expense_types, categories_by_type)
                 except Exception as e:
                     log.warning(f"Bank statement categorisation failed: {e}")
-                    ai_note = f"Couldn't suggest categories ({e}). Fill them in before saving."
+                    reason = str(e) if isinstance(e, RuntimeError) else "the AI service had an error"
+                    ai_note = (f"AI suggestions unavailable: {reason} Categories were guessed from the bank "
+                               f"description instead. Check them and fill in any blanks before importing.")
+                _rule_based_suggestions(rows, categories_by_type)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except RuntimeError as e:
