@@ -82,7 +82,7 @@
               <select name="commission_override_type" id="commOverrideType" class="form-select" style="max-width:160px;" onchange="toggleCommOverride()">
                 <option value="default" {{ 'selected' if not project or project.get('commission_override_type','default') == 'default' }}>Default rate</option>
                 <option value="percent" {{ 'selected' if project and project.get('commission_override_type') == 'percent' }}>Custom %</option>
-                <option value="fixed"   {{ 'selected' if project and project.get('commission_override_type') == 'fixed' }}>Fixed $</option>
+                <option value="fixed"   {{ 'selected' if project and project.get('commission_override_type') == 'fixed' }}>Fixed ₹</option>
               </select>
               <input type="number" name="commission_override_value" id="commOverrideValue"
                      class="form-control" step="0.01" min="0"
@@ -167,27 +167,27 @@
                 <thead>
                   <tr>
                     <th>Service</th>
-                    <th style="width:160px;">Cost ($)</th>
+                    <th style="width:160px;">Cost (₹)</th>
                   </tr>
                 </thead>
                 <tbody id="serviceCostBody"></tbody>
                 <tfoot>
                   <tr>
                     <td class="text-end fw-600">Subtotal</td>
-                    <td class="fw-600" id="serviceCostTotal">$0.00</td>
+                    <td class="fw-600" id="serviceCostTotal">₹0.00</td>
                   </tr>
                   <tr id="serviceCostRushRow" class="text-warning" style="display:none;">
                     <td class="text-end fw-600"><i class="bi bi-lightning-charge-fill me-1"></i>Rush Fee</td>
-                    <td class="fw-600" id="serviceCostRushAmt">$0.00</td>
+                    <td class="fw-600" id="serviceCostRushAmt">₹0.00</td>
                   </tr>
                   <tr class="border-top">
                     <td class="text-end fw-700">Contract Value</td>
-                    <td class="fw-700 text-teal" id="serviceCostGrandTotal">$0.00</td>
+                    <td class="fw-700 text-teal" id="serviceCostGrandTotal">₹0.00</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
-            <div class="form-text">Updates "Contract Value ($)" automatically as you enter costs.</div>
+            <div class="form-text">Updates "Contract Value (₹)" automatically as you enter costs.</div>
           </div>
           {% endif %}
           <div class="col-12">
@@ -266,7 +266,7 @@
       <div class="card-panel mb-3">
         <h6 class="section-heading">Financials</h6>
         <div class="mb-2">
-          <label class="form-label">Contract Value ($) <span class="text-danger">*</span></label>
+          <label class="form-label">Contract Value (₹) <span class="text-danger">*</span></label>
           {% set existing_stages = project.get('payment_stages') if project else None %}
           {% set has_invoiced = existing_stages and (existing_stages|selectattr('status', 'in', ['Invoiced', 'Paid', 'Partially Paid', 'Overdue'])|list|length > 0) %}
           {% set contract_val = project.get('contract_value','0') if project else '0' %}
@@ -281,7 +281,7 @@
         </div>
         {% if not is_new %}
         <div class="mb-2">
-          <label class="form-label">Amount Paid ($)</label>
+          <label class="form-label">Amount Paid (₹)</label>
           <input type="number" name="amount_paid" class="form-control bg-light" readonly
                  value="{{ '%.2f'|format(project.get('amount_paid', 0)|float) if project else '0.00' }}">
           <div class="form-text">Auto-synced from invoices.</div>
@@ -353,25 +353,25 @@
         <p class="text-muted small mb-3">Set budgets to track actual vs planned costs on the P&amp;L tab.</p>
         <div class="row g-3">
           <div class="col-md-4">
-            <label class="form-label">Labor Budget ($)</label>
+            <label class="form-label">Labor Budget (₹)</label>
             <input type="number" name="budget_labor" id="budgetLabor" class="form-control budget-input"
                    value="{{ '%.2f'|format(project.get('budget_labor',0)|float) if project and project.get('budget_labor') else '' }}"
                    min="0" step="0.01" placeholder="0.00" oninput="updateBudgetTotal()">
           </div>
           <div class="col-md-4">
-            <label class="form-label">Expenses Budget ($)</label>
+            <label class="form-label">Expenses Budget (₹)</label>
             <input type="number" name="budget_expenses" id="budgetExpenses" class="form-control budget-input"
                    value="{{ '%.2f'|format(project.get('budget_expenses',0)|float) if project and project.get('budget_expenses') else '' }}"
                    min="0" step="0.01" placeholder="0.00" oninput="updateBudgetTotal()">
           </div>
           <div class="col-md-4">
-            <label class="form-label">Subcontractor Budget ($)</label>
+            <label class="form-label">Subcontractor Budget (₹)</label>
             <input type="number" name="budget_subcontractor" id="budgetSubcontractor" class="form-control budget-input"
                    value="{{ '%.2f'|format(project.get('budget_subcontractor',0)|float) if project and project.get('budget_subcontractor') else '' }}"
                    min="0" step="0.01" placeholder="0.00" oninput="updateBudgetTotal()">
           </div>
           <div class="col-md-4">
-            <label class="form-label">Actual Labor Cost ($) <span class="text-muted small">(manual entry)</span></label>
+            <label class="form-label">Actual Labor Cost (₹) <span class="text-muted small">(manual entry)</span></label>
             <input type="number" name="actual_labor_cost" id="actualLaborCost" class="form-control"
                    value="{{ '%.2f'|format(project.get('actual_labor_cost',0)|float) if project and project.get('actual_labor_cost') else '' }}"
                    min="0" step="0.01" placeholder="0.00">
@@ -380,7 +380,7 @@
             <div class="d-flex align-items-center gap-2 p-2 rounded" style="background:#f0fdf4;border:1px solid #bbf7d0;">
               <i class="bi bi-calculator text-success"></i>
               <span class="small text-muted">Total Budget:</span>
-              <span class="fw-bold text-teal" id="budgetTotalDisplay">$0.00</span>
+              <span class="fw-bold text-teal" id="budgetTotalDisplay">₹0.00</span>
             </div>
           </div>
         </div>
@@ -411,7 +411,7 @@
           <input type="text" id="editStageName" class="form-control" readonly style="background:#f5f5f5;">
         </div>
         <div class="mb-3">
-          <label class="form-label">Stage Amount ($)</label>
+          <label class="form-label">Stage Amount (₹)</label>
           <input type="number" id="editStageAmount" class="form-control" min="0" step="0.01" placeholder="0.00"
                  oninput="validateStageAmount()">
           <div class="form-text text-muted mt-1" id="stageValidationMsg"></div>
@@ -624,7 +624,7 @@ function editExistingPaymentStages() {
       </div>
     `;
   });
-  html += '<div class="alert alert-info mt-3"><strong>Total:</strong> <span id="editStagesTotal">$0.00</span></div>';
+  html += '<div class="alert alert-info mt-3"><strong>Total:</strong> <span id="editStagesTotal">₹0.00</span></div>';
   html += '</div>';
 
   // Show in a modal (or use a simple prompt-like approach)
@@ -1399,7 +1399,7 @@ function prepareEditStage(index, name, amount) {
   const maxAmount = contractValue - otherStagesTotal;
 
   document.getElementById('amountConstraintMsg').textContent =
-    `Max for this stage: $${maxAmount.toFixed(2)} (to match contract value of $${contractValue.toFixed(2)})`;
+    `Max for this stage: ₹${maxAmount.toFixed(2)} (to match contract value of ₹${contractValue.toFixed(2)})`;
 
   validateStageAmount();
 }
@@ -1415,11 +1415,11 @@ function validateStageAmount() {
   const saveBtn = document.getElementById('saveStageBtn');
 
   if (amount > maxAmount) {
-    msgEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Amount exceeds max of $${maxAmount.toFixed(2)}</span>`;
+    msgEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Amount exceeds max of ₹${maxAmount.toFixed(2)}</span>`;
     msgEl.style.color = '#dc2626';
     saveBtn.disabled = true;
   } else if (amount <= 0) {
-    msgEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Amount must be greater than $0</span>`;
+    msgEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Amount must be greater than ₹0</span>`;
     saveBtn.disabled = true;
   } else {
     msgEl.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>Valid amount</span>`;
@@ -1493,7 +1493,7 @@ function openEditPreviewStageModal() {
 
   const contractValue = parseFloat(document.getElementById('contractValue')?.value) || 0;
   document.getElementById('amountConstraintMsg').textContent =
-    `Max total: $${contractValue.toFixed(2)} (contract value)`;
+    `Max total: ₹${contractValue.toFixed(2)} (contract value)`;
 
   modal.show();
 }
@@ -1703,7 +1703,7 @@ function updatePreviewStageTotals() {
             ${changeIcon} Contract value ${changeType} by <strong>${CURRENCY_SYMBOL}${diffAmt}</strong>
           </div>
           <div style="font-size: 12px; opacity: 0.9;">
-            From $${originalValue.toFixed(2)} → $${newTotal.toFixed(2)}
+            From ₹${originalValue.toFixed(2)} → ₹${newTotal.toFixed(2)}
           </div>
         </div>
       `;

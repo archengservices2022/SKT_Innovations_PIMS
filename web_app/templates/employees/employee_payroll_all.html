@@ -46,22 +46,22 @@
 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:20px;">
   <div style="background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0;">
     <div style="font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Total Salary</div>
-    <div style="font-size:20px; font-weight:800; color:#0f172a;">${{ '{:,.2f}'.format(total_salary_amount) }}</div>
+    <div style="font-size:20px; font-weight:800; color:#0f172a;">{{ currency_symbol }}{{ '{:,.2f}'.format(total_salary_amount) }}</div>
     <div style="font-size:11px; color:#94a3b8; margin-top:4px;">All records</div>
   </div>
   <div style="background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0;">
     <div style="font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Total Bonus</div>
-    <div style="font-size:20px; font-weight:800; color:#0f172a;">${{ '{:,.2f}'.format(total_bonus_amount) }}</div>
+    <div style="font-size:20px; font-weight:800; color:#0f172a;">{{ currency_symbol }}{{ '{:,.2f}'.format(total_bonus_amount) }}</div>
     <div style="font-size:11px; color:#94a3b8; margin-top:4px;">All records</div>
   </div>
   <div style="background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0;">
     <div style="font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Paid Records</div>
     <div style="font-size:20px; font-weight:800; color:#16a34a;">{{ paid_count }}</div>
-    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">${{ '{:,.2f}'.format(paid_amount) }}</div>
+    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">{{ currency_symbol }}{{ '{:,.2f}'.format(paid_amount) }}</div>
   </div>
   <div style="background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0;">
     <div style="font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Pending Salary</div>
-    <div style="font-size:20px; font-weight:800; color:#b45309;">${{ '{:,.2f}'.format(pending_amount) }}</div>
+    <div style="font-size:20px; font-weight:800; color:#b45309;">{{ currency_symbol }}{{ '{:,.2f}'.format(pending_amount) }}</div>
     <div style="font-size:11px; color:#94a3b8; margin-top:4px;">{{ pending_count }} record{{ 's' if pending_count != 1 else '' }}</div>
   </div>
 </div>
@@ -75,8 +75,7 @@
         <tr>
           <th>Date</th>
           <th>Type</th>
-          <th class="text-end">Amount (USD)</th>
-          <th class="text-end">Amount (BDT)</th>
+          <th class="text-end">Amount (₹)</th>
           <th>Status</th>
           <th>Notes</th>
         </tr>
@@ -98,7 +97,6 @@
             {% endif %}
           </td>
           <td class="text-end text-green">{{ currency_symbol }}{{ '{:,.2f}'.format(sal.get('amount', 0)|float) }}</td>
-          <td class="text-end text-green">৳{{ '{:,.2f}'.format((sal.get('amount', 0)|float) * (sal.get('exchange_rate', 120)|float)) }}</td>
           <td>
             {% set status = sal.get('salary_status', 'Paid')|lower %}
             {% if status == 'paid' or status == '' %}

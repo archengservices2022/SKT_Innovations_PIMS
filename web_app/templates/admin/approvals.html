@@ -168,11 +168,10 @@
                   {% set curr = item.currency %}
                   {% set rate = item.exchange_rate or 120 %}
                   {% if curr == 'BDT' %}
-                    <div class="fw-semibold">${{ "{:.2f}".format((item.amount|float) / rate) }}</div>
+                    <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format((item.amount|float) / rate) }}</div>
                     <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
                   {% else %}
-                    <div class="fw-semibold">${{ "{:.2f}".format(item.amount|float) }}</div>
-                    <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format((item.amount|float) * rate) }}</div>
+                    <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format(item.amount|float) }}</div>
                   {% endif %}
                 {% else %}—{% endif %}
               </td>
@@ -232,11 +231,10 @@
                   {% set curr = item.currency %}
                   {% set rate = item.exchange_rate or 120 %}
                   {% if curr == 'BDT' %}
-                    <div class="fw-semibold">${{ "{:.2f}".format((item.amount|float) / rate) }}</div>
+                    <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format((item.amount|float) / rate) }}</div>
                     <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
                   {% else %}
-                    <div class="fw-semibold">${{ "{:.2f}".format(item.amount|float) }}</div>
-                    <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format((item.amount|float) * rate) }}</div>
+                    <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format(item.amount|float) }}</div>
                   {% endif %}
                 {% else %}—{% endif %}
               </td>
@@ -446,11 +444,10 @@
                       {% set curr = item.currency %}
                       {% set rate = item.exchange_rate or 120 %}
                       {% if curr == 'BDT' %}
-                        <div class="fw-semibold">${{ "{:.2f}".format((item.amount|float) / rate) }}</div>
+                        <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format((item.amount|float) / rate) }}</div>
                         <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
                       {% else %}
-                        <div class="fw-semibold">${{ "{:.2f}".format(item.amount|float) }}</div>
-                        <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format((item.amount|float) * rate) }}</div>
+                        <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format(item.amount|float) }}</div>
                       {% endif %}
                     {% else %}—{% endif %}
                   </td>
@@ -501,11 +498,10 @@
                       {% set curr = item.currency %}
                       {% set rate = item.exchange_rate or 120 %}
                       {% if curr == 'BDT' %}
-                        <div class="fw-semibold">${{ "{:.2f}".format((item.amount|float) / rate) }}</div>
+                        <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format((item.amount|float) / rate) }}</div>
                         <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
                       {% else %}
-                        <div class="fw-semibold">${{ "{:.2f}".format(item.amount|float) }}</div>
-                        <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format((item.amount|float) * rate) }}</div>
+                        <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format(item.amount|float) }}</div>
                       {% endif %}
                     {% else %}—{% endif %}
                   </td>
@@ -665,7 +661,7 @@
           Employee: <strong id="med-modal-employee"></strong> &mdash; Claimed: <strong id="med-modal-claimed"></strong>
         </p>
         <div class="mb-3">
-          <label class="form-label fw-semibold" style="font-size:12px;">Approved Amount (USD) <span class="text-danger">*</span></label>
+          <label class="form-label fw-semibold" style="font-size:12px;">Approved Amount (₹) <span class="text-danger">*</span></label>
           <input type="number" id="medAmountApproved" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00">
         </div>
         <div class="mb-2">
@@ -819,7 +815,7 @@ document.addEventListener('DOMContentLoaded', function() {
       var curr = this.dataset.currency || 'USD';
       var rate = parseFloat(this.dataset.rate) || 120;
       var usd = curr === 'BDT' ? (amt / rate).toFixed(2) : amt.toFixed(2);
-      document.getElementById('med-modal-claimed').textContent = '$' + usd;
+      document.getElementById('med-modal-claimed').textContent = CURRENCY_SYMBOL + usd;
       document.getElementById('medAmountApproved').value = usd;
       document.getElementById('medAdminNotes').value = '';
       new bootstrap.Modal(document.getElementById('medicalApproveModal')).show();

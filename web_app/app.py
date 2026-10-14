@@ -82,9 +82,11 @@ PROJECT_NUMBER_PREFIX = "SKT"
 FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", _project_config["api_key"])
 FIREBASE_DB_URL  = os.environ.get("FIREBASE_DB_URL",  _project_config["db_url"])
 
-# Both MABS and Arch use USD $
-CURRENCY_SYMBOL = "$"
-CURRENCY_CODE   = "USD"
+# All amounts are in Indian Rupees
+CURRENCY_SYMBOL = "₹"
+CURRENCY_CODE   = "INR"
+# ReportLab's built-in Helvetica has no ₹ glyph, so PDFs spell the currency out
+PDF_CURRENCY_SYMBOL = "Rs. "
 
 FIREBASE_AVAILABLE = False
 db = None
@@ -1491,6 +1493,7 @@ def inject_globals():
         "format_date_invoice": _format_date_invoice,  # Invoice-specific formatter (MM-DD-YY)
         "currency_symbol": CURRENCY_SYMBOL,
         "currency_code":   CURRENCY_CODE,
+        "CURRENCY_SYMBOL": CURRENCY_SYMBOL,
         **clock_widget,
     }
 
@@ -3095,7 +3098,7 @@ def quotes_export():
     w.writerow([f"{co.get('name','')} - Quotes Report"])
     w.writerow([])
 
-    headers = ["Quote Number", "Client", "Project / Scope", "Salesperson", "Date", "Valid Until", "Status", "Subtotal", "Tax", "Total", "Commission Rate (%)", "Commission Earned ($)", "Notes"]
+    headers = ["Quote Number", "Client", "Project / Scope", "Salesperson", "Date", "Valid Until", "Status", "Subtotal", "Tax", "Total", "Commission Rate (%)", "Commission Earned (₹)", "Notes"]
     w.writerow(headers)
 
     for q in items:
@@ -3196,7 +3199,7 @@ def quotes_export_excel():
         ws.row_dimensions[2].height = 16
 
     headers = ["Quote Number","Client","Project / Scope","Salesperson","Date","Valid Until",
-               "Status","Subtotal ($)","Tax ($)","Total ($)","Commission Rate (%)","Commission Earned ($)","Notes"]
+               "Status","Subtotal (₹)","Tax (₹)","Total (₹)","Commission Rate (%)","Commission Earned (₹)","Notes"]
     header_row = 3 if _date_range else 2
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=header_row, column=col, value=h)
@@ -3248,7 +3251,7 @@ def quotes_export_excel():
                         if ri % 2 == 0:
                             cell.fill = alt_fill
                         if ci in (8, 9, 10, 12):
-                            cell.number_format = '"$"#,##0.00'
+                            cell.number_format = '"₹"#,##0.00'
                         if ci == 11 and val is not None:
                             cell.number_format = '0.0"%"'
                         cell.alignment = ctr
@@ -3379,9 +3382,9 @@ def quotes_export_pdf():
                         Paragraph(_qsp or "—", cell_style),
                         Paragraph(date_str, cell_style),
                         Paragraph(q.get("status","—"), cell_style),
-                        Paragraph(f"${total:,.2f}", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{total:,.2f}", cell_style),
                         Paragraph(f"{_qrate:.1f}%" if _qrate else "—", cell_style),
-                        Paragraph(f"${_qearned:,.2f}" if _qearned is not None else "—", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{_qearned:,.2f}" if _qearned is not None else "—", cell_style),
                     ])
 
     cw = [1.1*inch, 1.8*inch, 2.6*inch, 1.5*inch, 1.0*inch, 1.1*inch, 1.0*inch, 0.85*inch, 1.0*inch]
@@ -4068,7 +4071,7 @@ def projects_import_excel():
             if v is None:
                 return 0.0
             try:
-                return float(str(v).replace("$", "").replace(",", "").strip() or 0)
+                return float(str(v).replace("$", "").replace("₹", "").replace("Rs.", "").replace(",", "").strip() or 0)
             except Exception:
                 return 0.0
 
@@ -4321,7 +4324,7 @@ def project_new():
                 contract_value = _safe_float(data.get("contract_value", 0))
 
                 if abs(total_amount - contract_value) > 0.01:
-                    flash(f"❌ Error: Payment plan total (${total_amount:.2f}) does not match contract value (${contract_value:.2f}). Please adjust amounts and try again.", "danger")
+                    flash(f"❌ Error: Payment plan total ({CURRENCY_SYMBOL}{total_amount:.2f}) does not match contract value ({CURRENCY_SYMBOL}{contract_value:.2f}). Please adjust amounts and try again.", "danger")
                     # Preserve form data and re-render
                     sales_people = _load_sales_people()
                     next_proj_num = _next_project_number()
@@ -4692,7 +4695,7 @@ def project_detail(project_id):
     # An explicit fixed/percent override is honoured even at 0 — it means the
     # commission is deliberately $0, not "use the default rate".
     _explicit_override = ("percent" in comm_override_type or "%" in comm_override_type
-                          or "fixed" in comm_override_type or "$" in comm_override_type)
+                          or "fixed" in comm_override_type or "$" in comm_override_type or "₹" in comm_override_type)
     if _explicit_override:
         if "%" in comm_override_type or "percent" in comm_override_type:
             if contract_val > 0:
@@ -4990,7 +4993,7 @@ def co_status(project_id, co_idx):
             update_data["status"] = "In Progress"
             update_data["updated_at"] = now_str
         fb_update(f"/projects/{project_id}", update_data)
-        flash(f"{cos[co_idx]['co_number']} approved — contract updated to ${new_value:,.0f} and new payment stage added.", "success")
+        flash(f"{cos[co_idx]['co_number']} approved — contract updated to {CURRENCY_SYMBOL}{new_value:,.0f} and new payment stage added.", "success")
         return _redirect_project_detail(project_id, "#tab-change-orders")
     fb_update(f"/projects/{project_id}", {"change_orders": cos})
     flash(f"{cos[co_idx]['co_number']} status updated to {new_status}.", "success")
@@ -5404,7 +5407,7 @@ def co_pdf(project_id, co_idx):
     story.append(Spacer(1, 4*mm))
 
     # ── Amount table ──────────────────────────────────────────────────────────
-    currency_sym = ci.get("currency_symbol", "$")
+    currency_sym = PDF_CURRENCY_SYMBOL
     amount = _safe_float(co.get("amount", 0))
     amt_table = Table([
         [Paragraph("<b>Description</b>", b9), Paragraph("<b>Amount</b>", ps("ra", fontName="Helvetica-Bold", fontSize=9, alignment=2))],
@@ -6091,7 +6094,7 @@ def project_stage_set_amount(project_id, stage_idx):
         "payment_stages": stages,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     })
-    flash(f"Stage updated to ${new_amount:,.2f} — remaining stages adjusted to balance.", "success")
+    flash(f"Stage updated to {CURRENCY_SYMBOL}{new_amount:,.2f} — remaining stages adjusted to balance.", "success")
     return redirect(url_for("project_detail", project_id=project_id))
 
 @app.route("/projects/<project_id>/delete", methods=["POST"])
@@ -6321,7 +6324,7 @@ def projects_export_excel():
 
     # Add headers
     headers = ["Project Number","Project Name","Client","Received Date","End Date",
-               "Contract Value ($)","Amount Paid ($)","Outstanding ($)","Status"]
+               "Contract Value (₹)","Amount Paid (₹)","Outstanding (₹)","Status"]
     header_row = 2
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=header_row, column=col, value=h)
@@ -6366,7 +6369,7 @@ def projects_export_excel():
                         if ri % 2 == 0:
                             cell.fill = alt_fill
                         if ci in (6, 7, 8):
-                            cell.number_format = '"$"#,##0.00'
+                            cell.number_format = '"₹"#,##0.00'
                         cell.alignment = ctr
                     ri += 1
 
@@ -6457,9 +6460,9 @@ def projects_export_pdf():
                         Paragraph(p.get("company_name","") or p.get("client_name","—") or "—", cell_style),
                         Paragraph(fmt_date_pdf(p.get("date_received","")), cell_style),
                         Paragraph(fmt_date_pdf(p.get("end_date","")), cell_style),
-                        Paragraph(f"${cv:,.0f}", cell_style),
-                        Paragraph(f"${paid:,.0f}", cell_style),
-                        Paragraph(f"${cv-paid:,.0f}", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{cv:,.0f}", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{paid:,.0f}", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{cv-paid:,.0f}", cell_style),
                         Paragraph(p.get("status","—"), cell_style),
                     ])
     cw = [1.5*inch, 2.0*inch, 1.6*inch, 1.0*inch, 1.0*inch, 1.0*inch, 1.0*inch, 1.0*inch, 1.0*inch]
@@ -8931,12 +8934,12 @@ def invoice_send_reminder(invoice_id):
         from_name    = em.get("from_name", company_name)
 
         if is_overdue:
-            subject = f"OVERDUE: Invoice {inv_num} — ${outstanding:,.2f} Outstanding"
+            subject = f"OVERDUE: Invoice {inv_num} — {CURRENCY_SYMBOL}{outstanding:,.2f} Outstanding"
             tone_line = f'<p style="color:#dc2626;font-weight:bold;">This invoice is <u>past due</u>. Immediate payment is appreciated.</p>'
             header_color = "#dc2626"
             header_label = "OVERDUE NOTICE"
         else:
-            subject = f"Payment Reminder: Invoice {inv_num} — ${outstanding:,.2f} Outstanding"
+            subject = f"Payment Reminder: Invoice {inv_num} — {CURRENCY_SYMBOL}{outstanding:,.2f} Outstanding"
             tone_line = "<p>We hope this message finds you well. This is a friendly reminder that the invoice below is due for payment.</p>"
             header_color = "#0D9488"
             header_label = "PAYMENT REMINDER"
@@ -8959,10 +8962,10 @@ def invoice_send_reminder(invoice_id):
           <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;{'color:#dc2626;font-weight:bold;' if is_overdue else ''}">{due_date or '—'}</td></tr>
       {'<tr><td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">Project</td><td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;">' + proj_name + '</td></tr>' if proj_name else ''}
       <tr style="background:#f8fafc;"><td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">Invoice Total</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;">${total:,.2f}</td></tr>
-      {'<tr><td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">Amount Paid</td><td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#10b981;">${:,.2f}</td></tr>'.format(amt_paid + tax_paid) if (amt_paid + tax_paid) > 0 else ''}
+          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;">{CURRENCY_SYMBOL}{total:,.2f}</td></tr>
+      {'<tr><td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;">Amount Paid</td><td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#10b981;">{}{:,.2f}</td></tr>'.format(CURRENCY_SYMBOL, amt_paid + tax_paid) if (amt_paid + tax_paid) > 0 else ''}
       <tr><td style="padding:12px 14px;font-weight:700;font-size:1rem;">Outstanding Balance</td>
-          <td style="padding:12px 14px;font-weight:700;font-size:1.1rem;color:{header_color};">${outstanding:,.2f}</td></tr>
+          <td style="padding:12px 14px;font-weight:700;font-size:1.1rem;color:{header_color};">{CURRENCY_SYMBOL}{outstanding:,.2f}</td></tr>
     </table>
     <p>Please arrange payment at your earliest convenience. If you have already made this payment, please disregard this message.</p>
     <p>If you have any questions, please reply to this email and we will be happy to assist.</p>
@@ -9728,7 +9731,7 @@ def invoicing_export_excel():
     ws.row_dimensions[1].height = 20
 
     headers = ["Invoice Number","Client","Project","Date","Due Date",
-               "Subtotal ($)","Tax ($)","Total ($)","Paid ($)","Outstanding ($)","Status"]
+               "Subtotal (₹)","Tax (₹)","Total (₹)","Paid (₹)","Outstanding (₹)","Status"]
     header_row = 2
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=header_row, column=col, value=h)
@@ -9783,7 +9786,7 @@ def invoicing_export_excel():
                         if ri % 2 == 0:
                             cell.fill = alt_fill
                         if ci in (7, 8, 9, 10, 11):
-                            cell.number_format = '"$"#,##0.00'
+                            cell.number_format = '"₹"#,##0.00'
                         cell.alignment = ctr
                     ri += 1
 
@@ -9885,11 +9888,11 @@ def invoicing_export_pdf():
                         Paragraph(projects_str, cell_style),
                         Paragraph(fmt_inv_date(m.get("invoice_date","")), cell_style),
                         Paragraph(fmt_inv_date(m.get("due_date","")), cell_style),
-                        Paragraph(f"${subtotal:,.0f}", cell_style),
-                        Paragraph(f"${tax:,.0f}", cell_style),
-                        Paragraph(f"${total:,.0f}", cell_style),
-                        Paragraph(f"${total_paid:,.0f}", cell_style),
-                        Paragraph(f"${total-total_paid:,.0f}", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{subtotal:,.0f}", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{tax:,.0f}", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{total:,.0f}", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{total_paid:,.0f}", cell_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{total-total_paid:,.0f}", cell_style),
                         Paragraph(m.get("status","—"), cell_style),
                     ])
     cw = [1.3*inch, 1.5*inch, 1.7*inch, 0.8*inch, 0.8*inch, 0.7*inch, 0.65*inch, 0.7*inch, 0.7*inch, 0.95*inch, 0.8*inch]
@@ -10785,9 +10788,9 @@ def client_statement(company_name):
             m.get("invoice_date", "—") or "—",
             m.get("due_date", "—") or "—",
             m.get("status", "—"),
-            f"${total:,.2f}",
-            f"${total_paid_with_tax:,.2f}",
-            f"${balance:,.2f}",
+            f"{PDF_CURRENCY_SYMBOL}{total:,.2f}",
+            f"{PDF_CURRENCY_SYMBOL}{total_paid_with_tax:,.2f}",
+            f"{PDF_CURRENCY_SYMBOL}{balance:,.2f}",
         ])
 
     if not inv_list:
@@ -10818,9 +10821,9 @@ def client_statement(company_name):
     # Summary
     elems.append(Spacer(1, 16))
     sum_data = [
-        ["Total Invoiced",  f"${total_invoiced:,.2f}"],
-        ["Total Paid",      f"${total_paid:,.2f}"],
-        ["Balance Due",     f"${balance_due:,.2f}"],
+        ["Total Invoiced",  f"{PDF_CURRENCY_SYMBOL}{total_invoiced:,.2f}"],
+        ["Total Paid",      f"{PDF_CURRENCY_SYMBOL}{total_paid:,.2f}"],
+        ["Balance Due",     f"{PDF_CURRENCY_SYMBOL}{balance_due:,.2f}"],
     ]
     sum_tbl = Table(sum_data, colWidths=[2.5*inch, 1.5*inch])
     sum_tbl.setStyle(TableStyle([
@@ -11376,7 +11379,7 @@ def api_commission_pay():
     if payment_amount > outstanding_total + 0.01:
         return jsonify({
             "success": False,
-            "message": f"Payment amount (${payment_amount:.2f}) exceeds outstanding (${outstanding_total:.2f}). Please enter a valid amount."
+            "message": f"Payment amount ({CURRENCY_SYMBOL}{payment_amount:.2f}) exceeds outstanding ({CURRENCY_SYMBOL}{outstanding_total:.2f}). Please enter a valid amount."
         }), 400
 
     # Use filtered list for payment allocation
@@ -11532,13 +11535,14 @@ def api_commission_edit():
 
     # Map display names to both display and database values
     rate_type_mapping = {
-        "Fixed Amount ($)": {"display": "Fixed Amount ($)", "db": "fixed"},
+        "Fixed Amount (₹)": {"display": "Fixed Amount (₹)", "db": "fixed"},
+        "Fixed Amount ($)": {"display": "Fixed Amount (₹)", "db": "fixed"},
         "Default (salesperson rate)": {"display": "Default (salesperson rate)", "db": "default"},
         "Custom Percentage (%)": {"display": "Custom Percentage (%)", "db": "percent"},
         # Also handle old format if it comes from database
-        "Fixed amount": {"display": "Fixed Amount ($)", "db": "fixed"},
+        "Fixed amount": {"display": "Fixed Amount (₹)", "db": "fixed"},
         "default": {"display": "Default (salesperson rate)", "db": "default"},
-        "fixed": {"display": "Fixed Amount ($)", "db": "fixed"},
+        "fixed": {"display": "Fixed Amount (₹)", "db": "fixed"},
         "percent": {"display": "Custom Percentage (%)", "db": "percent"}
     }
 
@@ -11569,7 +11573,7 @@ def api_commission_edit():
     elif db_rate_type == "fixed":
         # User entered a fixed amount
         stored_amount = rate_value
-        display_rate_type = f"Fixed ${rate_value:.2f}"
+        display_rate_type = f"Fixed {CURRENCY_SYMBOL}{rate_value:.2f}"
     elif db_rate_type == "percent":
         # User entered a percentage
         stored_amount = rate_value
@@ -12035,7 +12039,7 @@ def payroll_export_excel():
                         if ri % 2 == 0:
                             cell.fill = alt_fill
                         if ci == 4:
-                            cell.number_format = '"$"#,##0.00'
+                            cell.number_format = '"₹"#,##0.00'
                         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     ri += 1
 
@@ -12063,7 +12067,7 @@ def payroll_export_excel():
             if ci2 == 4:
                 cell.number_format = '0.0"%"'
             elif ci2 in (5, 6):
-                cell.number_format = '"$"#,##0.00'
+                cell.number_format = '"₹"#,##0.00'
             if ri % 2 == 0:
                 cell.fill = alt_fill
         ri += 1
@@ -12075,7 +12079,7 @@ def payroll_export_excel():
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal="center", vertical="center")
         if ci2 in (5, 6):
-            cell.number_format = '"$"#,##0.00'
+            cell.number_format = '"₹"#,##0.00'
 
     col_widths = [14, 20, 14, 12, 16, 16, 12]
     for ci, w in enumerate(col_widths, 1):
@@ -12186,7 +12190,7 @@ def payroll_export_pdf():
                             Paragraph(sal.get("employee_name", "—"), cell_style),
                             Paragraph(sal.get("salary_type", "Salary"), cell_style),
                             Paragraph(fmt_pdf_date(sal.get("date", "")), cell_style),
-                            Paragraph(f"${_safe_float(sal.get('amount', 0)):,.2f}", cell_style),
+                            Paragraph(f"{PDF_CURRENCY_SYMBOL}{_safe_float(sal.get('amount', 0)):,.2f}", cell_style),
                             Paragraph(sal.get("region", "—"), cell_style),
                             Paragraph(sal.get("notes", "—"), cell_style),
                             Paragraph(sal.get("salary_status", "—"), cell_style),
@@ -12230,8 +12234,8 @@ def payroll_export_pdf():
                 Paragraph(r["salesperson"], cell_style),
                 Paragraph(r["emp_type"] or "—", cell_style),
                 Paragraph(f"{r['rate']:.1f}%", cell_style),
-                Paragraph(f"${r['revenue']:,.2f}", cell_style),
-                Paragraph(f"${r['earned']:,.2f}", cell_style),
+                Paragraph(f"{PDF_CURRENCY_SYMBOL}{r['revenue']:,.2f}", cell_style),
+                Paragraph(f"{PDF_CURRENCY_SYMBOL}{r['earned']:,.2f}", cell_style),
                 Paragraph(r["status"], cell_style),
             ])
         # Totals row
@@ -12239,8 +12243,8 @@ def payroll_export_pdf():
         comm_data.append([
             Paragraph("", bold_cell), Paragraph("", bold_cell), Paragraph("", bold_cell),
             Paragraph("Totals", bold_cell),
-            Paragraph(f"${comm_total_rev:,.2f}", bold_cell),
-            Paragraph(f"${comm_total_earned:,.2f}", bold_cell),
+            Paragraph(f"{PDF_CURRENCY_SYMBOL}{comm_total_rev:,.2f}", bold_cell),
+            Paragraph(f"{PDF_CURRENCY_SYMBOL}{comm_total_earned:,.2f}", bold_cell),
             Paragraph("", bold_cell),
         ])
         comm_cw = [0.9*inch, 1.2*inch, 0.9*inch, 0.8*inch, 1.1*inch, 1.1*inch, 0.8*inch]
@@ -12297,9 +12301,9 @@ def payroll_export_pdf():
                 Paragraph(adv.get("advance_no", "—"), cell_style),
                 Paragraph(adv.get("employee_name", "—"), cell_style),
                 Paragraph(fmt_pdf_date(adv.get("date", "")), cell_style),
-                Paragraph(f"${_safe_float(adv.get('amount', 0)):,.2f}", cell_style),
-                Paragraph(f"${_safe_float(adv.get('adjusted', 0)):,.2f}", cell_style),
-                Paragraph(f"${balance:,.2f}", cell_style),
+                Paragraph(f"{PDF_CURRENCY_SYMBOL}{_safe_float(adv.get('amount', 0)):,.2f}", cell_style),
+                Paragraph(f"{PDF_CURRENCY_SYMBOL}{_safe_float(adv.get('adjusted', 0)):,.2f}", cell_style),
+                Paragraph(f"{PDF_CURRENCY_SYMBOL}{balance:,.2f}", cell_style),
                 Paragraph(adv.get("status", "Open"), cell_style),
             ])
 
@@ -12391,7 +12395,7 @@ def _make_excel(title, headers, rows, col_widths, num_cols=None):
         for ci, val in enumerate(row, 1):
             cell = ws.cell(row=ri, column=ci, value=val)
             if ri % 2 == 0: cell.fill = alt_fill
-            if ci in num_cols: cell.number_format = '"$"#,##0.00'
+            if ci in num_cols: cell.number_format = '"₹"#,##0.00'
             cell.alignment = ctr
     for ci, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(ci)].width = w
@@ -12536,7 +12540,7 @@ def financial_income_export(fmt):
         return _export_response(buf, "excel", label)
     if fmt == "pdf":
         fmt_rows = [[r[0],r[1],r[2],r[3],r[4],r[5],r[6],
-                     f"${r[7]:,.2f}",f"${r[8]:,.2f}",f"${r[9]:,.2f}",f"${r[10]:,.2f}"] for r in rows]
+                     f"{PDF_CURRENCY_SYMBOL}{r[7]:,.2f}",f"{PDF_CURRENCY_SYMBOL}{r[8]:,.2f}",f"{PDF_CURRENCY_SYMBOL}{r[9]:,.2f}",f"{PDF_CURRENCY_SYMBOL}{r[10]:,.2f}"] for r in rows]
         buf = _make_pdf(title, headers, fmt_rows,
                         [1.1,1.1,1.2,1.6,1.3,0.7,0.9,0.9,0.7,1.0,1.0])
         if not buf: return redirect(url_for("financial"))
@@ -12620,7 +12624,7 @@ def financial_expenses_export(fmt):
         buf = _make_excel("Expenses", headers, rows, [18,38,55,35,42,28,12,32], num_cols=[7])
         return _export_response(buf, "excel", label)
     if fmt == "pdf":
-        fmt_rows = [[r[0],r[1],r[2],r[3],r[4],r[5],f"${r[6]:,.2f}",r[7]] for r in rows]
+        fmt_rows = [[r[0],r[1],r[2],r[3],r[4],r[5],f"{PDF_CURRENCY_SYMBOL}{r[6]:,.2f}",r[7]] for r in rows]
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -12761,7 +12765,7 @@ def financial_byproject_export(fmt):
         p_contract = _safe_float(p.get("contract_value", 0))
 
         # Check for fixed amount (flexible matching)
-        if p_comm_val > 0 and ("fixed" in p_comm_type or "$" in p_comm_type):
+        if p_comm_val > 0 and ("fixed" in p_comm_type or "$" in p_comm_type or "₹" in p_comm_type):
             p_comm_earned = p_comm_val
         elif "%" in p_comm_type and p_comm_val > 0 and p_contract > 0:
             # Handle both decimal (0.50) and percentage (50) formats
@@ -12794,8 +12798,8 @@ def financial_byproject_export(fmt):
                           [20,40,36,20,13,13,13,13,13,13,9], num_cols=[5,6,7,8,9,10])
         return _export_response(buf, "excel", f"by_project_{year}")
     if fmt == "pdf":
-        fmt_rows = [[r[0],r[1],r[2],r[3],f"${r[4]:,.2f}",f"${r[5]:,.2f}",
-                     f"${r[6]:,.2f}",f"${r[7]:,.2f}",f"${r[8]:,.2f}",f"${r[9]:,.2f}",r[10]] for r in rows]
+        fmt_rows = [[r[0],r[1],r[2],r[3],f"{PDF_CURRENCY_SYMBOL}{r[4]:,.2f}",f"{PDF_CURRENCY_SYMBOL}{r[5]:,.2f}",
+                     f"{PDF_CURRENCY_SYMBOL}{r[6]:,.2f}",f"{PDF_CURRENCY_SYMBOL}{r[7]:,.2f}",f"{PDF_CURRENCY_SYMBOL}{r[8]:,.2f}",f"{PDF_CURRENCY_SYMBOL}{r[9]:,.2f}",r[10]] for r in rows]
         buf = _make_pdf(f"By Project {year}", headers, fmt_rows,
                         [0.8,1.6,1.4,0.85,1.0,1.0,1.0,1.0,1.0,1.0,0.7])
         if not buf: return redirect(url_for("financial"))
@@ -12867,7 +12871,7 @@ def financial_aging_export(fmt):
         buf = _make_excel("AR Aging", headers, all_rows, [14,14,32,16,16,10,12,13], num_cols=[7])
         return _export_response(buf, "excel", "ar_aging")
     if fmt == "pdf":
-        fmt_rows = [[r[0],r[1],r[2],r[3],r[4],r[5],r[6],f"${r[7]:,.2f}"] for r in all_rows]
+        fmt_rows = [[r[0],r[1],r[2],r[3],r[4],r[5],r[6],f"{PDF_CURRENCY_SYMBOL}{r[7]:,.2f}"] for r in all_rows]
         buf = _make_pdf("A/R Aging Report", headers, fmt_rows, [1.0,1.1,2.2,1.0,1.0,0.8,1.0,1.0])
         if not buf: return redirect(url_for("financial"))
         return _export_response(buf, "pdf", "ar_aging")
@@ -13851,7 +13855,7 @@ def update_employee_advance():
         if total_after < total_adjusted - 0.005:
             return jsonify({
                 "success": False,
-                "error": f"The employee's advances would total ${total_after:.2f}, which is less than the ${total_adjusted:.2f} already adjusted. Delete or reduce an adjustment first."
+                "error": f"The employee's advances would total {CURRENCY_SYMBOL}{total_after:.2f}, which is less than the {CURRENCY_SYMBOL}{total_adjusted:.2f} already adjusted. Delete or reduce an adjustment first."
             }), 400
 
         # Update fields
@@ -14244,7 +14248,7 @@ def _add_advance_adjustment_core(data):
         if new_adjusted > advance_amount + 0.005:
             return ({
                 "success": False,
-                "error": f"Cannot add adjustment. Total adjusted (${new_adjusted:.2f}) would exceed advance amount (${advance_amount:.2f}). Maximum adjustment: ${advance_amount - current_adjusted:.2f}"
+                "error": f"Cannot add adjustment. Total adjusted ({CURRENCY_SYMBOL}{new_adjusted:.2f}) would exceed advance amount ({CURRENCY_SYMBOL}{advance_amount:.2f}). Maximum adjustment: {CURRENCY_SYMBOL}{advance_amount - current_adjusted:.2f}"
             }), 400
 
         # Check if advance should be closed
@@ -14297,7 +14301,7 @@ def _add_advance_adjustment_core(data):
                     log.error(f"SECURITY: Commission deduction BLOCKED: ${adjustment_amount:.2f} exceeds available ${pending_commission:.2f} for {employee_name}")
                     return ({
                         "success": False,
-                        "error": f"Unable to apply commission deduction. Requested amount (${adjustment_amount:.2f}) exceeds the employee's available pending commission (${pending_commission:.2f})."
+                        "error": f"Unable to apply commission deduction. Requested amount ({CURRENCY_SYMBOL}{adjustment_amount:.2f}) exceeds the employee's available pending commission ({CURRENCY_SYMBOL}{pending_commission:.2f})."
                     }), 400
 
                 # Check if employee has pending commission
@@ -14305,7 +14309,7 @@ def _add_advance_adjustment_core(data):
                     log.warning(f"Commission deduction blocked: employee has no pending commission")
                     return ({
                         "success": False,
-                        "error": f"Employee '{employee_name}' has $0.00 pending commission. Cannot create deduction."
+                        "error": f"Employee '{employee_name}' has {CURRENCY_SYMBOL}0.00 pending commission. Cannot create deduction."
                     }), 400
             else:
                 log.warning(f"Commission deduction: employee_name is empty!")
@@ -14910,17 +14914,17 @@ def add_employee_adjustment():
         if amount > total_open + 0.005:
             return jsonify({
                 "success": False,
-                "error": f"Adjustment amount (${amount:.2f}) exceeds the outstanding advance balance (${total_open:.2f})."
+                "error": f"Adjustment amount ({CURRENCY_SYMBOL}{amount:.2f}) exceeds the outstanding advance balance ({CURRENCY_SYMBOL}{total_open:.2f})."
             }), 400
 
         if adj_type == "Commission Deduction":
             pending = _calculate_employee_pending_commission(employee_name)
             if pending <= 0:
-                return jsonify({"success": False, "error": f"Employee '{employee_name}' has $0.00 pending commission. Cannot create deduction."}), 400
+                return jsonify({"success": False, "error": f"Employee '{employee_name}' has {CURRENCY_SYMBOL}0.00 pending commission. Cannot create deduction."}), 400
             if amount > pending + 0.005:
                 return jsonify({
                     "success": False,
-                    "error": f"Unable to apply commission deduction. Requested amount (${amount:.2f}) exceeds the employee's available pending commission (${pending:.2f})."
+                    "error": f"Unable to apply commission deduction. Requested amount ({CURRENCY_SYMBOL}{amount:.2f}) exceeds the employee's available pending commission ({CURRENCY_SYMBOL}{pending:.2f})."
                 }), 400
 
         import uuid as _uuid
@@ -14991,11 +14995,11 @@ def update_employee_adjustment():
         ledger = _build_employee_advance_ledger(employee)
         max_amount = round(ledger["balance"] + old_total, 2)
         if amount > max_amount + 0.005:
-            return jsonify({"success": False, "error": f"Adjustment amount (${amount:.2f}) exceeds the employee's outstanding advance balance (${max_amount:.2f})."}), 400
+            return jsonify({"success": False, "error": f"Adjustment amount ({CURRENCY_SYMBOL}{amount:.2f}) exceeds the employee's outstanding advance balance ({CURRENCY_SYMBOL}{max_amount:.2f})."}), 400
         if adj_type == "Commission Deduction":
             pending = _calculate_employee_pending_commission(employee) + (old_total if old_type == "Commission Deduction" else 0)
             if amount > pending + 0.005:
-                return jsonify({"success": False, "error": f"Unable to apply commission adjustment. Requested amount (${amount:.2f}) exceeds the employee's available pending commission (${pending:.2f})."}), 400
+                return jsonify({"success": False, "error": f"Unable to apply commission adjustment. Requested amount ({CURRENCY_SYMBOL}{amount:.2f}) exceeds the employee's available pending commission ({CURRENCY_SYMBOL}{pending:.2f})."}), 400
 
         first = min((i[3] for i in old_items), key=lambda a: a.get("created_at") or "")
         group_id = first.get("group_id") or old_items[0][2]
@@ -15091,7 +15095,7 @@ def advance_adjustment_export_pdf():
     import io as _io
 
     def money(n):
-        return f"${_safe_float(n):,.2f}"
+        return f"{PDF_CURRENCY_SYMBOL}{_safe_float(n):,.2f}"
 
     styles = getSampleStyleSheet()
     co = company_info()
@@ -15309,7 +15313,7 @@ def _reapply_adjustment_pieces(employee, source_advance_id, source_advance_no, i
                 return payload, status, moved
             remaining = round(remaining - chunk, 2)
         if remaining > 0.005:
-            return {"success": False, "error": f"Could not place ${remaining:.2f} of an adjustment on the remaining advances."}, 400, moved
+            return {"success": False, "error": f"Could not place {CURRENCY_SYMBOL}{remaining:.2f} of an adjustment on the remaining advances."}, 400, moved
         moved += 1
     return {"success": True}, 200, moved
 
@@ -16278,7 +16282,7 @@ def financial():
         p_contract = _safe_float(p.get("contract_value", 0))
 
         # Check for fixed amount (flexible matching)
-        if p_comm_val > 0 and ("fixed" in p_comm_type or "$" in p_comm_type):
+        if p_comm_val > 0 and ("fixed" in p_comm_type or "$" in p_comm_type or "₹" in p_comm_type):
             p_comm_earned = p_comm_val
         elif "%" in p_comm_type and p_comm_val > 0 and p_contract > 0:
             # Handle both decimal (0.50) and percentage (50) formats
@@ -18326,10 +18330,10 @@ def expense_restore(exp_id):
         _amt = _safe_float(archive.get("amount", 0))
         _atype = (archive.get("type") or "").strip() or {"Commission Adjustment": "Commission Deduction"}.get(archive.get("category", ""), archive.get("category", ""))
         if not _present and _amt > _ledger["balance"] + 0.005:
-            flash(f"Cannot restore: {_emp}'s outstanding advance balance (${_ledger['balance']:.2f}) is less than this adjustment (${_amt:.2f}).", "warning")
+            flash(f"Cannot restore: {_emp}'s outstanding advance balance ({CURRENCY_SYMBOL}{_ledger['balance']:.2f}) is less than this adjustment ({CURRENCY_SYMBOL}{_amt:.2f}).", "warning")
             return redirect(url_for("financial", tab="expenses"))
         if not _present and _atype == "Commission Deduction" and _amt > _ledger["pending_commission"] + 0.005:
-            flash(f"Cannot restore: {_emp}'s pending commission (${_ledger['pending_commission']:.2f}) is less than this adjustment (${_amt:.2f}).", "warning")
+            flash(f"Cannot restore: {_emp}'s pending commission ({CURRENCY_SYMBOL}{_ledger['pending_commission']:.2f}) is less than this adjustment ({CURRENCY_SYMBOL}{_amt:.2f}).", "warning")
             return redirect(url_for("financial", tab="expenses"))
 
     # Standardize description for salary expenses
@@ -19428,8 +19432,8 @@ def _balance_sheet_summary_table(title: str, items: dict, total: float, styles_k
     from reportlab.platypus import Table, TableStyle
     from reportlab.lib import colors
     from reportlab.lib.units import inch
-    rows = [[n, f"${amt:,.2f}"] for n, amt in sorted(items.items())] if items else [["No records", ""]]
-    rows.append(["Total", f"${total:,.2f}"])
+    rows = [[n, f"{PDF_CURRENCY_SYMBOL}{amt:,.2f}"] for n, amt in sorted(items.items())] if items else [["No records", ""]]
+    rows.append(["Total", f"{PDF_CURRENCY_SYMBOL}{total:,.2f}"])
     tbl = Table([[title, "Amount"]] + rows, colWidths=[3.2*inch, 2*inch])
     tbl.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,0), colors.HexColor("#1F4E79")),
@@ -19482,8 +19486,8 @@ def _build_balance_sheet_pdf(data: dict):
     # Monthly revenue/expense table
     tdata = [
         ["", *months],
-        ["Revenue"] + [f"${v:,.0f}" for v in data["monthly_revenue"]],
-        ["Expense"] + [f"${v:,.0f}" for v in data["monthly_expenses"]],
+        ["Revenue"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["monthly_revenue"]],
+        ["Expense"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["monthly_expenses"]],
     ]
     tbl = Table(tdata, colWidths=[0.7*inch] + [0.535*inch]*12)
     tbl.setStyle(TableStyle([
@@ -19504,9 +19508,9 @@ def _build_balance_sheet_pdf(data: dict):
     # Totals summary
     net_bg = colors.HexColor("#DCFCE7") if data["net_profit"] > 0 else colors.HexColor("#F1F5F9")
     summary_tbl = Table([
-        ["Total Revenue",  f"${data['total_revenue']:,.2f}"],
-        ["Total Expenses", f"${data['total_expenses']:,.2f}"],
-        ["Net Profit",     f"${data['net_profit']:,.2f}"],
+        ["Total Revenue",  f"{PDF_CURRENCY_SYMBOL}{data['total_revenue']:,.2f}"],
+        ["Total Expenses", f"{PDF_CURRENCY_SYMBOL}{data['total_expenses']:,.2f}"],
+        ["Net Profit",     f"{PDF_CURRENCY_SYMBOL}{data['net_profit']:,.2f}"],
     ], colWidths=[2.2*inch, 2.2*inch])
     summary_tbl.setStyle(TableStyle([
         ("FONTNAME",   (0,0), (0,-1), "Helvetica-Bold"),
@@ -19679,7 +19683,7 @@ def export_balance_sheet(fmt):
 
         for i, val in enumerate(monthly_revenue, 3):
             cell = ws.cell(row=13, column=i, value=val)
-            cell.number_format = '"$"#,##0.00'
+            cell.number_format = '"₹"#,##0.00'
             cell.alignment = center_align
             cell.border = thin_border
             cell.font = normal_font
@@ -19693,7 +19697,7 @@ def export_balance_sheet(fmt):
 
         for i, val in enumerate(monthly_expenses, 3):
             cell = ws.cell(row=14, column=i, value=val)
-            cell.number_format = '"$"#,##0.00'
+            cell.number_format = '"₹"#,##0.00'
             cell.alignment = center_align
             cell.border = thin_border
             cell.font = normal_font
@@ -19706,7 +19710,7 @@ def export_balance_sheet(fmt):
         ws['H20'].alignment = center_align
         ws.merge_cells('I20:J20')
         ws['I20'].value = total_revenue
-        ws['I20'].number_format = '"$"#,##0.00'
+        ws['I20'].number_format = '"₹"#,##0.00'
         ws['I20'].font = bold_font
         ws['I20'].alignment = left_align
 
@@ -19717,7 +19721,7 @@ def export_balance_sheet(fmt):
         ws['H21'].alignment = center_align
         ws.merge_cells('I21:J21')
         ws['I21'].value = total_expenses
-        ws['I21'].number_format = '"$"#,##0.00'
+        ws['I21'].number_format = '"₹"#,##0.00'
         ws['I21'].font = bold_font
         ws['I21'].alignment = left_align
 
@@ -19728,7 +19732,7 @@ def export_balance_sheet(fmt):
         ws['H22'].alignment = center_align
         ws.merge_cells('I22:J22')
         ws['I22'].value = net_profit
-        ws['I22'].number_format = '"$"#,##0.00'
+        ws['I22'].number_format = '"₹"#,##0.00'
         ws['I22'].font = bold_font
         ws['I22'].fill = green_fill if net_profit > 0 else light_gray_fill
         ws['I22'].alignment = left_align
@@ -19787,7 +19791,7 @@ def export_balance_sheet(fmt):
 
             ws.merge_cells(f"D{row}:E{row}")
             ws[f"D{row}"].value = amt
-            ws[f"D{row}"].number_format = '"$"#,##0.00'
+            ws[f"D{row}"].number_format = '"₹"#,##0.00'
             ws[f"D{row}"].alignment = center_align
 
             for col in range(2, 6):
@@ -19803,7 +19807,7 @@ def export_balance_sheet(fmt):
 
         ws.merge_cells(f"D{row}:E{row}")
         ws[f"D{row}"].value = total_inside
-        ws[f"D{row}"].number_format = '"$"#,##0.00'
+        ws[f"D{row}"].number_format = '"₹"#,##0.00'
         ws[f"D{row}"].fill = green_fill
         ws[f"D{row}"].font = bold_font
         ws[f"D{row}"].alignment = center_align
@@ -19848,7 +19852,7 @@ def export_balance_sheet(fmt):
 
             ws.merge_cells(f"D{row}:E{row}")
             ws[f"D{row}"].value = amt
-            ws[f"D{row}"].number_format = '"$"#,##0.00'
+            ws[f"D{row}"].number_format = '"₹"#,##0.00'
             ws[f"D{row}"].alignment = center_align
 
             for col in range(2, 6):
@@ -19864,7 +19868,7 @@ def export_balance_sheet(fmt):
 
         ws.merge_cells(f"D{row}:E{row}")
         ws[f"D{row}"].value = total_outside
-        ws[f"D{row}"].number_format = '"$"#,##0.00'
+        ws[f"D{row}"].number_format = '"₹"#,##0.00'
         ws[f"D{row}"].fill = green_fill
         ws[f"D{row}"].font = bold_font
         ws[f"D{row}"].alignment = center_align
@@ -19903,7 +19907,7 @@ def export_balance_sheet(fmt):
 
             ws.merge_cells(f"J{row}:K{row}")
             ws[f"J{row}"].value = amt
-            ws[f"J{row}"].number_format = '"$"#,##0.00'
+            ws[f"J{row}"].number_format = '"₹"#,##0.00'
             ws[f"J{row}"].alignment = center_align
 
             for col in range(7, 12):
@@ -19918,7 +19922,7 @@ def export_balance_sheet(fmt):
 
         ws.merge_cells(f"J{row}:K{row}")
         ws[f"J{row}"].value = total_expenses
-        ws[f"J{row}"].number_format = '"$"#,##0.00'
+        ws[f"J{row}"].number_format = '"₹"#,##0.00'
         ws[f"J{row}"].fill = green_fill
         ws[f"J{row}"].font = bold_font
         ws[f"J{row}"].alignment = center_align
@@ -20542,7 +20546,7 @@ def employee_profile_pdf(uid):
 
     import io as _io
     co  = company_info()
-    cs  = CURRENCY_SYMBOL
+    cs  = PDF_CURRENCY_SYMBOL
     buf = _io.BytesIO()
     _PAGE_MARGIN = 0.25*inch  # as slim as a page can go and still print safely on
                                # a physical printer without clipping — the letterhead,
@@ -20616,7 +20620,7 @@ def employee_profile_pdf(uid):
     def _icon_shapes(kind, s, color_hex):
         c = colors.HexColor(color_hex)
         if kind == "dollar":
-            return [String(s/2, s*0.20, "$", fontName="Helvetica-Bold", fontSize=s*0.66, fillColor=c, textAnchor="middle")]
+            return [String(s/2, s*0.24, "Rs", fontName="Helvetica-Bold", fontSize=s*0.46, fillColor=c, textAnchor="middle")]
         if kind == "gift":
             bx, by, bw, bh = s*0.18, s*0.12, s*0.64, s*0.5
             return [Rect(bx, by, bw, bh, fillColor=None, strokeColor=c, strokeWidth=1.4),
@@ -20976,7 +20980,7 @@ def employee_profile_pdf(uid):
         row.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
         return row
 
-    comp_title = side_title("coins", "COMPENSATION SUMMARY", "All amounts in USD")
+    comp_title = side_title("coins", "COMPENSATION SUMMARY", "All amounts in INR")
     comp_rows = [
         ["Total Salary Paid",   money(data["total_salary_paid"])],
         ["Total Bonus Paid",    money(data["total_bonus_paid"])],
@@ -22034,7 +22038,7 @@ def employees():
             _ov = _safe_float(_proj.get("commission_override_value", 0))
             if "%" in _ot or "percent" in _ot:
                 _rd = f"{(_ov if _ov > 1 else _ov * 100):g}% (custom)"
-            elif "fixed" in _ot or "$" in _ot:
+            elif "fixed" in _ot or "$" in _ot or "₹" in _ot:
                 _rd = f"Fixed {CURRENCY_SYMBOL}{_ov:,.2f}"
             else:
                 _rd = "Default"
@@ -22108,7 +22112,7 @@ def medical_claim_new():
     except ValueError:
         usd_amount = 0.0
     if usd_amount > 5000:
-        flash("Medical claim cannot exceed $5,000 USD.", "danger")
+        flash("Medical claim cannot exceed ₹5,000.", "danger")
         return redirect(url_for("employees") + "#tab-medical")
 
     exchange_rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 110)) or 110
@@ -22213,7 +22217,7 @@ def medical_claim_review(claim_id):
         admin_note = request.form.get("admin_notes", "").strip()
         notes_parts = [f"Medical claim by {claim.get('employee_name', '')}"]
         if orig_currency == "USD":
-            notes_parts.append(f"Original claim: ${orig_usd:,.2f} USD (at ৳{exchange_rate:.0f}/$1)")
+            notes_parts.append(f"Original claim: {CURRENCY_SYMBOL}{orig_usd:,.2f}")
         if admin_note:
             notes_parts.append(admin_note)
         exp_data = {
@@ -24446,7 +24450,7 @@ def api_approval_medical(claim_id, action):
         orig_usd = _safe_float(claim.get("amount_claimed", 0))
         notes_parts = [f"Medical claim by {claim.get('employee_name', '')}"]
         if orig_currency == "USD":
-            notes_parts.append(f"Original claim: ${orig_usd:,.2f} USD (at ৳{exchange_rate:.0f}/$1)")
+            notes_parts.append(f"Original claim: {CURRENCY_SYMBOL}{orig_usd:,.2f}")
         if admin_notes:
             notes_parts.append(admin_notes)
         exp_data = {
@@ -24622,6 +24626,423 @@ def fix_project_numbers():
     return redirect(url_for("settings") + "?tab=tools")
 
 
+# ── Expense type / category choices ────────────────────────────────────────────
+_DEFAULT_EXPENSE_TYPES = [
+    "O & M (Operations & Maintenance)",
+    "Capital Expenses",
+    "Other Expenses",
+]
+_DEFAULT_CATEGORIES_BY_TYPE = {
+    "O & M (Operations & Maintenance)": [
+        "Facilities & Utilities",
+        "Office & Admin Overhead",
+        "Engineering Software & IT",
+        "Salaries, Labor & Related Costs",
+        "Professional Services",
+        "Insurance & Compliance",
+        "Travel, Site Visits & Vehicles",
+        "Marketing & Business Development",
+        "Training, Licensure & Development",
+        "Safety & Field Supplies",
+        "Miscellaneous O & M",
+    ],
+    "Capital Expenses": [
+        "Computer & Office Equipment",
+        "Field & Inspection Equipment",
+        "Furniture & Fixtures",
+        "Vehicles",
+        "Software (Capitalized)",
+        "Leasehold Improvements",
+        "Accumulated Depreciation",
+    ],
+    "Other Expenses": [
+        "Salary/Bonuses",
+        "Tax Expenses/Tax Deductions",
+        "Medical/Benefits",
+        "Meals & Entertainment",
+        "Donations",
+        "Bank Charges",
+        "Contingency Funds",
+        "Unexpected Costs",
+    ],
+}
+
+
+def _expense_type_options():
+    """Return (expense_types, categories_by_type) from Settings, falling back to the defaults."""
+    custom = fb_get("/custom_categories") or {}
+    types = custom.get("expense_type") if isinstance(custom.get("expense_type"), list) else []
+    cats = custom.get("Categories") if isinstance(custom.get("Categories"), dict) else {}
+    return (types or list(_DEFAULT_EXPENSE_TYPES)), (cats or dict(_DEFAULT_CATEGORIES_BY_TYPE))
+
+
+def _ai_structured(content, schema: dict, effort: str = "low", max_tokens: int = 16000) -> dict:
+    """Run one Claude call whose reply must match `schema` and return the parsed JSON.
+
+    Raises RuntimeError with a message fit to show the user."""
+    client = _get_ai_client()
+    if not client:
+        raise RuntimeError("No Anthropic API key configured. Add it in Settings → AI.")
+    # Streaming keeps long replies (a busy month's statement) clear of HTTP timeouts
+    with client.beta.messages.stream(
+        model="claude-opus-5-5",
+        max_tokens=max_tokens,
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}},
+        messages=[{"role": "user", "content": content}],
+    ) as stream:
+        resp = stream.get_final_message()
+    if resp.stop_reason == "refusal":
+        raise RuntimeError("The AI declined to read this document.")
+    if resp.stop_reason == "max_tokens":
+        raise RuntimeError("This statement is too long to read in one go. Upload a shorter date range.")
+    text = next((b.text for b in resp.content if b.type == "text"), "")
+    return json.loads(text)
+
+
+# ── Bank statement import ──────────────────────────────────────────────────────
+_MONTHS = {m: i for i, m in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], start=1)}
+
+
+def _parse_statement_date(value, day_first: bool = True) -> str:
+    """Return YYYY-MM-DD for the date formats banks commonly export, or '' if unreadable."""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
+        return f"{value.year:04d}-{value.month:02d}-{value.day:02d}"
+    t = str(value or "").strip()
+    y = mo = d = None
+    if m := re.match(r"^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", t):
+        y, mo, d = int(m[1]), int(m[2]), int(m[3])
+    elif m := re.match(r"^(\d{1,2})[-/. ]([A-Za-z]{3,9})[-/., ]+(\d{2,4})", t):
+        d, mo, y = int(m[1]), _MONTHS.get(m[2][:3].lower()), int(m[3])
+    elif m := re.match(r"^([A-Za-z]{3,9})[ .-](\d{1,2}),?[ .-](\d{2,4})", t):
+        mo, d, y = _MONTHS.get(m[1][:3].lower()), int(m[2]), int(m[3])
+    elif m := re.match(r"^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})", t):
+        a, b, y = int(m[1]), int(m[2]), int(m[3])
+        d, mo = (a, b) if day_first else (b, a)
+    if not (y and mo and d):
+        return ""
+    if y < 100:
+        y += 2000
+    try:
+        return datetime(y, mo, d).strftime("%Y-%m-%d")
+    except ValueError:
+        return ""
+
+
+def _parse_statement_amount(value):
+    """Return (amount, hint) where amount is a positive float or None and hint is
+    'debit', 'credit' or 'negative' when the cell itself says which way the money went."""
+    if value is None or value == "":
+        return None, None
+    if isinstance(value, (int, float)):
+        return (abs(float(value)) or None), ("negative" if value < 0 else None)
+    t = str(value).strip()
+    hint = None
+    if re.search(r"\bdr\.?$", t, re.I):
+        hint = "debit"
+    elif re.search(r"\bcr\.?$", t, re.I):
+        hint = "credit"
+    elif t.startswith("-") or t.endswith("-") or (t.startswith("(") and t.endswith(")")):
+        hint = "negative"
+    digits = re.sub(r"[^\d.]", "", t)
+    try:
+        amount = float(digits)
+    except ValueError:
+        return None, None
+    return (amount or None), hint
+
+
+def _find_statement_columns(header_row):
+    """Map the statement's header cells to the columns we need; None if this isn't a header row."""
+    cols = {}
+    for i, cell in enumerate(header_row):
+        h = re.sub(r"[^a-z/ ]", " ", str(cell or "").lower()).strip()
+        words = set(h.replace("/", " ").split())
+        if not h or "balance" in words:
+            continue
+        if ("date" in words or "dt" in words) and "date" not in cols:
+            cols["date"] = i
+        elif ("date" in words or "dt" in words) and words & {"txn", "transaction", "tran", "posting"}:
+            cols["date"] = i  # prefer the transaction date over a value date
+        elif ("date" in words or "dt" in words):
+            continue  # a second date column such as Value Date
+        elif words & {"narration", "description", "particulars", "details", "remarks", "memo", "payee"}:
+            cols.setdefault("description", i)
+        elif h in {"type", "dr/cr", "cr/dr", "debit/credit", "txn type", "transaction type"}:
+            cols.setdefault("type", i)
+        elif words & {"withdrawal", "withdrawals", "debit", "debits", "dr"} or "money out" in h or "paid out" in h:
+            cols.setdefault("debit", i)
+        elif words & {"deposit", "deposits", "credit", "credits", "cr"} or "money in" in h or "paid in" in h:
+            cols.setdefault("credit", i)
+        elif "amount" in words or "amt" in words:
+            cols.setdefault("amount", i)
+    if "date" in cols and ("debit" in cols or "amount" in cols):
+        return cols
+    return None
+
+
+def _read_statement_table(filename: str, raw: bytes):
+    """Return the statement's rows (lists of cells) from a CSV or .xlsx file."""
+    import io as _io
+    name = filename.lower()
+    if name.endswith(".xlsx") or name.endswith(".xlsm"):
+        from openpyxl import load_workbook
+        ws = load_workbook(_io.BytesIO(raw), read_only=True, data_only=True).active
+        return [list(r) for r in ws.iter_rows(values_only=True)]
+    if name.endswith(".xls"):
+        raise ValueError("Old .xls files aren't supported. Open it in Excel and save as .xlsx or CSV.")
+    import csv
+    text = None
+    for enc in ("utf-8-sig", "cp1252"):
+        try:
+            text = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        raise ValueError("Couldn't read this file as text. Upload a CSV, Excel (.xlsx) or PDF statement.")
+    try:
+        dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t|")
+    except csv.Error:
+        dialect = csv.excel
+    return list(csv.reader(_io.StringIO(text), dialect))
+
+
+def _statement_rows_from_table(table):
+    """Turn a CSV/Excel table into transactions, keeping only money going out."""
+    cols, body = None, []
+    for idx, row in enumerate(table[:40]):
+        cols = _find_statement_columns(row)
+        if cols:
+            body = table[idx + 1:]
+            break
+    if not cols:
+        raise ValueError("Couldn't find the date and amount columns. Check that the file has a header row "
+                         "like Date / Narration / Withdrawal / Deposit.")
+
+    def cell(r, key):
+        return r[cols[key]] if key in cols and cols[key] < len(r) else None
+
+    # Indian banks write 03/04/2026 for 3 April; switch only if a date proves month-first
+    day_first = True
+    for r in body:
+        if m := re.match(r"^\s*(\d{1,2})[-/.](\d{1,2})[-/.]", str(cell(r, "date") or "")):
+            if int(m[1]) > 12:
+                break
+            if int(m[2]) > 12:
+                day_first = False
+                break
+
+    amount_col_has_negatives = "amount" in cols and any(
+        _parse_statement_amount(cell(r, "amount"))[1] == "negative" for r in body)
+
+    rows, credits = [], 0
+    for r in body:
+        date = _parse_statement_date(cell(r, "date"), day_first)
+        if not date:
+            continue  # opening balance, totals, page footers
+        description = " ".join(str(cell(r, "description") or "").split())
+        direction = None
+        if "debit" in cols:
+            amount, _ = _parse_statement_amount(cell(r, "debit"))
+            if amount:
+                direction = "debit"
+            else:
+                amount, _ = _parse_statement_amount(cell(r, "credit"))
+                direction = "credit" if amount else None
+        else:
+            amount, hint = _parse_statement_amount(cell(r, "amount"))
+            kind = str(cell(r, "type") or "").lower()
+            if re.search(r"\b(dr|debit|withdraw)", kind) or hint == "debit":
+                direction = "debit"
+            elif re.search(r"\b(cr|credit|deposit)", kind) or hint == "credit":
+                direction = "credit"
+            elif hint == "negative":
+                direction = "debit"
+            elif amount_col_has_negatives:
+                direction = "credit"
+            elif amount:
+                direction = "unknown"
+        if not amount or not direction:
+            continue
+        if direction == "credit":
+            credits += 1
+            continue
+        rows.append({"date": date, "description": description, "amount": round(amount, 2),
+                     "direction_unknown": direction == "unknown"})
+    return rows, credits
+
+
+def _suggestion_schema(expense_types, categories_by_type, extra_props=None):
+    """JSON schema for one suggested expense; enums keep the AI to the app's own lists."""
+    all_cats = sorted({c for cats in categories_by_type.values() if isinstance(cats, list) for c in cats})
+    props = {
+        "expense_name": {"type": "string"},
+        "expense_type": {"type": "string", "enum": list(expense_types)},
+        "category": {"type": "string", "enum": all_cats} if all_cats else {"type": "string"},
+        "vendor": {"type": "string"},
+    }
+    props.update(extra_props or {})
+    return {"type": "object", "properties": props, "required": list(props), "additionalProperties": False}
+
+
+_SUGGEST_GUIDE = ("For each transaction suggest: expense_name (a short, plain description), expense_type and "
+                  "category (from the allowed lists - pick the category that belongs to the chosen type), and "
+                  "vendor (the merchant or payee name, cleaned of reference numbers; blank if unclear). "
+                  "Bank fees, charges and GST on charges go under Bank Charges.")
+
+
+def _suggest_expense_fields(rows, expense_types, categories_by_type):
+    """Fill expense_name/type/category/vendor on each row with one AI call per 150 rows."""
+    item = _suggestion_schema(expense_types, categories_by_type, {"index": {"type": "integer"}})
+    schema = {"type": "object", "properties": {"items": {"type": "array", "items": item}},
+              "required": ["items"], "additionalProperties": False}
+    type_map = json.dumps(categories_by_type, ensure_ascii=False)
+    for start in range(0, len(rows), 150):
+        chunk = rows[start:start + 150]
+        listing = "\n".join(f"{start + i} | {r['date']} | {r['amount']:.2f} | {r['description']}"
+                            for i, r in enumerate(chunk))
+        prompt = (f"These are outgoing payments from a company bank statement (index | date | amount in "
+                  f"{CURRENCY_CODE} | bank description). {_SUGGEST_GUIDE}\n"
+                  f"Categories belonging to each type: {type_map}\n"
+                  f"Return one item per transaction with its index.\n\n{listing}")
+        for s in _ai_structured(prompt, schema, effort="low").get("items", []):
+            i = s.get("index")
+            if isinstance(i, int) and 0 <= i < len(rows):
+                rows[i].update({k: s.get(k, "") for k in ("expense_name", "expense_type", "category", "vendor")})
+
+
+def _statement_rows_from_pdf(raw: bytes, expense_types, categories_by_type):
+    """Have Claude read every transaction in a PDF statement; keeps only money going out."""
+    txn = _suggestion_schema(expense_types, categories_by_type, {
+        "date": {"type": "string", "description": "YYYY-MM-DD"},
+        "description": {"type": "string"},
+        "amount": {"type": "number"},
+        "direction": {"type": "string", "enum": ["debit", "credit"]},
+    })
+    schema = {"type": "object", "properties": {"transactions": {"type": "array", "items": txn}},
+              "required": ["transactions"], "additionalProperties": False}
+    prompt = ("This is a company bank statement. List every transaction row in order. For each give the "
+              "transaction date as YYYY-MM-DD (Indian statements write day before month), the bank's "
+              "description text exactly as printed, the amount as a positive number, and direction: debit "
+              "for money going out (withdrawals) or credit for money coming in (deposits). Skip opening and "
+              "closing balance lines, totals and page headers. "
+              f"{_SUGGEST_GUIDE} Categories belonging to each type: {json.dumps(categories_by_type, ensure_ascii=False)}")
+    content = [
+        {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                         "data": base64.standard_b64encode(raw).decode("ascii")}},
+        {"type": "text", "text": prompt},
+    ]
+    result = _ai_structured(content, schema, effort="medium", max_tokens=64000)
+    rows, credits = [], 0
+    for t in result.get("transactions", []):
+        amount = abs(_safe_float(t.get("amount")))
+        date = _parse_statement_date(t.get("date"))
+        if not amount or not date:
+            continue
+        if t.get("direction") == "credit":
+            credits += 1
+            continue
+        rows.append({"date": date, "description": " ".join(str(t.get("description", "")).split()),
+                     "amount": round(amount, 2), "direction_unknown": False,
+                     **{k: t.get(k, "") for k in ("expense_name", "expense_type", "category", "vendor")}})
+    return rows, credits
+
+
+@app.route("/financial/bank-statement/parse", methods=["POST"])
+@role_required("financial")
+def bank_statement_parse():
+    """Read an uploaded bank statement and return its outgoing payments for review (nothing is saved)."""
+    f = request.files.get("statement")
+    if not f or not f.filename:
+        return jsonify({"error": "No file uploaded"}), 400
+    raw = f.read()
+    expense_types, categories_by_type = _expense_type_options()
+    ai_note = ""
+    try:
+        if f.filename.lower().endswith(".pdf"):
+            rows, credits = _statement_rows_from_pdf(raw, expense_types, categories_by_type)
+        else:
+            rows, credits = _statement_rows_from_table(_read_statement_table(f.filename, raw))
+            if rows:
+                try:
+                    _suggest_expense_fields(rows, expense_types, categories_by_type)
+                except Exception as e:
+                    log.warning(f"Bank statement categorisation failed: {e}")
+                    ai_note = f"Couldn't suggest categories ({e}). Fill them in before saving."
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        log.exception("Bank statement read failed")
+        return jsonify({"error": f"Couldn't read this statement: {e}"}), 400
+
+    # Flag rows that look already recorded: same date and amount as an existing finance expense
+    existing = {}
+    for e in (fb_get("/balance_sheet_expenses") or {}).values():
+        if isinstance(e, dict):
+            key = (str(e.get("date", ""))[:10], round(_safe_float(e.get("amount")), 2))
+            existing.setdefault(key, e.get("expense_name") or e.get("description") or "an existing expense")
+    for r in rows:
+        r["duplicate_of"] = existing.get((r["date"], r["amount"]), "")
+        if not r.get("expense_name"):
+            r["expense_name"] = r["description"][:80]
+        for k in ("expense_type", "category", "vendor"):
+            r.setdefault(k, "")
+
+    return jsonify({"rows": rows, "credits_skipped": credits, "ai_note": ai_note,
+                    "expense_types": expense_types, "categories_by_type": categories_by_type})
+
+
+@app.route("/financial/bank-statement/import", methods=["POST"])
+@role_required("financial")
+def bank_statement_import():
+    """Save the reviewed bank statement rows as finance expenses, stored like ones added by hand."""
+    rows = (request.get_json(silent=True) or {}).get("rows") or []
+    exchange_rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 110)) or 110
+    now = datetime.now(timezone.utc).isoformat()
+    saved, skipped = 0, []
+    for r in rows[:1000]:
+        if not isinstance(r, dict):
+            continue
+        amount = round(_safe_float(r.get("amount")), 2)
+        date = str(r.get("date") or "")
+        description = str(r.get("description") or "").strip()
+        if amount <= 0 or not re.match(r"^\d{4}-\d{2}-\d{2}$", date) or not r.get("expense_type"):
+            skipped.append(description or date)
+            continue
+        data = {
+            "expense_type":      str(r.get("expense_type", "")),
+            "expense_name":      str(r.get("expense_name") or description)[:200],
+            "description":       description,
+            "amount":            amount,
+            "amount_bdt":        amount * exchange_rate,
+            "exchange_rate":     exchange_rate,
+            "category":          str(r.get("category", "")),
+            "date":              date,
+            "vendor":            str(r.get("vendor", "")).strip(),
+            "project_number":    "",
+            "notes":             f"Imported from bank statement: {description}",
+            "created_by":        session.get("user_email", ""),
+            "submitted_by_name": session.get("user_name", ""),
+            "submitted_by_uid":  session.get("user_uid", ""),
+            "status":            "Approved",
+            "source":            "bank_statement",
+            "created_at":        now,
+            "updated_at":        now,
+        }
+        if fb_push("/balance_sheet_expenses", data):
+            saved += 1
+        else:
+            skipped.append(description or date)
+    return jsonify({"success": True, "saved": saved, "skipped": len(skipped), "skipped_rows": skipped[:20]})
+
+
 # ── AI Routes ─────────────────────────────────────────────────────────────────
 
 @app.route("/ai/extract-pdf", methods=["POST"])
@@ -24632,61 +25053,7 @@ def ai_extract_pdf():
     if not f:
         return jsonify({"error": "No file uploaded"}), 400
 
-    custom_categories = fb_get("/custom_categories") or {}
-    expense_types = custom_categories.get("expense_type", []) if isinstance(custom_categories.get("expense_type"), list) else []
-    categories_by_type = custom_categories.get("Categories", {}) if isinstance(custom_categories.get("Categories"), dict) else {}
-
-    # Provide default values if empty (matching reference structure)
-    if not expense_types:
-        expense_types = [
-            "O & M (Operations & Maintenance)",
-            "Capital Expenses",
-            "Other Expenses"
-        ]
-
-    # Create separate lists: one for filter (with Group Expenses), one for modals (without)
-    expense_types_for_filter = list(expense_types)
-    if "Group Expenses" not in expense_types_for_filter:
-        expense_types_for_filter.append("Group Expenses")
-
-    # Use the original list (without Group Expenses) for the expense modal
-    expense_types_for_modal = expense_types
-
-    if not categories_by_type:
-        categories_by_type = {
-            "O & M (Operations & Maintenance)": [
-                "Facilities & Utilities",
-                "Office & Admin Overhead",
-                "Engineering Software & IT",
-                "Salaries, Labor & Related Costs",
-                "Professional Services",
-                "Insurance & Compliance",
-                "Travel, Site Visits & Vehicles",
-                "Marketing & Business Development",
-                "Training, Licensure & Development",
-                "Safety & Field Supplies",
-                "Miscellaneous O & M"
-            ],
-            "Capital Expenses": [
-                "Computer & Office Equipment",
-                "Field & Inspection Equipment",
-                "Furniture & Fixtures",
-                "Vehicles",
-                "Software (Capitalized)",
-                "Leasehold Improvements",
-                "Accumulated Depreciation"
-            ],
-            "Other Expenses": [
-                "Salary/Bonuses",
-                "Tax Expenses/Tax Deductions",
-                "Medical/Benefits",
-                "Meals & Entertainment",
-                "Donations",
-                "Bank Charges",
-                "Contingency Funds",
-                "Unexpected Costs"
-            ]
-        }
+    expense_types, categories_by_type = _expense_type_options()
 
     type_hint = f"Pick from these expense types if one fits: {expense_types}. " if expense_types else ""
     cat_hint = f"Pick from these categories if one fits: {sorted(set(c for cats in categories_by_type.values() for c in cats))}. " if categories_by_type else ""
@@ -24755,7 +25122,7 @@ def ai_draft_reminder(invoice_id):
     prompt = f"""Write a professional but friendly overdue payment reminder email.
 Invoice: {meta.get('invoice_number')}
 Client: {meta.get('client_name')}
-Amount outstanding: ${_safe_float(meta.get('total',0)) - _safe_float(meta.get('amount_paid',0)):,.2f}
+Amount outstanding: {CURRENCY_SYMBOL}{_safe_float(meta.get('total',0)) - _safe_float(meta.get('amount_paid',0)):,.2f}
 Due date: {due}
 Days overdue: {days_overdue}
 Company sending this: {company_info().get('name','SKT INNOVATIONS PRIVATE LIMITED')}
@@ -24764,7 +25131,7 @@ Keep it concise (3-4 short paragraphs), professional, and include a clear call t
 Use placeholders like [Your Name] for signature. Do not use asterisks for formatting."""
     try:
         email_text = _ai_call(prompt, max_tokens=512)
-        subject = f"Payment Reminder — {meta.get('invoice_number')} (${_safe_float(meta.get('total',0)):,.0f})"
+        subject = f"Payment Reminder — {meta.get('invoice_number')} ({CURRENCY_SYMBOL}{_safe_float(meta.get('total',0)):,.0f})"
         return jsonify({"subject": subject, "body": email_text})
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 503
@@ -24792,7 +25159,7 @@ Client         : {quote.get('client_name', 'Client')}
 Quote number   : {quote.get('job_number', '')}
 Project / Scope: {quote.get('project_name', '')}
 Services       : {services}
-Quote total    : ${total:,.2f}
+Quote total    : {CURRENCY_SYMBOL}{total:,.2f}
 Valid until    : {quote.get('valid_until', 'N/A')}
 Salesperson    : {quote.get('salesperson', '')}
 
@@ -24825,12 +25192,12 @@ def ai_cash_flow_summary():
     upcoming = data.get("upcoming", [])
     total_expected = sum(float(u.get("amount", 0)) for u in upcoming)
     items_text = "\n".join(
-        f"- {u.get('date','?')}: {u.get('label','?')} — ${float(u.get('amount',0)):,.0f}"
+        f"- {u.get('date','?')}: {u.get('label','?')} — {CURRENCY_SYMBOL}{float(u.get('amount',0)):,.0f}"
         for u in upcoming[:20]
     )
     prompt = f"""Based on these upcoming expected payments for the next 90 days, write a brief 2-3 sentence cash flow summary. Be specific about amounts and timing. No bullet points.
 
-Total expected: ${total_expected:,.0f}
+Total expected: {CURRENCY_SYMBOL}{total_expected:,.0f}
 Upcoming items:
 {items_text or 'No upcoming payments found.'}"""
     try:
@@ -24862,8 +25229,8 @@ def ai_project_health():
         next_stage_amt = _safe_float(pending_stages[0].get("amount", 0)) if pending_stages else 0
         summary_input = (
             f"Project: {p.get('project_name','')} ({pnum}), Status: {status}, "
-            f"Contract: ${cv:,.0f}, Paid: ${paid:,.0f} ({pct}%), "
-            f"Pending installments: {len(pending_stages)}, Next due: ${next_stage_amt:,.0f}"
+            f"Contract: {CURRENCY_SYMBOL}{cv:,.0f}, Paid: {CURRENCY_SYMBOL}{paid:,.0f} ({pct}%), "
+            f"Pending installments: {len(pending_stages)}, Next due: {CURRENCY_SYMBOL}{next_stage_amt:,.0f}"
         )
         summaries[pnum] = summary_input
 
@@ -26543,7 +26910,7 @@ def _send_project_completion_email(project_number: str, project_data: dict) -> N
     <tr><td style="padding:8px;border-bottom:1px solid #eee;">Project #</td>
         <td style="padding:8px;border-bottom:1px solid #eee;">{project_number}</td></tr>
     <tr><td style="padding:8px;">Contract Value</td>
-        <td style="padding:8px;font-weight:bold;">${contract_val:,.2f}</td></tr>
+        <td style="padding:8px;font-weight:bold;">{CURRENCY_SYMBOL}{contract_val:,.2f}</td></tr>
   </table>
   <p>We appreciate your business and look forward to working with you again.</p>
   <p style="margin-top:24px;">Best regards,<br><strong>{co.get('name','')}</strong></p>
@@ -27224,7 +27591,7 @@ def _upsert_project_commission(project_id: str, project_data: dict) -> None:
     # Explicit overrides are honoured even when the value is 0 — the user is
     # deliberately setting the commission to $0 / 0%, not asking for the default.
     _is_percent_override = "percent" in override_type or "%" in override_type
-    _is_fixed_override   = "fixed" in override_type or "$" in override_type
+    _is_fixed_override   = "fixed" in override_type or "$" in override_type or "₹" in override_type
 
     if _is_percent_override:
         # Handle both decimal (0.50) and percentage (50) formats
@@ -27918,9 +28285,9 @@ def project_pdf(project_id):
     elems.append(Paragraph("FINANCIAL SUMMARY", h2))
     elems.append(HRFlowable(width="100%", thickness=0.5, color=border, spaceAfter=6))
     fin_data = [
-        ["Contract Value",  f"${cv:,.2f}"],
-        ["Amount Paid",     f"${paid:,.2f}"],
-        ["Outstanding",     f"${outstanding:,.2f}"],
+        ["Contract Value",  f"{PDF_CURRENCY_SYMBOL}{cv:,.2f}"],
+        ["Amount Paid",     f"{PDF_CURRENCY_SYMBOL}{paid:,.2f}"],
+        ["Outstanding",     f"{PDF_CURRENCY_SYMBOL}{outstanding:,.2f}"],
         ["Collection Rate", f"{pct}%"],
         ["Payment Stage",   project.get("payment_category","—") or "—"],
     ]
@@ -28171,7 +28538,7 @@ def _generate_invoice_pdf_bytes(invoice_id: str, job_style_header: bool = False,
         qty_val = _safe_float(item.get("quantity", 1))
         qty = str(int(qty_val)) if qty_val == int(qty_val) else str(qty_val)
         unit_price_val = _safe_float(item.get('unit_price', 0))
-        unit_price = f"${unit_price_val:,.2f}"
+        unit_price = f"{PDF_CURRENCY_SYMBOL}{unit_price_val:,.2f}"
         project_number = ""
         project_name = ""
         plant = ""
@@ -28584,7 +28951,7 @@ def _generate_invoice_pdf_bytes(invoice_id: str, job_style_header: bool = False,
             description_display = processed_site_address
 
         total_due_val = qty_val * unit_price_val
-        total_due = f"${total_due_val:,.2f}"
+        total_due = f"{PDF_CURRENCY_SYMBOL}{total_due_val:,.2f}"
         item_data.append([
             project_cell,
             Paragraph(description_display, left_style),
@@ -28618,9 +28985,9 @@ def _generate_invoice_pdf_bytes(invoice_id: str, job_style_header: bool = False,
     tax_rate = _safe_float(meta.get('tax_rate', 0))
     total_amount = _safe_float(meta.get('total', 0))
     totals_data = [
-        [Paragraph("Total", styles['Right10']), Paragraph(f"${subtotal:,.2f}", styles['Right10'])],
-        [Paragraph(f"Tax ({tax_rate}%)", styles['Right10']), Paragraph(f"${tax_amount:,.2f}", styles['Right10'])],
-        [Paragraph("TOTAL AMOUNT DUE:", styles['RightBold10']), Paragraph(f"${total_amount:,.2f}", styles['RightBold10'])],
+        [Paragraph("Total", styles['Right10']), Paragraph(f"{PDF_CURRENCY_SYMBOL}{subtotal:,.2f}", styles['Right10'])],
+        [Paragraph(f"Tax ({tax_rate}%)", styles['Right10']), Paragraph(f"{PDF_CURRENCY_SYMBOL}{tax_amount:,.2f}", styles['Right10'])],
+        [Paragraph("TOTAL AMOUNT DUE:", styles['RightBold10']), Paragraph(f"{PDF_CURRENCY_SYMBOL}{total_amount:,.2f}", styles['RightBold10'])],
     ]
     totals_table = Table(totals_data, colWidths=[doc.width * 0.5, doc.width * 0.5])
     totals_table.setStyle(TableStyle([
@@ -28957,7 +29324,7 @@ def _generate_invoice_summary_pdf_bytes(invoice_ids: list, data_get=None):
         data.append([
             Paragraph(m.get('invoice_number', '—'), center10),
             Paragraph(invoice_plant(inv), center10),
-            Paragraph(f"${total:,.2f}", center10),
+            Paragraph(f"{PDF_CURRENCY_SYMBOL}{total:,.2f}", center10),
         ])
 
     tbl = Table(data, colWidths=[doc.width * 0.4, doc.width * 0.3, doc.width * 0.3], hAlign='LEFT')
@@ -28973,9 +29340,9 @@ def _generate_invoice_summary_pdf_bytes(invoice_ids: list, data_get=None):
     elems.append(Spacer(1, 5*mm))
 
     totals_data = [
-        [Paragraph("Subtotal:", right10b), Paragraph(f"${subtotal:,.2f}", right10)],
-        [Paragraph("Tax (if applicable):", right10b), Paragraph(f"${tax_total:,.2f}" if tax_total > 0.01 else "N/A", right10)],
-        [Paragraph("Total Amount Due:", right10b), Paragraph(f"${subtotal + tax_total:,.2f}", right10b)],
+        [Paragraph("Subtotal:", right10b), Paragraph(f"{PDF_CURRENCY_SYMBOL}{subtotal:,.2f}", right10)],
+        [Paragraph("Tax (if applicable):", right10b), Paragraph(f"{PDF_CURRENCY_SYMBOL}{tax_total:,.2f}" if tax_total > 0.01 else "N/A", right10)],
+        [Paragraph("Total Amount Due:", right10b), Paragraph(f"{PDF_CURRENCY_SYMBOL}{subtotal + tax_total:,.2f}", right10b)],
     ]
     totals_table = Table(totals_data, colWidths=[doc.width * 0.7, doc.width * 0.3], hAlign='LEFT')
     totals_table.setStyle(TableStyle([
@@ -29183,7 +29550,7 @@ Please find the attached paid invoice for your records.
 
 Invoice Details:
 Invoice Number: {invoice_number}
-Amount Paid: ${total_due:,.2f}
+Amount Paid: {CURRENCY_SYMBOL}{total_due:,.2f}
 Payment Date: {paid_date or 'Received'}
 
 Thank you for your payment. If you require any additional information, please let us know.
@@ -29203,7 +29570,7 @@ Please find the attached invoice for your review.
 
 Invoice Details:
 Invoice Number: {invoice_number}
-Amount Due: ${total_due:,.2f}
+Amount Due: {CURRENCY_SYMBOL}{total_due:,.2f}
 Due Date: {due_date}
 
 Please review the attached invoice at your convenience. If you have any questions or require additional information, please feel free to contact us.
@@ -29373,10 +29740,10 @@ def _generate_quote_pdf_bytes(quote_id: str):
     total_amount = quote.get('total', '')
 
     if agreed_cost:
-        agreed_cost_val = str(agreed_cost).replace('$', '').strip()
+        agreed_cost_val = str(agreed_cost).replace('$', '').replace('₹', '').strip()
         expedite_checkbox = "[✓]" if expedite else "[ ]"
         if expedite and expedite_amount and str(expedite_amount).strip():
-            expedite_val = str(expedite_amount).replace('$', '').strip()
+            expedite_val = str(expedite_amount).replace('$', '').replace('₹', '').strip()
         else:
             expedite_val = "________"
         cost_line = f"Agreed Cost: {agreed_cost_val}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Expedite? {expedite_checkbox} Yes, 50% Extra ( ) No:</b> {expedite_val}"
@@ -29387,8 +29754,8 @@ def _generate_quote_pdf_bytes(quote_id: str):
 
     if total_amount:
         try:
-            total_val = float(str(total_amount).replace('$', '').strip())
-            total_line = f"<b>TOTAL: ${total_val:,.2f}</b>"
+            total_val = float(str(total_amount).replace('$', '').replace('₹', '').strip())
+            total_line = f"<b>TOTAL: {PDF_CURRENCY_SYMBOL}{total_val:,.2f}</b>"
         except (ValueError, TypeError):
             total_line = "TOTAL: ________"
     else:
@@ -29407,7 +29774,7 @@ def _generate_quote_pdf_bytes(quote_id: str):
     elems.append(Spacer(1, 1.5*mm))
 
     elems.append(Paragraph("<b>In the case of Court Appearance or Disposition:</b> N/A", form_value))
-    elems.append(Paragraph("Rate: $250/hour (portal-to-portal)", form_value))
+    elems.append(Paragraph(f"Rate: {PDF_CURRENCY_SYMBOL}250/hour (portal-to-portal)", form_value))
     elems.append(Spacer(1, 0.12*inch))
 
     def add_section_title(label):
@@ -30924,9 +31291,9 @@ def _send_overdue_reminder_email(invoice_id: str, invoice: dict):
     <tr><td style="padding:8px;border-bottom:1px solid #eee;">Due Date</td>
         <td style="padding:8px;border-bottom:1px solid #eee;color:#DC2626;">{meta.get('due_date','—')}</td></tr>
     <tr><td style="padding:8px;border-bottom:1px solid #eee;">Invoice Total</td>
-        <td style="padding:8px;border-bottom:1px solid #eee;">${total:,.2f}</td></tr>
+        <td style="padding:8px;border-bottom:1px solid #eee;">{CURRENCY_SYMBOL}{total:,.2f}</td></tr>
     <tr><td style="padding:8px;">Balance Due</td>
-        <td style="padding:8px;font-weight:bold;font-size:18px;color:#DC2626;">${balance:,.2f}</td></tr>
+        <td style="padding:8px;font-weight:bold;font-size:18px;color:#DC2626;">{CURRENCY_SYMBOL}{balance:,.2f}</td></tr>
   </table>
   <p>Please arrange payment at your earliest convenience. Contact us at
      <a href="mailto:{em.get('smtp_user','')}">{em.get('smtp_user','')}</a> with any questions.</p>
@@ -31012,7 +31379,7 @@ def update_project_payment_plan(project_id):
             return {
                 "success": False,
                 "needs_permission": True,
-                "message": f"This will change the contract value from ${old_contract_value:,.2f} to ${new_contract_value:,.2f}. Continue?",
+                "message": f"This will change the contract value from {CURRENCY_SYMBOL}{old_contract_value:,.2f} to {CURRENCY_SYMBOL}{new_contract_value:,.2f}. Continue?",
                 "new_contract_value": new_contract_value
             }, 400
 

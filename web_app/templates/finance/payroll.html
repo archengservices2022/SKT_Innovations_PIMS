@@ -401,7 +401,7 @@
             </div>
 
             <div class="form-group">
-              <label for="sal_amount">Amount ($)</label>
+              <label for="sal_amount">Amount (₹)</label>
               <input type="number" id="sal_amount" step="0.01" min="0" required />
             </div>
 
@@ -564,7 +564,7 @@
                 <input type="text" id="commEditSalesperson" class="form-control form-control-sm" readonly style="background:#f8fafc;" />
               </div>
               <div class="form-group">
-                <label for="commEditContractValue">Contract Value ($)</label>
+                <label for="commEditContractValue">Contract Value (₹)</label>
                 <input type="number" id="commEditContractValue" class="form-control form-control-sm" step="0.01" readonly style="background:#f8fafc;" />
               </div>
             </div>
@@ -575,7 +575,7 @@
                 <label for="commEditRateType">Rate Type</label>
                 <select id="commEditRateType" class="form-control form-control-sm" onchange="calcCommissionEarned()">
                   <option value="percent">Percent (%)</option>
-                  <option value="fixed">Fixed Amount ($)</option>
+                  <option value="fixed">Fixed Amount (₹)</option>
                   <option value="default">Default</option>
                 </select>
               </div>
@@ -588,15 +588,15 @@
             <!-- Row 4: Commission Earned, Adjusted, Remaining Due (equal widths) -->
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px;margin-bottom:15px;">
               <div class="form-group">
-                <label for="commEditEarned">Commission Earned ($)</label>
+                <label for="commEditEarned">Commission Earned (₹)</label>
                 <input type="number" id="commEditEarned" class="form-control form-control-sm" step="0.01" readonly style="background:#f8fafc;color:#10b981;font-weight:600;" />
               </div>
               <div class="form-group">
-                <label for="commEditAdjusted">Adjusted / Deducted ($)</label>
+                <label for="commEditAdjusted">Adjusted / Deducted (₹)</label>
                 <input type="number" id="commEditAdjusted" class="form-control form-control-sm" step="0.01" readonly style="background:#f8fafc;color:#64748b;" />
               </div>
               <div class="form-group">
-                <label for="commEditRemainingDue">Remaining Due ($)</label>
+                <label for="commEditRemainingDue">Remaining Due (₹)</label>
                 <input type="number" id="commEditRemainingDue" class="form-control form-control-sm" step="0.01" readonly style="background:#f8fafc;color:#10b981;font-weight:600;" />
               </div>
             </div>

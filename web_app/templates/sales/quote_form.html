@@ -162,7 +162,7 @@
                          value="{{ quote.get('rush_rate','50') if quote else '50' }}"
                          oninput="calcTotals()">
                   <input type="hidden" name="rush_fee" id="rushFeeInput">
-                  <span class="text-warning small fw-bold" id="rushFeeDisplay">$0.00</span>
+                  <span class="text-warning small fw-bold" id="rushFeeDisplay">₹0.00</span>
                 </div>
               </div>
             </div>
@@ -251,7 +251,7 @@
         <h6 class="section-heading">Totals</h6>
         <div class="d-flex justify-content-between mb-2">
           <span>Subtotal</span>
-          <strong id="subtotalDisplay">$0.00</strong>
+          <strong id="subtotalDisplay">₹0.00</strong>
           <input type="hidden" name="subtotal" id="subtotalInput" value="{{ quote.get('subtotal','0') if quote else '0' }}">
         </div>
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -262,18 +262,18 @@
         </div>
         <div class="d-flex justify-content-between mb-2">
           <span>Tax Amount</span>
-          <strong id="taxDisplay">$0.00</strong>
+          <strong id="taxDisplay">₹0.00</strong>
           <input type="hidden" name="tax_amount" id="taxInput">
         </div>
         <div class="d-flex justify-content-between mb-2 text-warning" id="rushFeeRow"
              style="{{ '' if quote and quote.get('is_expedited') else 'display:none;' }}">
           <span><i class="bi bi-lightning-charge-fill me-1"></i>Rush Fee</span>
-          <strong id="rushFeeRowAmt">$0.00</strong>
+          <strong id="rushFeeRowAmt">₹0.00</strong>
         </div>
         <hr>
         <div class="d-flex justify-content-between">
           <strong>Total</strong>
-          <strong id="totalDisplay" class="text-teal fs-5">$0.00</strong>
+          <strong id="totalDisplay" class="text-teal fs-5">₹0.00</strong>
           <input type="hidden" name="total" id="totalInput">
         </div>
       </div>

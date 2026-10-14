@@ -99,11 +99,11 @@
 
             <h6 class="section-heading mt-4">Currency Settings</h6>
             <div class="mb-3">
-              <label class="form-label">BDT Exchange Rate <span class="text-muted fw-normal">(1 USD = — BDT)</span></label>
+              <label class="form-label">INR Exchange Rate <span class="text-muted fw-normal">(₹ per 1 USD)</span></label>
               <input type="number" name="bdt_exchange_rate" class="form-control"
                      value="{{ co.get('bdt_exchange_rate', 110) }}"
                      min="1" step="0.01" style="max-width:150px;">
-              <div class="form-text text-muted">Used to show USD — BDT equivalent for Outside America employees.</div>
+              <div class="form-text text-muted">All amounts are now entered and shown in rupees. This rate is only saved on new records for reference.</div>
             </div>
 
             <h6 class="section-heading mt-4">Invoice Defaults</h6>
@@ -324,11 +324,11 @@
               </select>
             </div>
             <div class="mb-2">
-              <label class="form-label">Hourly Rate ($)</label>
+              <label class="form-label">Hourly Rate (₹)</label>
               <input type="number" name="hourly_rate" class="form-control form-control-sm" placeholder="0.00" min="0" step="0.01">
             </div>
             <div class="mb-2">
-              <label class="form-label">Monthly Salary ($)
+              <label class="form-label">Monthly Salary (₹)
                 <span class="text-muted" style="font-size:10px;">— auto-posts to Payroll</span>
               </label>
               <input type="number" name="monthly_salary" class="form-control form-control-sm" placeholder="0.00 (blank if hourly)" min="0" step="0.01">
@@ -993,11 +993,11 @@
         </div>
         <div class="row g-2 mb-2">
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Hourly Rate ($)</label>
+            <label class="form-label fw-semibold" style="font-size:12px;">Hourly Rate (₹)</label>
             <input type="number" id="editHourlyRate" class="form-control form-control-sm" placeholder="0.00" min="0" step="0.01">
           </div>
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Monthly Salary ($)</label>
+            <label class="form-label fw-semibold" style="font-size:12px;">Monthly Salary (₹)</label>
             <input type="number" id="editMonthlySalary" class="form-control form-control-sm" placeholder="0.00 (blank if hourly)" min="0" step="0.01">
           </div>
         </div>

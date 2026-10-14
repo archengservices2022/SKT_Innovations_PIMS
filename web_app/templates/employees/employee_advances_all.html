@@ -45,17 +45,17 @@
 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:20px;">
   <div style="background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0;">
     <div style="font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Total Advances</div>
-    <div style="font-size:20px; font-weight:800; color:#0f172a;">${{ '{:,.2f}'.format(total_advanced) }}</div>
+    <div style="font-size:20px; font-weight:800; color:#0f172a;">{{ currency_symbol }}{{ '{:,.2f}'.format(total_advanced) }}</div>
     <div style="font-size:11px; color:#94a3b8; margin-top:4px;">All records</div>
   </div>
   <div style="background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0;">
     <div style="font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Total Recovered</div>
-    <div style="font-size:20px; font-weight:800; color:#16a34a;">${{ '{:,.2f}'.format(total_recovered) }}</div>
+    <div style="font-size:20px; font-weight:800; color:#16a34a;">{{ currency_symbol }}{{ '{:,.2f}'.format(total_recovered) }}</div>
     <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Paid back</div>
   </div>
   <div style="background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0;">
     <div style="font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Outstanding</div>
-    <div style="font-size:20px; font-weight:800; color:#dc2626;">${{ '{:,.2f}'.format(outstanding_amount) }}</div>
+    <div style="font-size:20px; font-weight:800; color:#dc2626;">{{ currency_symbol }}{{ '{:,.2f}'.format(outstanding_amount) }}</div>
     <div style="font-size:11px; color:#94a3b8; margin-top:4px;">{{ outstanding_count }} advance{{ '' if outstanding_count == 1 else 's' }}</div>
   </div>
   <div style="background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0;">

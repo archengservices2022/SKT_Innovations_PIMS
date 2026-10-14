@@ -442,7 +442,7 @@ async function quickPay(invoiceId, total, amountPaid, btn) {
     return;
   }
 
-  if (!confirm(`Record $${remaining.toFixed(2)} payment to complete invoice?`)) return;
+  if (!confirm(`Record ₹${remaining.toFixed(2)} payment to complete invoice?`)) return;
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';

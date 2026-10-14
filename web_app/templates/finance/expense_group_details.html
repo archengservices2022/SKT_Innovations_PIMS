@@ -36,7 +36,7 @@
       <div class="card">
         <div class="card-body">
           <div class="text-muted small mb-2">TOTAL AMOUNT</div>
-          <div class="h5 text-success">${{ "{:,.2f}".format(group.total_amount or 0) }} USD</div>
+          <div class="h5 text-success">₹{{ "{:,.2f}".format(group.total_amount or 0) }}</div>
         </div>
       </div>
     </div>
@@ -93,7 +93,7 @@
               <th>Expense Name</th>
               <th>Date</th>
               <th>Vendor</th>
-              <th style="text-align:right;">Amount (USD)</th>
+              <th style="text-align:right;">Amount (₹)</th>
               <th style="text-align:center;">Status</th>
             </tr>
           </thead>
@@ -105,7 +105,7 @@
                 <td>{{ expense.expense_name or '—' }}</td>
                 <td>{{ expense.date or '—' }}</td>
                 <td>{{ expense.vendor or '—' }}</td>
-                <td style="text-align:right;">${{ "{:,.2f}".format(expense.amount or 0) }}</td>
+                <td style="text-align:right;">₹{{ "{:,.2f}".format(expense.amount or 0) }}</td>
                 <td style="text-align:center;">
                   <span class="badge bg-success">{{ expense.status or 'Approved' }}</span>
                 </td>
@@ -126,7 +126,7 @@
           <div style="text-align:right; padding-top:15px; border-top:1px solid #e5e7eb;">
             <div style="font-size:12px; color:#666; margin-bottom:8px;">TOTAL GROUP EXPENSE</div>
             <div style="font-size:24px; font-weight:700; color:#0f766e;">
-              ${{ "{:,.2f}".format(group.total_amount or 0) }} USD
+              ₹{{ "{:,.2f}".format(group.total_amount or 0) }}
             </div>
           </div>
         </div>

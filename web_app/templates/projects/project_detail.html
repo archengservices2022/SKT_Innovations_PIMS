@@ -282,13 +282,13 @@
                   <td class="ps-2 text-muted">{{ h.get('changed_at','')[:10] }}</td>
                   <td>{{ h.get('changed_by','—') }}</td>
                   <td class="text-end text-muted">
-                    {% if h.get('old_type') == 'fixed' %}Fixed ${{ "{:,.2f}".format(h.get('old_value',0)|float) }}
+                    {% if h.get('old_type') == 'fixed' %}Fixed {{ currency_symbol }}{{ "{:,.2f}".format(h.get('old_value',0)|float) }}
                     {% elif h.get('old_type') == 'percent' %}{{ h.get('old_value',0) }}%
                     {% else %}Default{% endif %}
                   </td>
                   <td class="text-center text-muted">→</td>
                   <td>
-                    {% if h.get('new_type') == 'fixed' %}Fixed ${{ "{:,.2f}".format(h.get('new_value',0)|float) }}
+                    {% if h.get('new_type') == 'fixed' %}Fixed {{ currency_symbol }}{{ "{:,.2f}".format(h.get('new_value',0)|float) }}
                     {% elif h.get('new_type') == 'percent' %}{{ h.get('new_value',0) }}%
                     {% else %}Default{% endif %}
                   </td>
@@ -318,12 +318,12 @@
                     <select name="commission_override_type" id="commModalType" class="form-select form-select-sm" onchange="toggleCommModal()">
                       <option value="default" {{ 'selected' if comm_type == 'default' }}>Default (salesperson rate)</option>
                       <option value="percent" {{ 'selected' if comm_type == 'percent' }}>Custom Percentage (%)</option>
-                      <option value="fixed"   {{ 'selected' if comm_type == 'fixed' }}>Fixed Amount ($)</option>
+                      <option value="fixed"   {{ 'selected' if comm_type == 'fixed' }}>Fixed Amount (₹)</option>
                     </select>
                   </div>
                   <div class="mb-2" id="commModalValueRow" style="{{ 'display:none' if comm_type == 'default' else '' }}">
                     <label class="form-label small fw-semibold" id="commModalValueLabel">
-                      {% if comm_type == 'fixed' %}Amount ($){% else %}Percentage (%){% endif %}
+                      {% if comm_type == 'fixed' %}Amount (₹){% else %}Percentage (%){% endif %}
                     </label>
                     <input type="number" name="commission_override_value" id="commModalValue"
                            class="form-control form-control-sm" step="0.01" min="0"
@@ -448,7 +448,7 @@
                       {% endif %}
                     </span>
                     <span id="amountEdit_{{ loop.index0 }}" style="display:none; align-items:center;">
-                      $<input type="number" id="amountInput_{{ loop.index0 }}" class="form-control form-control-sm"
+                      ₹<input type="number" id="amountInput_{{ loop.index0 }}" class="form-control form-control-sm"
                              step="0.01" min="0" value="{{ s.get('amount',0)|float }}" style="width:80px; display:inline-block;"
                              data-original="{{ s.get('amount',0)|float }}"
                              onkeydown="handleEditKeydown(event, {{ loop.index0 }}, '{{ st }}', '{{ inv_id }}')"
@@ -648,7 +648,7 @@
               <td class="text-end">{{ currency_symbol }}{{ "{:,.0f}".format(b_labor) }}</td>
               <td class="text-end {{ 'text-danger fw-bold' if l_over else 'text-success' }}">{{ currency_symbol }}{{ "{:,.0f}".format(labor_total_cost) }}</td>
               <td class="text-end {{ 'text-danger' if l_over else '' }}">
-                {{ ('?$' + "{:,.0f}".format(labor_total_cost - b_labor)) if l_over else (CURRENCY_SYMBOL + "{:,.0f}".format(b_labor - labor_total_cost)) }}
+                {{ ('-' + CURRENCY_SYMBOL + "{:,.0f}".format(labor_total_cost - b_labor)) if l_over else (CURRENCY_SYMBOL + "{:,.0f}".format(b_labor - labor_total_cost)) }}
               </td>
               <td>
                 <div class="d-flex align-items-center gap-2">
@@ -669,7 +669,7 @@
               <td class="text-end">{{ currency_symbol }}{{ "{:,.0f}".format(b_exp) }}</td>
               <td class="text-end {{ 'text-danger fw-bold' if e_over else 'text-success' }}">{{ currency_symbol }}{{ "{:,.0f}".format(exp_total) }}</td>
               <td class="text-end {{ 'text-danger' if e_over else '' }}">
-                {{ ('?$' + "{:,.0f}".format(exp_total - b_exp)) if e_over else (CURRENCY_SYMBOL + "{:,.0f}".format(b_exp - exp_total)) }}
+                {{ ('-' + CURRENCY_SYMBOL + "{:,.0f}".format(exp_total - b_exp)) if e_over else (CURRENCY_SYMBOL + "{:,.0f}".format(b_exp - exp_total)) }}
               </td>
               <td>
                 <div class="d-flex align-items-center gap-2">
@@ -897,7 +897,7 @@
             <div class="fw-bold fs-5 text-warning">{{ co_submitted }}</div><div class="text-muted small">Pending</div>
           </div></div>
           <div class="col-3"><div class="card-panel text-center py-2">
-            <div class="fw-bold fs-5 text-teal">{{ currency_symbol }}{{ "{:,.0f}".format(co_approved_total) }}</div><div class="text-muted small">Approved $</div>
+            <div class="fw-bold fs-5 text-teal">{{ currency_symbol }}{{ "{:,.0f}".format(co_approved_total) }}</div><div class="text-muted small">Approved ₹</div>
           </div></div>
         </div>
         {% endif %}
@@ -1195,7 +1195,7 @@
               <input type="text" name="co_number" class="form-control" placeholder="e.g. CO-001" autocomplete="off" required>
             </div>
             <div class="col-md-4">
-              <label class="form-label fw-600">Amount ($) <span class="text-danger">*</span></label>
+              <label class="form-label fw-600">Amount (₹) <span class="text-danger">*</span></label>
               <input type="number" name="amount" class="form-control" step="0.01" min="0" placeholder="0.00" required>
             </div>
             <div class="col-md-3">
@@ -1295,7 +1295,7 @@
         <form id="editPaymentForm">
           <div class="mb-3">
             <div class="d-flex justify-content-between align-items-center mb-1">
-              <label class="form-label mb-0">Down Payment Amount ($)</label>
+              <label class="form-label mb-0">Down Payment Amount (₹)</label>
               <span class="badge status-not-started" id="downPaymentBadge" style="display:none;"></span>
             </div>
             <input type="number" id="editDownPaymentAmount" class="form-control" step="0.01" min="0"
@@ -1308,7 +1308,7 @@
           <div id="editRemainingStagesContainer"></div>
           <div class="alert alert-info small mt-3">
             <i class="bi bi-info-circle me-1"></i>
-            <strong>Total Plan:</strong> <span id="editPlanTotal">$0.00</span> / <span id="editContractValue">$0.00</span>
+            <strong>Total Plan:</strong> <span id="editPlanTotal">₹0.00</span> / <span id="editContractValue">₹0.00</span>
           </div>
         </form>
       </div>
@@ -1336,11 +1336,11 @@
           </div>
           <div class="row g-3">
             <div class="col-sm-6">
-              <label class="form-label">Original Amount ($)</label>
+              <label class="form-label">Original Amount (₹)</label>
               <input type="number" id="updateInvoicedOriginalAmount" class="form-control" disabled>
             </div>
             <div class="col-sm-6">
-              <label class="form-label">New Amount ($)</label>
+              <label class="form-label">New Amount (₹)</label>
               <input type="number" id="updateInvoicedNewAmount" class="form-control" step="0.01" min="0"
                      oninput="updateRedistributionPreview()">
             </div>
@@ -1375,16 +1375,16 @@
           </div>
           <div class="row g-3">
             <div class="col-sm-6">
-              <label class="form-label">Original Amount ($)</label>
+              <label class="form-label">Original Amount (₹)</label>
               <input type="number" id="updateStageOriginalAmount" class="form-control" disabled>
             </div>
             <div class="col-sm-6">
-              <label class="form-label">Already Paid ($)</label>
+              <label class="form-label">Already Paid (₹)</label>
               <input type="number" id="updateStagePaidAmount" class="form-control" disabled>
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">New Amount ($)</label>
+            <label class="form-label">New Amount (₹)</label>
             <input type="number" id="updateStageNewAmount" class="form-control" step="0.01" min="0"
                    oninput="updateRemainingForStage()">
             <small class="text-muted" id="updateStageRemainingDisplay"></small>
@@ -1758,9 +1758,9 @@ function updateRemainingForStage() {
 
   const remainingEl = document.getElementById('updateStageRemainingDisplay');
   if (diff > 0.01) {
-    remainingEl.innerHTML = `<span class="text-warning">?? Amount reduced by $${diff.toFixed(2)}</span>`;
+    remainingEl.innerHTML = `<span class="text-warning">?? Amount reduced by ₹${diff.toFixed(2)}</span>`;
   } else if (diff < -0.01) {
-    remainingEl.innerHTML = `<span class="text-danger">?? Amount increased by $${Math.abs(diff).toFixed(2)}</span>`;
+    remainingEl.innerHTML = `<span class="text-danger">?? Amount increased by ₹${Math.abs(diff).toFixed(2)}</span>`;
   } else {
     remainingEl.textContent = 'No change';
   }
@@ -1947,7 +1947,7 @@ function updateRedistributionPreview() {
 
   let preview = '';
   if (difference > 0.01) {
-    preview = `<div class="text-success">? Reducing by $${difference.toFixed(2)}</div>`;
+    preview = `<div class="text-success">? Reducing by ₹${difference.toFixed(2)}</div>`;
     preview += '<div class="text-muted small mt-2">This amount will be distributed equally among remaining non-invoiced stages:</div>';
 
     const uninvoicedStages = currentStages.filter((s, i) => i > idx && s.status === 'Pending Invoice');
@@ -1955,11 +1955,11 @@ function updateRedistributionPreview() {
       const perStage = difference / uninvoicedStages.length;
       uninvoicedStages.forEach(s => {
         const newStageAmount = (s.amount || 0) + perStage;
-        preview += `<div class="text-muted small">• ${s.name}: $${(s.amount || 0).toFixed(2)} → $${newStageAmount.toFixed(2)}</div>`;
+        preview += `<div class="text-muted small">• ${s.name}: ₹${(s.amount || 0).toFixed(2)} → ₹${newStageAmount.toFixed(2)}</div>`;
       });
     }
   } else if (difference < -0.01) {
-    preview = `<div class="text-danger">Increasing by $${Math.abs(difference).toFixed(2)}</div>`;
+    preview = `<div class="text-danger">Increasing by ₹${Math.abs(difference).toFixed(2)}</div>`;
     preview += '<div class="text-muted small mt-2">This amount will be subtracted equally from remaining non-invoiced stages.</div>';
   } else {
     preview = '<div class="text-secondary">No change</div>';
@@ -2065,7 +2065,7 @@ function showContractValuePermission(message, newContractValue, onApprove, onDen
           <div class="modal-body">
             <p class="text-muted mb-3">${message}</p>
             <div class="alert alert-warning alert-sm mb-0">
-              <strong>New Contract Value:</strong> $${newContractValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              <strong>New Contract Value:</strong> ₹${newContractValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
             </div>
           </div>
           <div class="modal-footer">
@@ -2814,7 +2814,7 @@ function toggleCommModal() {
       label.textContent = 'Percentage (%)';
       input.placeholder = 'e.g. 5';
     } else {
-      label.textContent = 'Amount ($)';
+      label.textContent = 'Amount (₹)';
       input.placeholder = 'e.g. 1500';
     }
   }

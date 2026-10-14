@@ -1019,7 +1019,7 @@ new Chart(ctx, {
         backgroundColor: '#0F172A',
         titleFont: { size: 12 },
         bodyFont: { size: 13, weight: '700' },
-        callbacks: { label: c => ' $' + c.parsed.y.toLocaleString() }
+        callbacks: { label: c => ' ' + CURRENCY_SYMBOL + c.parsed.y.toLocaleString() }
       }
     },
     scales: {

@@ -364,19 +364,19 @@
 
           {% set total_remaining = meta.get('total',0)|float - meta.get('amount_paid',0)|float - meta.get('tax_paid',0)|float %}
           <div class="mb-3">
-            <label class="form-label form-label-sm" style="color:#374151; font-weight:500;">Amount ($) <span class="text-danger">*</span></label>
+            <label class="form-label form-label-sm" style="color:#374151; font-weight:500;">Amount (₹) <span class="text-danger">*</span></label>
             <input type="number" name="amount" class="form-control form-control-sm" value="" min="0" step="0.01" id="invoiceAmountInput" data-max="{{ total_remaining }}" oninput="handlePaymentAmountChange()" onchange="handlePaymentAmountChange()" onblur="validatePaymentAmount()" {% if meta.get('status','Draft') == 'Paid' %}readonly{% endif %}>
             <div id="amountError" style="color:#DC2626; font-size:0.85rem; margin-top:4px; display:none;"></div>
             <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:0.8rem; color:#00695C;">
-              <span>Max: <strong>$<span id="displayMaxAmount">{{ "{:.2f}".format(total_remaining) }}</span></strong></span>
-              <span>Rem: <strong>$<span id="paymentRemaining">{{ "{:.2f}".format(total_remaining) }}</span></strong></span>
+              <span>Max: <strong>₹<span id="displayMaxAmount">{{ "{:.2f}".format(total_remaining) }}</span></strong></span>
+              <span>Rem: <strong>₹<span id="paymentRemaining">{{ "{:.2f}".format(total_remaining) }}</span></strong></span>
             </div>
           </div>
 
           {% if meta.get('tax_amount',0)|float > 0 %}
           {% set tax_remaining = meta.get('tax_amount',0)|float - (meta.get('tax_paid',0)|float) %}
           {% if tax_remaining > 0 %}
-          <div style="border-top:2px solid #86EFAC; margin-top:12px; padding-top:12px;"><div id="taxPaymentFields" style="display:none;"><div class="mb-3" style="background:#FEF3C7; border:1px solid #FCD34D; border-radius:6px; padding:10px;"><div style="font-size:0.75rem; color:#92400E;">Tax Remaining</div><div style="font-size:1.1rem; font-weight:700; color:#B45309;">$<span id="taxRemaining">{{ "{:.2f}".format(tax_remaining) }}</span></div></div><div class="mb-3"><label class="form-label form-label-sm" style="color:#374151; font-weight:500;">Tax Amount ($) <span class="text-danger">*</span></label><input type="number" name="tax_amount" class="form-control form-control-sm" id="taxAmountInput" value="" min="0" step="0.01" data-max="{{ tax_remaining }}" oninput="validateTaxAmountInput()" onchange="validateTaxAmountInput()"><div id="taxAmountError" style="color:#DC2626; font-size:0.85rem; margin-top:4px; display:none;"></div></div></div></div>
+          <div style="border-top:2px solid #86EFAC; margin-top:12px; padding-top:12px;"><div id="taxPaymentFields" style="display:none;"><div class="mb-3" style="background:#FEF3C7; border:1px solid #FCD34D; border-radius:6px; padding:10px;"><div style="font-size:0.75rem; color:#92400E;">Tax Remaining</div><div style="font-size:1.1rem; font-weight:700; color:#B45309;">₹<span id="taxRemaining">{{ "{:.2f}".format(tax_remaining) }}</span></div></div><div class="mb-3"><label class="form-label form-label-sm" style="color:#374151; font-weight:500;">Tax Amount (₹) <span class="text-danger">*</span></label><input type="number" name="tax_amount" class="form-control form-control-sm" id="taxAmountInput" value="" min="0" step="0.01" data-max="{{ tax_remaining }}" oninput="validateTaxAmountInput()" onchange="validateTaxAmountInput()"><div id="taxAmountError" style="color:#DC2626; font-size:0.85rem; margin-top:4px; display:none;"></div></div></div></div>
           {% endif %}
           {% endif %}
 
@@ -696,7 +696,7 @@ function validatePaymentAmount() {
 
   if (amount > maxAmount && maxAmount > 0) {
     errorDiv.style.display = 'block';
-    errorDiv.textContent = `Amount cannot exceed maximum of $${maxAmount.toFixed(2)}`;
+    errorDiv.textContent = `Amount cannot exceed maximum of ₹${maxAmount.toFixed(2)}`;
     amountInput.value = maxAmount.toFixed(2);
     return false;
   } else {
@@ -732,7 +732,7 @@ function updatePaymentTypeProject() {
     invoiceFields.style.display = 'block';
     invoiceAmountInput.dataset.max = remaining;
     invoiceAmountInput.max = remaining;
-    invoiceAmountInput.placeholder = `Max: $${remaining.toFixed(2)}`;
+    invoiceAmountInput.placeholder = `Max: ₹${remaining.toFixed(2)}`;
     invoiceAmountInput.value = '';
     invoiceAmountInput.dataset.projectNumber = projectNumber;
     validateAmountInput();
@@ -760,7 +760,7 @@ function updatePaymentTypeProject() {
     if (taxFields) taxFields.style.display = 'block';
     if (taxAmountInput) {
       taxAmountInput.dataset.max = remaining;
-      taxAmountInput.placeholder = `Max: $${remaining.toFixed(2)}`;
+      taxAmountInput.placeholder = `Max: ₹${remaining.toFixed(2)}`;
       taxAmountInput.value = '';
     }
   } else {
@@ -777,7 +777,7 @@ function validateTaxAmountInput() {
 
   if (amount > maxAmount) {
     taxInput.value = maxAmount.toFixed(2);
-    errorDiv.textContent = `Cannot add more than $${maxAmount.toFixed(2)}`;
+    errorDiv.textContent = `Cannot add more than ₹${maxAmount.toFixed(2)}`;
     errorDiv.style.display = 'block';
     taxInput.style.borderColor = '#DC2626';
     return false;
@@ -852,7 +852,7 @@ function requestPaymentDeletion(button) {
   const stageName = button.dataset.stageName || 'Payment';
   const invoiceNumber = '{{ meta.get("invoice_number", "") }}';
 
-  const paymentLabel = `${invoiceNumber} - Project ${projectNumber} - ${stageName} - $${parseFloat(amount).toFixed(2)}`;
+  const paymentLabel = `${invoiceNumber} - Project ${projectNumber} - ${stageName} - ₹${parseFloat(amount).toFixed(2)}`;
   const paymentAction = `Invoice payment history record for ${invoiceNumber}`;
 
   // Store payment deletion context
@@ -890,7 +890,7 @@ function deletePayment(type, ref) {
         if (data.permission_required && window._paymentToDelete) {
           // Show the delete request modal
           const invoiceNumber = '{{ meta.get("invoice_number", "") }}';
-          const paymentLabel = `${invoiceNumber} - Project ${window._paymentToDelete.projectNumber} - ${window._paymentToDelete.stageName} - $${parseFloat(window._paymentToDelete.amount).toFixed(2)}`;
+          const paymentLabel = `${invoiceNumber} - Project ${window._paymentToDelete.projectNumber} - ${window._paymentToDelete.stageName} - ₹${parseFloat(window._paymentToDelete.amount).toFixed(2)}`;
           const paymentAction = `Invoice payment history record for ${invoiceNumber}`;
           openDeleteRequestModal('payment', `{{ invoice.firebase_id }}_${type}_${ref}`, paymentLabel, paymentAction);
         } else {
@@ -995,7 +995,7 @@ function validateAmountInput() {
   // Validate
   if (maxAmount && amount > maxAmount) {
     amountInput.value = maxAmount.toFixed(2);
-    errorDiv.textContent = `Cannot add more than $${maxAmount.toFixed(2)}`;
+    errorDiv.textContent = `Cannot add more than ₹${maxAmount.toFixed(2)}`;
     errorDiv.style.display = 'block';
     amountInput.style.borderColor = '#DC2626';
     return false;

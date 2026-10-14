@@ -130,8 +130,7 @@
         <div class="card-body">
           <div class="text-muted small mb-2">TOTAL AMOUNT</div>
           <div class="h5 text-success">
-            ${{ "{:,.2f}".format(expense.amount or 0) }} USD
-            {% if expense.amount_bdt %} / ৳{{ "{:,.0f}".format(expense.amount_bdt) }} BDT{% endif %}
+            ₹{{ "{:,.2f}".format(expense.amount or 0) }}
           </div>
         </div>
       </div>
@@ -172,8 +171,7 @@
         <div class="card-body">
           <div class="text-muted small mb-2">TOTAL AMOUNT</div>
           <div class="h5 text-success">
-            ${{ "{:,.2f}".format(expense.amount or 0) }} USD
-            {% if expense.amount_bdt %} / ৳{{ "{:,.0f}".format(expense.amount_bdt) }} BDT{% endif %}
+            ₹{{ "{:,.2f}".format(expense.amount or 0) }}
           </div>
         </div>
       </div>
@@ -242,9 +240,9 @@
                 <ul style="margin: 8px 0; padding-left: 20px;">
                   {% for detail in expense.adjustment_payment_details %}
                     {% if detail.get and detail.project_number %}
-                      <li>{{ detail.project_number }} - ${{ "{:,.2f}".format(detail.amount or 0) }}</li>
+                      <li>{{ detail.project_number }} - ₹{{ "{:,.2f}".format(detail.amount or 0) }}</li>
                     {% elif detail.get('project_number') %}
-                      <li>{{ detail['project_number'] }} - ${{ "{:,.2f}".format(detail.get('amount', 0)) }}</li>
+                      <li>{{ detail['project_number'] }} - ₹{{ "{:,.2f}".format(detail.get('amount', 0)) }}</li>
                     {% endif %}
                   {% endfor %}
                 </ul>
@@ -260,9 +258,9 @@
                 <ul style="margin: 8px 0; padding-left: 20px;">
                   {% for detail in expense.commission_payment_details %}
                     {% if detail.get and detail.project_number %}
-                      <li>{{ detail.project_number }} - ${{ "{:,.2f}".format(detail.amount or 0) }}</li>
+                      <li>{{ detail.project_number }} - ₹{{ "{:,.2f}".format(detail.amount or 0) }}</li>
                     {% elif detail.get('project_number') %}
-                      <li>{{ detail['project_number'] }} - ${{ "{:,.2f}".format(detail.get('amount', 0)) }}</li>
+                      <li>{{ detail['project_number'] }} - ₹{{ "{:,.2f}".format(detail.get('amount', 0)) }}</li>
                     {% endif %}
                   {% endfor %}
                 </ul>
@@ -278,16 +276,6 @@
                 {{ expense.submitted_by_name }}
               {% elif expense.created_by %}
                 {{ expense.created_by.split('@')[0].replace('.', ' ').title() if '@' in expense.created_by else expense.created_by }}
-              {% else %}
-                —
-              {% endif %}
-            </div>
-          </div>
-          <div class="mb-3">
-            <strong>Exchange Rate (USD to BDT):</strong>
-            <div class="text-muted">
-              {% if expense.exchange_rate %}
-                1 USD = <strong style="color: #0d9488;">৳{{ "{:,.2f}".format(expense.exchange_rate) }}</strong> BDT
               {% else %}
                 —
               {% endif %}
@@ -338,7 +326,7 @@
               <th style="min-width:90px;">Date</th>
               <th style="min-width:120px;">Category</th>
               <th style="min-width:120px;">Expense Name</th>
-              <th style="text-align:right; min-width:100px;">Amount (USD)</th>
+              <th style="text-align:right; min-width:100px;">Amount (₹)</th>
               <th style="min-width:100px;">Description</th>
               <th style="text-align:left; min-width:100px;">Actions</th>
             </tr>
@@ -349,7 +337,7 @@
               <td style="font-size:12px; white-space:nowrap;">{{ child.date | format_date or '—' }}</td>
               <td style="font-size:12px;">{{ child.category or '—' }}</td>
               <td style="font-size:12px;">{{ child.expense_name or '—' }}</td>
-              <td style="font-size:12px; text-align:right;">${{ "{:,.2f}".format(child.amount or 0) }}</td>
+              <td style="font-size:12px; text-align:right;">₹{{ "{:,.2f}".format(child.amount or 0) }}</td>
               <td style="font-size:12px; color:#666;">{{ child.description or '—' }}</td>
               <td style="white-space:nowrap;">
                 <div style="display:flex; justify-content:flex-start; gap:4px; align-items:center;">
@@ -425,9 +413,9 @@
               </div>
             </div>
             <div class="col-md-6">
-              <label class="form-label form-label-sm fw-600">Amount (USD) *</label>
+              <label class="form-label form-label-sm fw-600">Amount (₹) *</label>
               <input type="number" name="amount" id="modalAmount" class="form-control form-control-sm" step="0.01" min="0" required oninput="updateModalBdtDisplay()">
-              <small class="form-text text-muted" id="modalBdtDisplay" style="color:#10b981;font-size:11px;margin-top:4px;">Conversion calculated with exchange rate</small>
+              <small class="form-text text-muted" id="modalBdtDisplay" style="color:#10b981;font-size:11px;margin-top:4px;"></small>
             </div>
           </div>
 
@@ -657,7 +645,7 @@
                 <!-- Total -->
                 <div style="text-align:right; padding:12px; background:#f0fdf4; border:1px solid #86efac; border-radius:4px;">
                   <div style="font-size:12px; color:#666; margin-bottom:6px; text-transform:uppercase; font-weight:600;">Total Expense</div>
-                  <div style="font-size:28px; font-weight:700; color:#0f766e;" id="groupTotalDisplay">$0.00 USD</div>
+                  <div style="font-size:28px; font-weight:700; color:#0f766e;" id="groupTotalDisplay">₹0.00</div>
                 </div>
               </div>
             </div>
@@ -703,7 +691,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label fw-600">Amount (USD) *</label>
+            <label class="form-label fw-600">Amount (₹) *</label>
             <input type="number" id="editItemAmount" class="form-control" step="0.01" min="0" placeholder="0.00" required>
           </div>
 
@@ -2102,7 +2090,7 @@ function openGroupEditModal(expense) {
               ${childExp.expense_name || '—'}
             </td>
             <td style="font-size:12px; text-align:right; padding:8px;">
-              $${parseFloat(childExp.amount || 0).toFixed(2)}
+              ₹${parseFloat(childExp.amount || 0).toFixed(2)}
             </td>
             <td style="font-size:12px; color:#666; padding:8px;">
               ${childExp.description || '—'}
@@ -2128,14 +2116,14 @@ function openGroupEditModal(expense) {
       expense.child_expenses.forEach((item) => {
         total += parseFloat(item.amount) || 0;
       });
-      document.getElementById('groupTotalDisplay').textContent = '$' + total.toFixed(2) + ' USD';
+      document.getElementById('groupTotalDisplay').textContent = '₹' + total.toFixed(2);
 
       // Show expense items section since there are child expenses
       document.getElementById('expenseItemsSection').style.display = 'block';
     } else {
       // Hide if no items
       document.getElementById('expenseItemsSection').style.display = 'none';
-      document.getElementById('groupTotalDisplay').textContent = '$0.00 USD';
+      document.getElementById('groupTotalDisplay').textContent = '₹0.00';
     }
 
     // Show group expense dialog
@@ -2190,7 +2178,7 @@ function addExpenseToGroupTable() {
       <td style="font-size:12px; white-space:nowrap; padding:8px;">${date}</td>
       <td style="font-size:12px; padding:8px;">${category}</td>
       <td style="font-size:12px; padding:8px;">${name}</td>
-      <td style="font-size:12px; text-align:right; padding:8px;">$${parseFloat(amount).toFixed(2)}</td>
+      <td style="font-size:12px; text-align:right; padding:8px;">₹${parseFloat(amount).toFixed(2)}</td>
       <td style="font-size:12px; color:#666; padding:8px;">${description || '—'}</td>
       <td style="width:18%; text-align:left; padding:8px; white-space:nowrap;">
         <div style="display:flex; justify-content:flex-start; gap:4px; align-items:center;">
@@ -2411,7 +2399,7 @@ function updateExistingItem(index) {
     <td style="font-size:12px; white-space:nowrap; padding:8px;">${date}</td>
     <td style="font-size:12px; padding:8px;">${category}</td>
     <td style="font-size:12px; padding:8px;">${name}</td>
-    <td style="font-size:12px; text-align:right; padding:8px;">$${parseFloat(amount).toFixed(2)}</td>
+    <td style="font-size:12px; text-align:right; padding:8px;">₹${parseFloat(amount).toFixed(2)}</td>
     <td style="font-size:12px; color:#666; padding:8px;">${description || '—'}</td>
     <td style="width:18%; text-align:left; padding:8px; white-space:nowrap;">
       <div style="display:flex; justify-content:flex-start; gap:4px; align-items:center;">
@@ -2452,7 +2440,7 @@ function updateGroupTotal() {
       total += item.amount || 0;
     });
   }
-  document.getElementById('groupTotalDisplay').textContent = '$' + total.toFixed(2) + ' USD';
+  document.getElementById('groupTotalDisplay').textContent = '₹' + total.toFixed(2);
 }
 
 function submitGroupExpenseModal() {
@@ -2603,7 +2591,7 @@ function handleEditExpense(expId) {
         document.getElementById('modalNotes').value = expense.notes || '';
         receiptFile = null;
 
-        // Update BDT display with the correct exchange rate
+        // Update INR display with the correct exchange rate
         updateModalBdtDisplay();
 
         console.log('Set modalVendor to:', document.getElementById('modalVendor').value);
@@ -3069,7 +3057,8 @@ function updateModalBdtDisplay() {
   const amount = parseFloat(document.getElementById('modalAmount').value) || 0;
   const exchangeRate = currentExchangeRate;
   const bdt = (amount * exchangeRate).toLocaleString('en-US', {maximumFractionDigits: 0});
-  document.getElementById('modalBdtDisplay').textContent = `≈ ৳${bdt} BDT @ ${exchangeRate}`;
+  // Amounts are entered in rupees now, so there is no conversion to show
+  document.getElementById('modalBdtDisplay').textContent = '';
 }
 
 function viewReceipt(expId) {

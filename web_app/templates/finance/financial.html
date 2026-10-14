@@ -952,6 +952,9 @@ a[href*="filter_expense"]:hover {
         <li><a class="dropdown-item" href="#" onclick="openAddGroupModal(); return false;">
           <i class="bi bi-folder-plus me-2"></i>Add Group Expenses
         </a></li>
+        <li><a class="dropdown-item" href="#" onclick="openBankImportModal(); return false;">
+          <i class="bi bi-bank me-2"></i>Import Bank Statement
+        </a></li>
       </ul>
     </div>
   </div>
@@ -1166,7 +1169,7 @@ a[href*="filter_expense"]:hover {
           </div>
         </div>
         <div class="col-md-6">
-          <label class="form-label form-label-sm fw-600">Amount (USD) *</label>
+          <label class="form-label form-label-sm fw-600">Amount (₹) *</label>
           <input type="number" name="amount" id="expenseAmount" class="form-control form-control-sm" step="0.01" min="0" required oninput="updateExpenseBdtDisplay()">
         </div>
       </div>
@@ -1490,7 +1493,7 @@ function updateExpenseSummaryCards() {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   expenseFilteredRows.forEach(row => {
-    const amount = parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,]/g,'') || 0);
+    const amount = parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,₹]/g,'') || 0);
     const dateCell = row.querySelector('td:first-child')?.textContent?.trim() || '';
     const expenseName = row.querySelector('td:nth-child(3)')?.textContent?.trim() || '';
 
@@ -1567,7 +1570,7 @@ function renderExpenseTable() {
   const currentPageRows = expenseFilteredRows.slice(start, end);
   currentPageRows.forEach(row => {
     row.style.display = '';
-    total += parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,]/g,'') || 0);
+    total += parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,₹]/g,'') || 0);
   });
 
   const alert = document.getElementById('expenseFilterAlert');
@@ -1580,8 +1583,8 @@ function renderExpenseTable() {
     const active = search || type || vendor || dateFrom || dateTo;
     alert.style.display = active ? '' : 'none';
     if (active) {
-      const grandTotal = expenseFilteredRows.reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,]/g,'') || 0), 0);
-      alert.textContent = `Showing ${expenseFilteredRows.length} of ${rows.length} entries — $${grandTotal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} total`;
+      const grandTotal = expenseFilteredRows.reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,₹]/g,'') || 0), 0);
+      alert.textContent = `Showing ${expenseFilteredRows.length} of ${rows.length} entries — ₹${grandTotal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} total`;
     }
   }
 
@@ -1802,7 +1805,7 @@ function resetExpenseSummaryCards() {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   allRows.forEach(row => {
-    const amount = parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,]/g,'') || 0);
+    const amount = parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,₹]/g,'') || 0);
     const dateCell = row.querySelector('td:first-child')?.textContent?.trim() || '';
     const expenseName = row.querySelector('td:nth-child(3)')?.textContent?.trim() || '';
 
@@ -1893,8 +1896,8 @@ function exportExpenseCSV() {
     function cellText(i) {
       return (cells[i] ? cells[i].textContent.trim().replace(/\s+/g,' ') : '').replace(/"/g,'""');
     }
-    // Amount: strip $ and commas for clean number
-    const amtRaw = cellText(6).replace(/[$,]/g,'');
+    // Amount: strip ₹/$ and commas for clean number
+    const amtRaw = cellText(6).replace(/[$,₹]/g,'');
     lines.push([
       '"'+cellText(0)+'"',
       '"'+cellText(1)+'"',
@@ -2136,7 +2139,7 @@ document.addEventListener('DOMContentLoaded', function() {
               </div>
             </div>
             <div class="col-md-6">
-              <label class="form-label form-label-sm fw-600">Amount (USD) *</label>
+              <label class="form-label form-label-sm fw-600">Amount (₹) *</label>
               <input type="number" name="amount" id="modalAmount" class="form-control form-control-sm" step="0.01" min="0" required oninput="updateModalBdtDisplay()" data-is-adjustment="false">
               <small class="text-muted d-none" id="amountReadOnlyHint">Amount is read-only for adjustments. Edit in Advance Adjustments to update.</small>
             </div>
@@ -2478,7 +2481,7 @@ function submitExpenseModal() {
                 <!-- Total -->
                 <div style="text-align:right; padding:12px; background:#f0fdf4; border:1px solid #86efac; border-radius:4px;">
                   <div style="font-size:12px; color:#666; margin-bottom:6px; text-transform:uppercase; font-weight:600;">Total Expense</div>
-                  <div style="font-size:28px; font-weight:700; color:#0f766e;" id="groupTotalDisplay">$0.00 USD</div>
+                  <div style="font-size:28px; font-weight:700; color:#0f766e;" id="groupTotalDisplay">₹0.00</div>
                 </div>
               </div>
             </div>
@@ -2525,7 +2528,7 @@ function submitExpenseModal() {
               <input type="text" id="commExpenseName" class="form-control form-control-sm">
             </div>
             <div class="col-md-6">
-              <label class="form-label form-label-sm fw-600">Amount ($) *</label>
+              <label class="form-label form-label-sm fw-600">Amount (₹) *</label>
               <input type="number" id="commExpenseAmount" class="form-control form-control-sm" step="0.01" disabled style="background-color: #f3f4f6; cursor: not-allowed;">
               <small class="text-muted d-block mt-1">Amount is locked. Edit commission rate in Commission tab.</small>
             </div>
@@ -2589,6 +2592,203 @@ function submitExpenseModal() {
     </div>
   </div>
 </div>
+
+<!-- Bank Statement Import Modal -->
+<div class="modal fade" id="bankImportModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-bank me-2"></i>Import Bank Statement</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="bankUploadStep">
+          <p class="small text-muted mb-2">
+            Upload a statement as CSV, Excel (.xlsx) or PDF. Every payment going out is listed for you to review.
+            Deposits are skipped. Nothing is saved until you click Import.
+          </p>
+          <div class="d-flex gap-2 align-items-center">
+            <input type="file" id="bankStatementFile" class="form-control form-control-sm" accept=".csv,.xlsx,.xlsm,.pdf,.txt">
+            <button type="button" class="btn btn-sm btn-teal text-nowrap" id="bankReadBtn" onclick="readBankStatement()">
+              <i class="bi bi-search me-1"></i>Read Statement
+            </button>
+          </div>
+          <div class="form-text">CSV and Excel are read directly and most reliably. PDFs are read by AI, so check the amounts.</div>
+        </div>
+        <div id="bankStatus" class="small mt-3"></div>
+        <div id="bankReviewStep" style="display:none;">
+          <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <div class="small" id="bankSummary"></div>
+            <div class="small fw-semibold" id="bankSelectedTotal"></div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" style="font-size:12px;">
+              <thead class="table-light">
+                <tr>
+                  <th><input type="checkbox" id="bankSelectAll" onchange="toggleAllBankRows(this.checked)"></th>
+                  <th>Date</th>
+                  <th style="min-width:180px;">Bank Description</th>
+                  <th class="text-end">Amount</th>
+                  <th style="min-width:160px;">Expense Name</th>
+                  <th style="min-width:160px;">Type</th>
+                  <th style="min-width:170px;">Category</th>
+                  <th style="min-width:130px;">Vendor</th>
+                </tr>
+              </thead>
+              <tbody id="bankRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm btn-primary" id="bankImportBtn" style="display:none;" onclick="importBankRows()">
+          <i class="bi bi-check-circle me-1"></i>Import Selected
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let bankRowsData = [];
+let bankCategoriesByType = {};
+
+function bankEsc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function bankMoney(n) {
+  return CURRENCY_SYMBOL + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function openBankImportModal() {
+  bankRowsData = [];
+  document.getElementById('bankStatementFile').value = '';
+  document.getElementById('bankStatus').innerHTML = '';
+  document.getElementById('bankReviewStep').style.display = 'none';
+  document.getElementById('bankImportBtn').style.display = 'none';
+  document.getElementById('bankUploadStep').style.display = '';
+  new bootstrap.Modal(document.getElementById('bankImportModal')).show();
+}
+
+function readBankStatement() {
+  const file = document.getElementById('bankStatementFile').files[0];
+  const status = document.getElementById('bankStatus');
+  if (!file) { status.innerHTML = '<span class="text-danger">Choose a statement file first.</span>'; return; }
+  const btn = document.getElementById('bankReadBtn');
+  btn.disabled = true;
+  status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Reading statement and suggesting categories. Large statements can take a minute...';
+  const fd = new FormData();
+  fd.append('statement', file);
+  fetch('/financial/bank-statement/parse', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+      btn.disabled = false;
+      if (res.error) { status.innerHTML = '<span class="text-danger">' + bankEsc(res.error) + '</span>'; return; }
+      bankRowsData = res.rows || [];
+      bankCategoriesByType = res.categories_by_type || {};
+      renderBankRows(res.expense_types || []);
+      const dupes = bankRowsData.filter(r => r.duplicate_of).length;
+      const unsure = bankRowsData.filter(r => r.direction_unknown).length;
+      let msg = '';
+      if (res.ai_note) msg += '<div class="text-warning">' + bankEsc(res.ai_note) + '</div>';
+      if (unsure) msg += '<div class="text-warning">' + unsure + ' row(s) didn\'t say whether money went in or out. Untick any deposits.</div>';
+      status.innerHTML = msg;
+      document.getElementById('bankSummary').innerHTML =
+        '<strong>' + bankRowsData.length + '</strong> payment(s) found' +
+        (res.credits_skipped ? ', ' + res.credits_skipped + ' deposit(s) skipped' : '') +
+        (dupes ? ', <span class="text-danger">' + dupes + ' look already recorded (unticked)</span>' : '');
+      document.getElementById('bankReviewStep').style.display = bankRowsData.length ? '' : 'none';
+      document.getElementById('bankImportBtn').style.display = bankRowsData.length ? '' : 'none';
+      if (!bankRowsData.length) status.innerHTML += '<div>No outgoing payments found in this file.</div>';
+      updateBankTotal();
+    })
+    .catch(err => {
+      btn.disabled = false;
+      status.innerHTML = '<span class="text-danger">Couldn\'t read the statement: ' + bankEsc(err.message) + '</span>';
+    });
+}
+
+function bankCategoryOptions(type, selected) {
+  const cats = bankCategoriesByType[type] || [];
+  const list = cats.includes(selected) || !selected ? cats : [selected].concat(cats);
+  return '<option value="">—</option>' + list.map(c =>
+    '<option' + (c === selected ? ' selected' : '') + '>' + bankEsc(c) + '</option>').join('');
+}
+
+function renderBankRows(types) {
+  document.getElementById('bankRows').innerHTML = bankRowsData.map((r, i) => {
+    const typeOpts = '<option value="">Select type…</option>' + types.map(t =>
+      '<option' + (t === r.expense_type ? ' selected' : '') + '>' + bankEsc(t) + '</option>').join('');
+    return '<tr' + (r.duplicate_of ? ' class="table-warning"' : '') + '>' +
+      '<td><input type="checkbox" class="bank-row-check" data-i="' + i + '"' + (r.duplicate_of ? '' : ' checked') + ' onchange="updateBankTotal()"></td>' +
+      '<td class="text-nowrap">' + bankEsc(r.date) + '</td>' +
+      '<td>' + bankEsc(r.description) +
+        (r.duplicate_of ? '<div class="text-danger" style="font-size:11px;">Possible duplicate of "' + bankEsc(r.duplicate_of) + '"</div>' : '') + '</td>' +
+      '<td class="text-end text-nowrap">' + bankMoney(r.amount) + '</td>' +
+      '<td><input type="text" class="form-control form-control-sm" data-i="' + i + '" data-f="expense_name" value="' + bankEsc(r.expense_name) + '" oninput="setBankField(this)"></td>' +
+      '<td><select class="form-select form-select-sm" data-i="' + i + '" data-f="expense_type" onchange="setBankField(this); refreshBankCategories(' + i + ')">' + typeOpts + '</select></td>' +
+      '<td><select class="form-select form-select-sm" id="bankCat' + i + '" data-i="' + i + '" data-f="category" onchange="setBankField(this)">' + bankCategoryOptions(r.expense_type, r.category) + '</select></td>' +
+      '<td><input type="text" class="form-control form-control-sm" data-i="' + i + '" data-f="vendor" value="' + bankEsc(r.vendor) + '" oninput="setBankField(this)"></td>' +
+      '</tr>';
+  }).join('');
+  document.getElementById('bankSelectAll').checked = bankRowsData.every(r => !r.duplicate_of);
+}
+
+function setBankField(el) {
+  bankRowsData[+el.dataset.i][el.dataset.f] = el.value;
+}
+
+function refreshBankCategories(i) {
+  const r = bankRowsData[i];
+  if (!(bankCategoriesByType[r.expense_type] || []).includes(r.category)) r.category = '';
+  document.getElementById('bankCat' + i).innerHTML = bankCategoryOptions(r.expense_type, r.category);
+}
+
+function toggleAllBankRows(on) {
+  document.querySelectorAll('.bank-row-check').forEach(cb => cb.checked = on);
+  updateBankTotal();
+}
+
+function selectedBankRows() {
+  return Array.from(document.querySelectorAll('.bank-row-check:checked')).map(cb => bankRowsData[+cb.dataset.i]);
+}
+
+function updateBankTotal() {
+  const sel = selectedBankRows();
+  const total = sel.reduce((s, r) => s + Number(r.amount || 0), 0);
+  document.getElementById('bankSelectedTotal').textContent = sel.length + ' selected · ' + bankMoney(total);
+}
+
+function importBankRows() {
+  const rows = selectedBankRows();
+  const status = document.getElementById('bankStatus');
+  if (!rows.length) { status.innerHTML = '<span class="text-danger">Tick at least one row to import.</span>'; return; }
+  const missing = rows.filter(r => !r.expense_type).length;
+  if (missing) { status.innerHTML = '<span class="text-danger">Pick an expense type for every ticked row (' + missing + ' missing).</span>'; return; }
+  const btn = document.getElementById('bankImportBtn');
+  btn.disabled = true;
+  status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving ' + rows.length + ' expense(s)...';
+  fetch('/financial/bank-statement/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rows: rows })
+  })
+    .then(r => r.json())
+    .then(res => {
+      btn.disabled = false;
+      if (!res.success) { status.innerHTML = '<span class="text-danger">' + bankEsc(res.error || 'Import failed') + '</span>'; return; }
+      status.innerHTML = '<span class="text-success">Imported ' + res.saved + ' expense(s).' +
+        (res.skipped ? ' ' + res.skipped + ' row(s) skipped.' : '') + ' Refreshing...</span>';
+      setTimeout(() => location.reload(), 900);
+    })
+    .catch(err => {
+      btn.disabled = false;
+      status.innerHTML = '<span class="text-danger">Import failed: ' + bankEsc(err.message) + '</span>';
+    });
+}
+</script>
 
 <!-- Receipt Viewer Modal -->
 <div class="modal fade" id="receiptModal" tabindex="-1">
@@ -2741,7 +2941,7 @@ function editGroupExpenseModal(expId, expData) {
               ${childExp.expense_name || '—'}
             </td>
             <td style="font-size:12px; text-align:right; padding:8px;">
-              $${parseFloat(childExp.amount || 0).toFixed(2)}
+              ₹${parseFloat(childExp.amount || 0).toFixed(2)}
             </td>
             <td style="font-size:12px; color:#666; padding:8px;">
               ${childExp.description || '—'}
@@ -2767,14 +2967,14 @@ function editGroupExpenseModal(expId, expData) {
       expData.child_expenses.forEach((item) => {
         total += item.amount || 0;
       });
-      document.getElementById('groupTotalDisplay').textContent = '$' + total.toFixed(2) + ' USD';
+      document.getElementById('groupTotalDisplay').textContent = '₹' + total.toFixed(2);
 
       // Show expense items section since there are child expenses
       document.getElementById('expenseItemsSection').style.display = 'block';
     } else {
       // Hide if no items
       document.getElementById('expenseItemsSection').style.display = 'none';
-      document.getElementById('groupTotalDisplay').textContent = '$0.00 USD';
+      document.getElementById('groupTotalDisplay').textContent = '₹0.00';
     }
 
     // Display group receipt if it exists
@@ -2841,7 +3041,7 @@ function editExpenseModal(expId, expData) {
     document.getElementById('modalNotes').value = expData.notes || '';
     receiptFile = null;
 
-    // Update BDT display with correct exchange rate
+    // Update INR display with correct exchange rate
     updateModalBdtDisplay();
 
     // For commissions and adjustments, disable amount field and show note
@@ -3290,7 +3490,7 @@ function openAddGroupModal() {
   window.expenseCounterInGroup = 0;
   window.groupItemData = {};
   document.getElementById('expensesTableBody').innerHTML = '';
-  document.getElementById('groupTotalDisplay').textContent = '$0.00 USD';
+  document.getElementById('groupTotalDisplay').textContent = '₹0.00';
   document.getElementById('groupReceiptPreview').innerHTML = '';
 
   // Set today's date for group expense date
@@ -3446,7 +3646,7 @@ function addExpenseToGroupTable() {
       <td style="white-space:nowrap; font-size:11px;">${formattedDate}</td>
       <td style="font-size:12px; padding:6px 8px;">${category}</td>
       <td style="font-size:12px; padding:6px 8px;">${itemName}</td>
-      <td style="text-align:right; font-size:11px;">$${amount.toFixed(2)}</td>
+      <td style="text-align:right; font-size:11px;">₹${amount.toFixed(2)}</td>
       <td style="font-size:10px; color:#666;">${descDisplay}</td>
       <td style="white-space:nowrap;">
         ${hasReceipt ? `<button type="button" class="btn btn-link p-0 me-2" onclick="viewItemReceipt(${index})" title="View Receipt" style="font-size:14px; color:#0ea5e9;"><i class="bi bi-paperclip"></i></button>` : ''}
@@ -3503,7 +3703,7 @@ function addExpenseToGroupTable() {
         <td style="white-space:nowrap; font-size:11px;">${formattedDate}</td>
         <td style="font-size:12px; padding:6px 8px;">${category}</td>
         <td style="font-size:12px; padding:6px 8px;">${itemName}</td>
-        <td style="text-align:right; font-size:11px;">$${amount.toFixed(2)}</td>
+        <td style="text-align:right; font-size:11px;">₹${amount.toFixed(2)}</td>
         <td style="font-size:10px; color:#666;">${descDisplay}</td>
         <td style="white-space:nowrap;">
           ${hasReceipt ? `<button type="button" class="btn btn-link p-0 me-2" onclick="viewItemReceipt(${index})" title="View Receipt" style="font-size:14px; color:#0ea5e9;"><i class="bi bi-paperclip"></i></button>` : ''}
@@ -3669,7 +3869,7 @@ function updateGroupTotal() {
       total += item.amount || 0;
     }
   }
-  document.getElementById('groupTotalDisplay').textContent = '$' + total.toFixed(2) + ' USD';
+  document.getElementById('groupTotalDisplay').textContent = '₹' + total.toFixed(2);
 }
 
 // View group receipt from server
@@ -5425,7 +5625,7 @@ function viewReceipt(expId) {
         </select>
         <div class="form-check form-switch mb-0 ms-1" style="font-size:12px;">
           <input class="form-check-input" type="checkbox" id="commHideZero" checked onchange="filterCommTable()">
-          <label class="form-check-label text-muted" for="commHideZero">Hide $0</label>
+          <label class="form-check-label text-muted" for="commHideZero">Hide ₹0</label>
         </div>
       </div>
     </div>
@@ -5720,7 +5920,7 @@ if (chartEl) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: c => ` ${c.dataset.label}: $${c.parsed.y.toLocaleString('en-US', {minimumFractionDigits:0})}`
+            label: c => ` ${c.dataset.label}: ₹${c.parsed.y.toLocaleString('en-US', {minimumFractionDigits:0})}`
           }
         }
       },
@@ -5762,7 +5962,7 @@ function donutChartOptions(isCurrency) {
           label: c => {
             const total = c.dataset.data.reduce((a, b) => a + b, 0);
             const pct = total > 0 ? Math.round(c.parsed / total * 100) : 0;
-            const val = isCurrency ? ' $' + c.parsed.toLocaleString('en-US') : ' ' + c.parsed;
+            const val = isCurrency ? ' ₹' + c.parsed.toLocaleString('en-US') : ' ' + c.parsed;
             return `  ${c.label}:${val}  (${pct}%)`;
           }
         }
@@ -5944,7 +6144,7 @@ document.getElementById('cashFlowBtn').addEventListener('click', async () => {
   // Populated by initArSummary and read by the click-to-drill-down handlers
   // below, which live on window since they're wired up via inline onclick.
   let currentArData = {};
-  let currentArCurrency = '$';
+  let currentArCurrency = '₹';
   let selectedArCategory = null;
 
   function initArSummary() {
@@ -6348,7 +6548,7 @@ document.getElementById('cashFlowBtn').addEventListener('click', async () => {
       }
       function numCell(i) {
         if (!cells[i]) return '0.00';
-        var t = cells[i].textContent.trim().replace(/[$,]/g,'').replace(/—/g,'0');
+        var t = cells[i].textContent.trim().replace(/[$,₹]/g,'').replace(/—/g,'0');
         return parseFloat(t||0).toFixed(2);
       }
       var idx = 0;
@@ -6477,7 +6677,7 @@ function exportAgingCSV() {
       return (cells[i] ? cells[i].textContent.trim().replace(/\s+/g,' ') : '').replace(/"/g,'""');
     }
     var bucket = BUCKET_LABELS[row.getAttribute('data-bucket')] || row.getAttribute('data-bucket') || '';
-    var balanceRaw = cellText(6).replace(/[$,]/g,'');
+    var balanceRaw = cellText(6).replace(/[$,₹]/g,'');
     lines.push([
       '"'+bucket+'"',
       '"'+cellText(0)+'"',  // Invoice
@@ -6636,13 +6836,13 @@ function backfillCommissions(btn) {
     if (footerCells.length >= 5) {
       // Footer structure: [label(colspan=5), commission, adjusted, paid, remaining, action]
       // Commission value cell (index 1)
-      footerCells[1].textContent = '$' + format(totalCommission);
+      footerCells[1].textContent = '₹' + format(totalCommission);
       // Adjusted value cell (index 2)
-      footerCells[2].textContent = '$' + format(totalAdjusted);
+      footerCells[2].textContent = '₹' + format(totalAdjusted);
       // Paid Commission value cell (index 3)
-      footerCells[3].textContent = '$' + format(totalPaid);
+      footerCells[3].textContent = '₹' + format(totalPaid);
       // Remaining Due value cell (index 4)
-      footerCells[4].textContent = '$' + format(totalRemaining);
+      footerCells[4].textContent = '₹' + format(totalRemaining);
     }
   }
 
@@ -6677,19 +6877,19 @@ function backfillCommissions(btn) {
     if (cardPanels.length >= 4) {
       // First card: Total Earned
       var earnedDiv = cardPanels[0].querySelector('div[style*="font-size:1.6rem"]');
-      if (earnedDiv) earnedDiv.textContent = '$' + format(totalEarned);
+      if (earnedDiv) earnedDiv.textContent = '₹' + format(totalEarned);
 
       // Second card: Total Adjusted
       var adjustedDiv = cardPanels[1].querySelector('div[style*="font-size:1.6rem"]');
-      if (adjustedDiv) adjustedDiv.textContent = '$' + format(totalAdjusted);
+      if (adjustedDiv) adjustedDiv.textContent = '₹' + format(totalAdjusted);
 
       // Third card: Total Paid
       var paidDiv = cardPanels[2].querySelector('div[style*="font-size:1.6rem"]');
-      if (paidDiv) paidDiv.textContent = '$' + format(totalPaid);
+      if (paidDiv) paidDiv.textContent = '₹' + format(totalPaid);
 
       // Fourth card: Outstanding
       var outstandingDiv = cardPanels[3].querySelector('div[style*="font-size:1.6rem"]');
-      if (outstandingDiv) outstandingDiv.textContent = '$' + format(Math.max(0, totalOutstanding));
+      if (outstandingDiv) outstandingDiv.textContent = '₹' + format(Math.max(0, totalOutstanding));
     }
   }
 
@@ -6749,7 +6949,7 @@ function commRateTypeChange(pid) {
     inp.classList.add('d-none');
   } else {
     inp.classList.remove('d-none');
-    inp.placeholder = sel.value === 'percent' ? '%' : '$';
+    inp.placeholder = sel.value === 'percent' ? '%' : '₹';
   }
 }
 function commRateSave(pid) {
@@ -6779,7 +6979,7 @@ function commRateSave(pid) {
       // Update commission amount cell
       var amtCell = document.getElementById('amountCell-' + pid);
       if (amtCell) {
-        var sym = amtCell.textContent.trim().replace(/[\d,\.]/g,'')[0] || '$';
+        var sym = amtCell.textContent.trim().replace(/[\d,\.]/g,'')[0] || '₹';
         amtCell.textContent = sym + parseFloat(data.commission_amount).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
       }
       // Update data- attrs on row
@@ -6858,7 +7058,7 @@ function confirmMarkPaidDate() {
   .catch(() => { alert('Network error.'); if (saveBtn) saveBtn.disabled = false; });
 }
 
-// Display BDT equivalent for expense form
+// Display INR equivalent for expense form
 function updateExpenseBdtDisplay() {
   const amountInput = document.getElementById('expenseAmount');
   const bdtDisplay = document.getElementById('expenseBdtDisplay');
@@ -6867,15 +7067,15 @@ function updateExpenseBdtDisplay() {
   if (amountInput && amountInput.value) {
     const usdAmount = parseFloat(amountInput.value) || 0;
     const bdtAmount = (usdAmount * exchangeRate).toFixed(2);
-    bdtDisplay.textContent = `৳${bdtAmount.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} BDT`;
+    bdtDisplay.textContent = `₹${bdtAmount.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} INR`;
   } else {
     bdtDisplay.textContent = '';
   }
 }
 
-// Display BDT equivalent for modal edit form (disabled - BDT display removed from UI)
+// Display INR equivalent for modal edit form (disabled - INR display removed from UI)
 function updateModalBdtDisplay() {
-  // BDT display element removed from modal, function kept for compatibility
+  // INR display element removed from modal, function kept for compatibility
 }
 
 // Make expense rows clickable to open details page
@@ -6923,7 +7123,7 @@ function loadExpenseGroups() {
             <td>—</td>
             <td>—</td>
             <td>—</td>
-            <td style="text-align:right;"><strong>$${parseFloat(group.total_amount || 0).toFixed(2)}</strong></td>
+            <td style="text-align:right;"><strong>₹${parseFloat(group.total_amount || 0).toFixed(2)}</strong></td>
             <td style="text-align:center;"><span class="badge bg-info">${group.expense_count || 0} items</span></td>
             <td>—</td>
             <td>—</td>

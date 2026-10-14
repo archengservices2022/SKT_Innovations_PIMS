@@ -876,25 +876,9 @@
           {% if profile_user.get('monthly_salary') %}
           <div class="comp-card green">
             <div class="text-muted small fw-semibold mb-1">Monthly Salary</div>
-            {% if profile_user.get('region') == 'Outside America' %}
-            <div class="fw-800" style="font-size:22px;color:#15803D;">
-              ৳{{ "{:,.0f}".format((profile_user.monthly_salary|float) * (bdt_exchange_rate or 110)) }}<span class="text-muted fw-normal" style="font-size:13px;"> BDT/mo</span>
-            </div>
-            {% if user_role == 'admin' %}
-            <div class="text-muted" style="font-size:12px;margin-top:2px;">
-              — {{ currency_symbol }}{{ "{:,.0f}".format(profile_user.monthly_salary|float) }} USD/mo
-            </div>
-            {% endif %}
-            {% else %}
             <div class="fw-800" style="font-size:22px;color:#15803D;">
               {{ currency_symbol }}{{ "{:,.0f}".format(profile_user.monthly_salary|float) }}<span class="text-muted fw-normal" style="font-size:13px;">/mo</span>
             </div>
-            {% if user_role == 'admin' %}
-            <div class="text-muted" style="font-size:12px;margin-top:2px;">
-              — ৳{{ "{:,.0f}".format((profile_user.monthly_salary|float) * (bdt_exchange_rate or 110)) }} BDT/mo
-            </div>
-            {% endif %}
-            {% endif %}
           </div>
           {% endif %}
         </div>
@@ -1791,11 +1775,7 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
           <td class="text-end" style="font-size:12px;">
             {% if u.get('hourly_rate') %}<div class="fw-500">{{ currency_symbol }}{{ '%.2f'|format(u.hourly_rate|float) }}/hr</div>{% endif %}
             {% if u.get('monthly_salary') %}
-            {% if u.get('region') == 'Outside America' %}
-            <div class="text-success">৳{{ '{:,.0f}'.format((u.monthly_salary|float) * (bdt_exchange_rate or 110)) }} BDT/mo</div>
-            {% else %}
             <div class="text-success">{{ currency_symbol }}{{ '{:,.0f}'.format(u.monthly_salary|float) }}/mo</div>
-            {% endif %}
             {% endif %}
             {% if not u.get('hourly_rate') and not u.get('monthly_salary') %}<span class="text-muted">—</span>{% endif %}
           </td>
@@ -1976,7 +1956,7 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
               <input type="date" name="hire_date" id="empEditHireDate" class="form-control form-control-sm">
             </div>
             <div class="col-sm-6">
-              <label class="form-label small fw-semibold">Hourly Rate ($)</label>
+              <label class="form-label small fw-semibold">Hourly Rate (₹)</label>
               <input type="number" step="0.01" min="0" name="hourly_rate" id="empEditRate" class="form-control form-control-sm" placeholder="0.00">
             </div>
           </div>
@@ -2041,20 +2021,12 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
             {% else %}?{% endif %}
           </td>
           <td><span class="badge badge-role-{{ u.role or 'admin' }}">{{ (u.role or 'admin')|capitalize }}</span></td>
-          <td class="text-end fw-500">{{ ('$%.2f/hr' % u.hourly_rate) if u.hourly_rate else '—' }}</td>
+          <td class="text-end fw-500">{{ (currency_symbol ~ '%.2f/hr' % u.hourly_rate) if u.hourly_rate else '—' }}</td>
           <td class="text-end">
             {% if u.monthly_salary %}
-            {% if u.get('region') == 'Outside America' %}
-            <span class="badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;font-size:11px;"
-                  title="? {{ currency_symbol }}{{ '{:,.0f}'.format(u.monthly_salary|float) }} USD">
-              ?{{ '{:,.0f}'.format((u.monthly_salary|float) * (bdt_exchange_rate or 110)) }} BDT/mo
-            </span>
-            {% else %}
-            <span class="badge" style="background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;font-size:11px;"
-                  title="? ?{{ '{:,.0f}'.format((u.monthly_salary|float) * (bdt_exchange_rate or 110)) }} BDT">
+            <span class="badge" style="background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;font-size:11px;">
               {{ currency_symbol }}{{ '{:,.0f}'.format(u.monthly_salary|float) }}/mo
             </span>
-            {% endif %}
             {% else %}?{% endif %}
           </td>
           <td class="text-muted small">{{ u.email or '—' }}</td>
@@ -2103,11 +2075,11 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
             </select>
           </div>
           <div class="mb-2">
-            <label class="form-label fw-semibold" style="font-size:12px;">Hourly Rate ($)</label>
+            <label class="form-label fw-semibold" style="font-size:12px;">Hourly Rate (₹)</label>
             <input type="number" id="dirEditRate" class="form-control form-control-sm" min="0" step="0.01">
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold" style="font-size:12px;">Monthly Salary ($)</label>
+            <label class="form-label fw-semibold" style="font-size:12px;">Monthly Salary (₹)</label>
             <input type="number" id="dirEditSalary" class="form-control form-control-sm" min="0" step="0.01">
           </div>
           <div id="dirEditMsg" style="font-size:12px;"></div>
@@ -2182,12 +2154,9 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
           </div>
 
           <div class="mb-2">
-            <label class="form-label small fw-semibold">Amount (USD) <span class="text-danger">*</span></label>
+            <label class="form-label small fw-semibold">Amount (₹) <span class="text-danger">*</span></label>
             <input type="number" name="amount" id="empAmountUsd" class="form-control form-control-sm"
                    step="0.01" min="0.01" placeholder="0.00" required oninput="empConvertAmountToBdt()">
-            <div class="mt-1" style="font-size:12px;color:#64748b;">
-              ≈ <span style="font-weight:700;color:#10b981;" id="empBdtConversion">৳0.00</span> BDT (at ৳<span id="empExchangeRateDisplay">{{ bdt_exchange_rate or 110 }}</span> per $1)
-            </div>
             <input type="hidden" name="amount_taka" id="empAmountTaka">
           </div>
 
@@ -2284,8 +2253,6 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
               </td>
               <td class="text-end">
                 <div class="fw-semibold" style="font-size:14px;">{{ currency_symbol }}{{ "{:,.2f}".format(e.get('amount',0)|float) }}</div>
-                {% set rate = e|get_exchange_rate %}
-                <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format((e.get('amount',0)|float) * rate) }}</div>
               </td>
               <td class="text-muted small">{{ e.get('project_number','—') or '—' }}</td>
               <td class="text-muted small" style="min-width:125px;">{{ e.get('created_at','—') | format_date }}</td>
@@ -2427,8 +2394,6 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
           <td class="text-muted small">{{ e.get('vendor','—') }}</td>
           <td class="text-end">
             <div class="fw-semibold" style="font-size:14px;color:#10b981;">{{ currency_symbol }}{{ "{:,.2f}".format(e.get('amount',0)|float) }}</div>
-            {% set rate = e|get_exchange_rate %}
-            <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format((e.get('amount',0)|float) * rate) }}</div>
           </td>
           <td class="text-center">
             {% if e.get('receipt_filename') or e.get('has_receipt') %}
@@ -2543,8 +2508,6 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
           </td>
           <td class="text-end">
             <div class="fw-semibold" style="font-size:14px;color:#0D9488;">{{ currency_symbol }}{{ "{:,.2f}".format(e.get('amount',0)|float) }}</div>
-            {% set rate = e|get_exchange_rate %}
-            <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format((e.get('amount',0)|float) * rate) }}</div>
           </td>
           <td class="text-muted small">{{ e.get('project_number','—') or '—' }}</td>
           <td class="text-muted small" style="min-width:140px;">{{ e.get('created_at','—') | format_date }}</td>
@@ -2695,12 +2658,12 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
             </select>
           </div>
           <div class="mb-2">
-            <label class="form-label fw-semibold" style="font-size:12px;">Amount Claimed (USD)</label>
+            <label class="form-label fw-semibold" style="font-size:12px;">Amount Claimed (₹)</label>
             <input type="number" name="amount_claimed" id="medClaimAmtUsd" class="form-control form-control-sm"
                    min="0.01" max="5000" step="0.01" placeholder="0.00" required oninput="updateMedBdtHint()">
             <input type="hidden" name="amount_currency" value="USD">
             <div class="form-text" id="medBdtHint" style="color:#10b981;font-size:11px;"></div>
-            <div class="form-text text-muted" style="font-size:11px;">Maximum claim: $5,000 USD</div>
+            <div class="form-text text-muted" style="font-size:11px;">Maximum claim: ₹5,000</div>
           </div>
           <div class="mb-2">
             <label class="form-label fw-semibold" style="font-size:12px;">Provider / Hospital</label>
@@ -2766,16 +2729,14 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
               <td class="text-muted small">{{ c.get('description') or '—' }}</td>
               <td class="text-muted small" style="min-width:80px;">{{ c.get('receipt_ref') or '—' }}</td>
               <td class="text-end fw-semibold">
-                {# All entries now in USD format #}
-                <div>${{ '{:,.2f}'.format(c.amount_claimed|float) }}</div>
-                <div class="text-muted" style="font-size:11px;">৳{{ '{:,.0f}'.format((c.amount_claimed|float) * (c.get('exchange_rate', 120)|float)) }}</div>
+                {# Amounts are in rupees #}
+                <div>{{ currency_symbol }}{{ '{:,.2f}'.format(c.amount_claimed|float) }}</div>
               </td>
               <td class="text-end text-success fw-semibold">
                 {% set _amt_appr = c.get('amount_approved') %}
                 {% if _amt_appr is not none and _amt_appr != '' %}
-                  {# All entries now in USD format #}
-                  <div>${{ '{:,.2f}'.format(_amt_appr|float) }}</div>
-                  <div class="text-muted" style="font-size:11px;">৳{{ '{:,.0f}'.format((_amt_appr|float) * (c.get('exchange_rate', 120)|float)) }}</div>
+                  {# Amounts are in rupees #}
+                  <div>{{ currency_symbol }}{{ '{:,.2f}'.format(_amt_appr|float) }}</div>
                 {% else %}—{% endif %}
               </td>
               <td>
@@ -2848,7 +2809,7 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
             <thead style="background:#f8fafc;">
               <tr>
                 <th>Submitted On</th><th>Employee</th><th style="white-space:nowrap;">Expense Date</th><th>Type</th><th>Provider</th><th>Description</th><th>Ref #</th>
-                <th class="text-end">Claimed ($USD)</th><th class="text-end">Approved ($USD)</th><th>Status</th><th>Receipt</th><th>Actions</th>
+                <th class="text-end">Claimed (₹)</th><th class="text-end">Approved (₹)</th><th>Status</th><th>Receipt</th><th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -2862,15 +2823,13 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
               <td class="text-muted small">{{ c.get('description') or '—' }}</td>
               <td class="text-muted small">{{ c.get('receipt_ref') or '—' }}</td>
               <td class="text-end fw-semibold">
-                {# All entries now in USD format #}
-                <div>${{ '%.2f'|format(c.amount_claimed|float) }}</div>
-                <div class="text-muted" style="font-size:11px;">৳{{ '%.0f'|format((c.amount_claimed|float) * (c.get('exchange_rate', 120)|float)) }}</div>
+                {# Amounts are in rupees #}
+                <div>{{ currency_symbol }}{{ '%.2f'|format(c.amount_claimed|float) }}</div>
               </td>
               <td class="text-end fw-semibold">
                 {% if c.status == 'Approved' and c.get('amount_approved') %}
-                  {# All entries now in USD format #}
-                  <div>${{ '%.2f'|format(c.amount_approved|float) }}</div>
-                  <div class="text-muted" style="font-size:11px;">৳{{ '%.0f'|format((c.amount_approved|float) * (c.get('exchange_rate', 120)|float)) }}</div>
+                  {# Amounts are in rupees #}
+                  <div>{{ currency_symbol }}{{ '%.2f'|format(c.amount_approved|float) }}</div>
                 {% else %}—{% endif %}
               </td>
               <td>
@@ -2905,7 +2864,7 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
                 {% if c.status == 'Approved' and c.get('firebase_id') %}
                 <button class="btn btn-xs btn-outline-secondary"
                         onclick="openMedAmtEdit('{{ c.firebase_id }}','{{ c.employee_name }}','{{ c.amount_claimed }}','{{ c.get("amount_approved","") }}','{{ c.get("exchange_rate", 120) }}')"
-                        title="Correct USD amount"><i class="bi bi-pencil"></i></button>
+                        title="Correct amount"><i class="bi bi-pencil"></i></button>
                 {% endif %}
                 {% endif %}
               </td>
@@ -2955,9 +2914,9 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
           <input type="hidden" name="action" id="medReviewAction">
           <div class="mb-2" id="medApprovedRow">
             <div class="alert alert-info py-2 mb-2" style="font-size:12px;" id="medBdtInfo"></div>
-            <label class="form-label fw-semibold" style="font-size:12px;">Amount to Approve ($USD)</label>
+            <label class="form-label fw-semibold" style="font-size:12px;">Amount to Approve (₹)</label>
             <div class="input-group input-group-sm">
-              <span class="input-group-text">$</span>
+              <span class="input-group-text">₹</span>
               <input type="number" name="amount_approved" id="medApprovedAmt"
                      class="form-control form-control-sm" min="0" step="0.01" placeholder="0.00">
             </div>
@@ -2991,9 +2950,9 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
         <div class="modal-body py-2">
           <div class="alert alert-info py-2 mb-2" style="font-size:12px;" id="medAmtEditInfo"></div>
           <div class="mb-2">
-            <label class="form-label fw-semibold" style="font-size:12px;">Corrected Amount ($USD)</label>
+            <label class="form-label fw-semibold" style="font-size:12px;">Corrected Amount (₹)</label>
             <div class="input-group input-group-sm">
-              <span class="input-group-text">$</span>
+              <span class="input-group-text">₹</span>
               <input type="number" name="amount_approved_usd" id="medAmtEditUsd"
                      class="form-control form-control-sm" min="0" step="0.01" placeholder="0.00" required>
             </div>
@@ -3592,7 +3551,7 @@ window.empConvertAmountToBdt = function() {
   const bdt = usd * exchangeRate;
 
   bdtHidden.value = bdt.toFixed(2);
-  bdtDisplay.textContent = '৳' + bdt.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  bdtDisplay.textContent = '₹' + bdt.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
 // Keep old function for backward compatibility
@@ -3738,14 +3697,9 @@ document.addEventListener('DOMContentLoaded', function() {
 const _BDT_RATE = {{ bdt_exchange_rate or 110 }};
 
 function updateMedBdtHint() {
-  const usd = parseFloat(document.getElementById('medClaimAmtUsd').value) || 0;
+  // Amounts are entered in rupees, so there is nothing to convert
   const hint = document.getElementById('medBdtHint');
-  if (usd > 0) {
-    const bdt = (usd * _BDT_RATE).toFixed(2);
-    hint.textContent = '≈ ৳' + bdt.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' BDT (at ৳' + _BDT_RATE + ' per $1)';
-  } else {
-    hint.textContent = '';
-  }
+  if (hint) hint.textContent = '';
 }
 
 // Keep old function for backward compatibility
@@ -3766,12 +3720,9 @@ window.openMedReview = function(claimId, empName, amtClaimed, action) {
   if (action === 'approve') {
     approvedRow.style.display = '';
     const usdAmt = parseFloat(amtClaimed) || 0;
-    const bdtAmt = usdAmt * _BDT_RATE;
     document.getElementById('medBdtInfo').innerHTML =
-      '<strong>Claimed:</strong> $' + usdAmt.toFixed(2) + ' USD' +
-      ' &nbsp;≈&nbsp; <strong>৳' + bdtAmt.toLocaleString() + ' BDT</strong>';
-    document.getElementById('medRateNote').textContent =
-      'Exchange rate: ৳' + _BDT_RATE + ' = $1 USD. Adjust if needed.';
+      '<strong>Claimed:</strong> ' + CURRENCY_SYMBOL + usdAmt.toFixed(2);
+    document.getElementById('medRateNote').textContent = '';
     document.getElementById('medApprovedAmt').value = usdAmt.toFixed(2);
     submitBtn.className = 'btn btn-sm btn-success';
     submitBtn.textContent = 'Approve';
@@ -3795,14 +3746,10 @@ window.openMedAmtEdit = function(claimId, empName, amtClaimed, amtApproved, exch
   form.action = '/employees/medical-claims/' + claimId + '/update-amount';
   document.getElementById('medAmtEditTitle').textContent = 'Correct Amount — ' + empName;
   const usdAmt = parseFloat(amtClaimed) || 0;
-  const rate = parseFloat(exchangeRate) || 120;
-  const bdtAmt = usdAmt * rate;
   document.getElementById('medAmtEditInfo').innerHTML =
-    '<strong>Claimed:</strong> $' + usdAmt.toFixed(2) + ' USD' +
-    ' &nbsp;≈&nbsp; <strong>৳' + bdtAmt.toLocaleString() + ' BDT</strong>' +
-    (amtApproved ? '<br><strong>Currently stored:</strong> $' + parseFloat(amtApproved).toFixed(2) + ' USD' : '');
-  document.getElementById('medAmtEditRate').innerHTML =
-    'Exchange Rate: 1 USD = <strong>৳' + rate.toFixed(0) + '</strong>';
+    '<strong>Claimed:</strong> ' + CURRENCY_SYMBOL + usdAmt.toFixed(2) +
+    (amtApproved ? '<br><strong>Currently stored:</strong> ' + CURRENCY_SYMBOL + parseFloat(amtApproved).toFixed(2) : '');
+  document.getElementById('medAmtEditRate').innerHTML = '';
   document.getElementById('medAmtEditUsd').value =
     amtApproved ? parseFloat(amtApproved).toFixed(2) : usdAmt.toFixed(2);
   new bootstrap.Modal(document.getElementById('medAmtEditModal')).show();
