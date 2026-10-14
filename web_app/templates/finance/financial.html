@@ -2738,7 +2738,6 @@ function renderBankRows(types) {
 
 function setBankField(el) {
   bankRowsData[+el.dataset.i][el.dataset.f] = el.value;
-  if (el.dataset.f === 'expense_type' && el.value) el.closest('tr').classList.remove('table-danger');
 }
 
 function refreshBankCategories(i) {
@@ -2766,20 +2765,6 @@ function importBankRows() {
   const rows = selectedBankRows();
   const status = document.getElementById('bankStatus');
   if (!rows.length) { status.innerHTML = '<span class="text-danger">Tick at least one row to import.</span>'; return; }
-  let firstMissing = null;
-  document.querySelectorAll('.bank-row-check').forEach(cb => {
-    const tr = cb.closest('tr');
-    const isMissing = cb.checked && !bankRowsData[+cb.dataset.i].expense_type;
-    tr.classList.toggle('table-danger', isMissing);
-    if (isMissing && !firstMissing) firstMissing = tr;
-  });
-  if (firstMissing) {
-    const missing = rows.filter(r => !r.expense_type).length;
-    status.innerHTML = '<span class="text-danger">' + missing + ' ticked row(s) highlighted in red have no expense type. ' +
-      'Pick a type for each, or untick them, then click Import Selected again.</span>';
-    firstMissing.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
   const btn = document.getElementById('bankImportBtn');
   btn.disabled = true;
   status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving ' + rows.length + ' expense(s)...';

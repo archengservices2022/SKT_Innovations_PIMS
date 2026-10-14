@@ -24977,6 +24977,17 @@ def _rule_based_suggestions(rows, categories_by_type):
                 if cat in type_of and pattern.search(desc):
                     r["category"], r["expense_type"] = cat, type_of[cat]
                     break
+        if not r.get("expense_type"):
+            r["expense_type"], r["category"] = _fallback_expense_type(categories_by_type)
+
+
+def _fallback_expense_type(categories_by_type):
+    """(type, category) for a payment nobody could classify, so it can still be imported and fixed later."""
+    if "Unexpected Costs" in (categories_by_type.get("Other Expenses") or []):
+        return "Other Expenses", "Unexpected Costs"
+    for t, cats in categories_by_type.items():
+        return t, (cats[0] if isinstance(cats, list) and cats else "")
+    return _DEFAULT_EXPENSE_TYPES[-1], ""
 
 
 def _statement_rows_from_pdf(raw: bytes, expense_types, categories_by_type):
@@ -25072,14 +25083,17 @@ def bank_statement_import():
     rows = (request.get_json(silent=True) or {}).get("rows") or []
     exchange_rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 110)) or 110
     now = datetime.now(timezone.utc).isoformat()
+    fallback_type, fallback_cat = _fallback_expense_type(_expense_type_options()[1])
     saved, skipped = 0, []
     for r in rows[:1000]:
         if not isinstance(r, dict):
             continue
+        if not r.get("expense_type"):
+            r["expense_type"], r["category"] = fallback_type, fallback_cat
         amount = round(_safe_float(r.get("amount")), 2)
         date = str(r.get("date") or "")
         description = str(r.get("description") or "").strip()
-        if amount <= 0 or not re.match(r"^\d{4}-\d{2}-\d{2}$", date) or not r.get("expense_type"):
+        if amount <= 0 or not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
             skipped.append(description or date)
             continue
         data = {
