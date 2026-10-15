@@ -24990,6 +24990,128 @@ def _fallback_expense_type(categories_by_type):
     return _DEFAULT_EXPENSE_TYPES[-1], ""
 
 
+_PDF_TXN_LINE = re.compile(
+    r"^\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}[-/ ][A-Za-z]{3}[-/ ,]+\d{2,4}|\d{4}-\d{2}-\d{2})\s+(.*)$")
+_PDF_MONEY = re.compile(r"(?<![\d,.])(\d[\d,]*\.\d{2})(?:\s*(CR|DR)\b)?", re.I)
+_PDF_SKIP_LINE = re.compile(r"\b(page|total|statement|generated|summary|balance|period|account|customer|"
+                            r"branch|ifsc|address|signature|abbreviation|nominee|narration|particulars|"
+                            r"withdrawals?|deposits?|chq|value dt|value date)\b", re.I)
+_CREDIT_HINT = re.compile(r"\b(NEFT CR|RTGS CR|IMPS CR|BY TRANSFER|BY CLG|DEPOSIT|INT\.? ?PD|INTEREST|REFUND|"
+                          r"REVERSAL|SALARY CR|CASH DEP)\b", re.I)
+
+
+def _open_statement_pdf(raw: bytes, password: str = ""):
+    """Open a PDF statement, unlocking it with `password` if the bank protected it."""
+    import io as _io
+    if not PYPDF_AVAILABLE:
+        raise ValueError("PDF reading isn't installed on the server (pypdf). Upload Excel or CSV instead.")
+    try:
+        reader = _PdfReader(_io.BytesIO(raw))
+    except Exception:
+        raise ValueError("This file couldn't be opened as a PDF.")
+    if reader.is_encrypted:
+        try:
+            ok = reader.decrypt(password or "")
+        except Exception as e:
+            raise ValueError(f"Couldn't unlock this PDF ({e}).")
+        if not ok:
+            raise ValueError("This PDF is password-protected. Enter the PDF password (the one your bank gave you "
+                             "for statements) and click Read Statement again." if not password else
+                             "That PDF password is wrong. Check it and try again.")
+    return reader
+
+
+def _statement_rows_from_pdf_text(reader):
+    """Read transactions from a text-based (downloaded, not scanned) PDF statement without AI.
+
+    Each transaction line starts with a date and ends with the amount and running balance; whether
+    money went out is worked out from how the balance moved. Returns (rows, credits) - both empty
+    when the PDF has no readable transaction lines (e.g. a scan)."""
+    entries, opening = [], None
+    for page in reader.pages:
+        try:
+            text = page.extract_text(extraction_mode="layout") or ""
+        except Exception:
+            text = page.extract_text() or ""
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            m = _PDF_TXN_LINE.match(line)
+            money = list(_PDF_MONEY.finditer(line))
+            if not m:
+                if opening is None and money and re.search(r"opening\s+balance|balance\s+b/?f|brought forward", line, re.I):
+                    opening = _pdf_money_value(money[-1])
+                # A wrapped description continues on the next line with words only
+                elif entries and not money and not _PDF_SKIP_LINE.search(line) and len(line.strip()) < 90 \
+                        and not entries[-1]["closed"]:
+                    entries[-1]["description"] += " " + line.strip()
+                elif entries:
+                    entries[-1]["closed"] = True
+                continue
+            if not money:
+                continue
+            rest = m.group(2)
+            desc = _PDF_MONEY.sub(" ", rest)
+            desc = re.sub(r"^\s*\d{1,2}[-/ ][A-Za-z]{3}[-/ ,]+\d{2,4}\b", " ", desc)  # value date like 13 Apr 2026
+            desc = re.sub(r"(?<!\S)(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{8,})(?!\S)", " ", desc)  # value date, ref no.
+            amt_tok = money[-2] if len(money) >= 2 else money[0]
+            entries.append({
+                "date_raw": m.group(1),
+                "description": " ".join(desc.split()),
+                "amount": float(amt_tok.group(1).replace(",", "")),
+                "mark": (amt_tok.group(2) or "").upper(),
+                "balance": _pdf_money_value(money[-1]) if len(money) >= 2 else None,
+                "closed": False,
+            })
+    if not entries:
+        return [], 0
+
+    # Indian banks write 03/04/2026 for 3 April; switch only if a date proves month-first
+    day_first = True
+    for e in entries:
+        if d := re.match(r"^(\d{1,2})[-/.](\d{1,2})[-/.]", e["date_raw"]):
+            if int(d[1]) > 12:
+                break
+            if int(d[2]) > 12:
+                day_first = False
+                break
+    for e in entries:
+        e["date"] = _parse_statement_date(e["date_raw"], day_first)
+    dated = [e for e in entries if e["date"]]
+    if len(dated) > 1 and dated[0]["date"] > dated[-1]["date"]:
+        entries.reverse()  # newest-first statements: walk the balance in date order
+        opening = None
+
+    rows, credits, prev = [], 0, opening
+    for e in entries:
+        bal, amount = e["balance"], e["amount"]
+        unknown = False
+        if e["mark"] in ("DR", "CR"):
+            direction = "debit" if e["mark"] == "DR" else "credit"
+        elif prev is not None and bal is not None and abs(bal - prev) > 0.005:
+            direction = "debit" if bal < prev else "credit"
+        elif _CREDIT_HINT.search(e["description"]):
+            direction = "credit"
+        else:
+            direction, unknown = "debit", True
+        if bal is not None:
+            prev = bal
+        if not e["date"] or not amount:
+            continue
+        if direction == "credit":
+            credits += 1
+            continue
+        rows.append({"date": e["date"], "description": e["description"], "amount": round(amount, 2),
+                     "direction_unknown": unknown})
+    return rows, credits
+
+
+def _pdf_money_value(match) -> float:
+    """Signed value of a money token; a 'DR' after a balance means the account is overdrawn."""
+    value = float(match.group(1).replace(",", ""))
+    return -value if (match.group(2) or "").upper() == "DR" else value
+
+
 def _statement_rows_from_pdf(raw: bytes, expense_types, categories_by_type):
     """Have Claude read every transaction in a PDF statement; keeps only money going out."""
     txn = _suggestion_schema(expense_types, categories_by_type, {
@@ -25038,10 +25160,22 @@ def bank_statement_parse():
     expense_types, categories_by_type = _expense_type_options()
     ai_note = ""
     try:
+        needs_suggestions = True
         if f.filename.lower().endswith(".pdf"):
-            rows, credits = _statement_rows_from_pdf(raw, expense_types, categories_by_type)
+            reader = _open_statement_pdf(raw, request.form.get("pdf_password", ""))
+            rows, credits = _statement_rows_from_pdf_text(reader)
+            if not rows and not credits:
+                # No text lines to read (usually a scanned statement): only AI can read it
+                try:
+                    rows, credits = _statement_rows_from_pdf(raw, expense_types, categories_by_type)
+                    needs_suggestions = False
+                except RuntimeError as e:
+                    raise ValueError("Couldn't find any transactions in this PDF. It may be a scanned image, which "
+                                     "needs AI to read, and AI isn't available right now: " + str(e) +
+                                     " Download the statement as Excel or CSV from your bank instead.")
         else:
             rows, credits = _statement_rows_from_table(_read_statement_table(f.filename, raw))
+        if needs_suggestions:
             if rows:
                 try:
                     _suggest_expense_fields(rows, expense_types, categories_by_type)
@@ -25050,7 +25184,7 @@ def bank_statement_parse():
                     reason = str(e) if isinstance(e, RuntimeError) else "the AI service had an error"
                     ai_note = (f"AI suggestions unavailable: {reason} Categories were guessed from the bank "
                                f"description instead. Check them and fill in any blanks before importing.")
-                _rule_based_suggestions(rows, categories_by_type)
+        _rule_based_suggestions(rows, categories_by_type)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except RuntimeError as e:

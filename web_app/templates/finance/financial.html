@@ -2608,12 +2608,17 @@ function submitExpenseModal() {
             Deposits are skipped. Nothing is saved until you click Import.
           </p>
           <div class="d-flex gap-2 align-items-center">
-            <input type="file" id="bankStatementFile" class="form-control form-control-sm" accept=".csv,.xlsx,.xlsm,.pdf,.txt">
+            <input type="file" id="bankStatementFile" class="form-control form-control-sm" accept=".csv,.xlsx,.xlsm,.pdf,.txt"
+                   onchange="document.getElementById('bankPdfPasswordWrap').style.display = /\.pdf$/i.test(this.value) ? '' : 'none'">
             <button type="button" class="btn btn-sm btn-teal text-nowrap" id="bankReadBtn" onclick="readBankStatement()">
               <i class="bi bi-search me-1"></i>Read Statement
             </button>
           </div>
-          <div class="form-text">CSV and Excel are read directly and most reliably. PDFs are read by AI, so check the amounts.</div>
+          <div id="bankPdfPasswordWrap" class="mt-2" style="display:none;max-width:360px;">
+            <input type="password" id="bankPdfPassword" class="form-control form-control-sm" autocomplete="off"
+                   placeholder="PDF password (only if your bank locked the PDF)">
+          </div>
+          <div class="form-text">CSV, Excel and PDFs downloaded from net banking are all read directly. Scanned PDFs need AI credit.</div>
         </div>
         <div id="bankStatus" class="small mt-3"></div>
         <div id="bankReviewStep" style="display:none;">
@@ -2665,6 +2670,8 @@ function bankMoney(n) {
 function openBankImportModal() {
   bankRowsData = [];
   document.getElementById('bankStatementFile').value = '';
+  document.getElementById('bankPdfPassword').value = '';
+  document.getElementById('bankPdfPasswordWrap').style.display = 'none';
   document.getElementById('bankStatus').innerHTML = '';
   document.getElementById('bankReviewStep').style.display = 'none';
   document.getElementById('bankImportBtn').style.display = 'none';
@@ -2681,6 +2688,7 @@ function readBankStatement() {
   status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Reading statement and suggesting categories. Large statements can take a minute...';
   const fd = new FormData();
   fd.append('statement', file);
+  fd.append('pdf_password', document.getElementById('bankPdfPassword').value);
   fetch('/financial/bank-statement/parse', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(res => {
