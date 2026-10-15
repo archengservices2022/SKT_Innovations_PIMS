@@ -24932,16 +24932,16 @@ _CATEGORY_RULES = [
     ("Bank Charges", r"CHARGES?|CHRG|CHGS?|ANNUAL FEE|PENALTY|MIN BAL|AMC FEE|STAMP DUTY"),
     ("Tax Expenses/Tax Deductions", r"GST PAYMENT|CBIC|GSTN|TDS|INCOME TAX|ADVANCE TAX|PROFESSIONAL TAX"),
     ("Salary/Bonuses", r"SALARY|SAL CR|BONUS|PAYROLL|WAGES"),
-    ("Professional Services", r"CA|ASSOCIATES|CONSULT\w*|LEGAL|ADVOCATE|AUDIT\w*|CHARTERED"),
+    ("Professional Services", r"CA FIRM|ASSOCIATES|CONSULT\w*|LEGAL|ADVOCATE|AUDIT\w*|CHARTERED"),
     ("Insurance & Compliance", r"LIC|INSURANCE|PREMIUM|POLICY"),
     ("Facilities & Utilities", r"RENT|ELECTRICITY|APSPDCL|APEPDCL|APCPDCL|TSSPDCL|TSNPDCL|BESCOM|POWER|WATER|"
                                r"BROADBAND|FIBERNET|INTERNET|JIO|AIRTEL|BSNL|VI POSTPAID|HP GAS|INDANE|BHARAT GAS|"
-                               r"CYLINDER|MAINTENANCE|HOUSEKEEPING|CLEANING"),
+                               r"CYLINDER|MAINTENANCE|HOUSEKEEPING|CLEANING|UTILIT\w*|SPECTRUM|COMCAST|XFINITY|VERIZON|T-MOBILE"),
     ("Engineering Software & IT", r"AUTODESK|MICROSOFT|GOOGLE|ADOBE|AWS|AMAZON WEB|ZOOM|SOFTWARE|GODADDY|HOSTINGER|"
-                                  r"BENTLEY|BLUEBEAM|SUBSCRIPTION|DROPBOX|CANVA|OPENAI"),
+                                  r"BENTLEY|BLUEBEAM|SUBSCRIPTION|DROPBOX|CANVA|OPENAI|ANTHROPIC|CLAUDE|CHATGPT|GITHUB"),
     ("Travel, Site Visits & Vehicles", r"IRCTC|OLA|UBER|RAPIDO|FUEL|PETROL|DIESEL|INDIAN OIL|IOCL|HPCL|BPCL|FASTAG|"
-                                       r"TOLL|MAKEMYTRIP|GOIBIBO|INDIGO|AIR INDIA|REDBUS|SITE VISIT|TRAVEL|PARKING"),
-    ("Meals & Entertainment", r"SWIGGY|ZOMATO|RESTAURANT|HOTEL|CAFE|LUNCH|DINNER|BREAKFAST|FOOD|DOMINOS|KFC"),
+                                       r"TOLL|MAKEMYTRIP|GOIBIBO|INDIGO|AIR INDIA|REDBUS|SITE VISIT|TRAVEL|PARKING|AMTRAK|AUTOMOTIVE|CAR WASH|LYFT"),
+    ("Meals & Entertainment", r"SWIGGY|ZOMATO|RESTAURANTS?|HOTEL|CAFE|LUNCH|DINNER|BREAKFAST|FOOD|DOMINOS|KFC|PANERA|STARBUCKS"),
     ("Computer & Office Equipment", r"CROMA|RELIANCE DIGITAL|VIJAY SALES|PRINTER|LAPTOP|COMPUTER|MONITOR|DELL|LENOVO"),
     ("Safety & Field Supplies", r"HARDWARE|TOOLS|SAFETY|HELMET|PPE"),
     ("Medical/Benefits", r"HOSPITAL|PHARMACY|APOLLO|MEDPLUS|MEDICAL|CLINIC|DIAGNOSTIC"),
@@ -24991,13 +24991,20 @@ def _fallback_expense_type(categories_by_type):
 
 
 _PDF_TXN_LINE = re.compile(
-    r"^\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}[-/ ][A-Za-z]{3}[-/ ,]+\d{2,4}|\d{4}-\d{2}-\d{2})\s+(.*)$")
-_PDF_MONEY = re.compile(r"(?<![\d,.])(\d[\d,]*\.\d{2})(?:\s*(CR|DR)\b)?", re.I)
+    r"^\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}[-/ ][A-Za-z]{3}[-/ ,]+\d{2,4}|\d{4}-\d{2}-\d{2}"
+    r"|\d{1,2}[-/]\d{1,2}(?![-/.\d]))\s+(.*)$")
+_PDF_MONEY = re.compile(r"(?<![\w.,])(?P<sign>[-+])?\s?(?P<cur>\$|₹|Rs\.?\s?|INR\s?|USD\s?)?"
+                        r"(?P<num>\d[\d,]*\.\d{2})(?!\d)(?:\s*(?P<mark>CR|DR)\b)?", re.I)
+_PDF_FULL_DATE = re.compile(r"(?<![\d/])(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?!\d)")
 _PDF_SKIP_LINE = re.compile(r"\b(page|total|statement|generated|summary|balance|period|account|customer|"
                             r"branch|ifsc|address|signature|abbreviation|nominee|narration|particulars|"
-                            r"withdrawals?|deposits?|chq|value dt|value date)\b", re.I)
+                            r"withdrawals?|deposits?|chq|value dt|value date|date|amount|merchant|trans|"
+                            r"purchases|payments and credits|continued)\b", re.I)
+_PDF_NOISE = re.compile(r"\b(?:APPLE|GOOGLE|SAMSUNG) PAY ENDING IN \d+\b|(?<!\S)(?=\S*\d)[A-Z0-9]{6,}(?!\S)", re.I)
 _CREDIT_HINT = re.compile(r"\b(NEFT CR|RTGS CR|IMPS CR|BY TRANSFER|BY CLG|DEPOSIT|INT\.? ?PD|INTEREST|REFUND|"
                           r"REVERSAL|SALARY CR|CASH DEP)\b", re.I)
+_CARD_STATEMENT = re.compile(r"credit card|card ending|card number|card no\b|minimum (payment|amount) due|"
+                             r"payment due date|total amount due", re.I)
 
 
 def _open_statement_pdf(raw: bytes, password: str = ""):
@@ -25021,95 +25028,136 @@ def _open_statement_pdf(raw: bytes, password: str = ""):
     return reader
 
 
-def _statement_rows_from_pdf_text(reader):
-    """Read transactions from a text-based (downloaded, not scanned) PDF statement without AI.
+def _pdf_money(match) -> dict:
+    """A money token as {value (signed), size, sign, mark, cur}; 'DR' after a balance means overdrawn."""
+    size = float(match["num"].replace(",", ""))
+    sign, mark = match["sign"] or "", (match["mark"] or "").upper()
+    cur = (match["cur"] or "").strip().upper().rstrip(".")
+    return {"size": size, "value": -size if sign == "-" or mark == "DR" else size,
+            "sign": sign, "mark": mark, "cur": cur}
 
-    Each transaction line starts with a date and ends with the amount and running balance; whether
-    money went out is worked out from how the balance moved. Returns (rows, credits) - both empty
-    when the PDF has no readable transaction lines (e.g. a scan)."""
-    entries, opening = [], None
+
+def _statement_rows_from_pdf_text(reader):
+    """Read transactions from a text-based (downloaded, not scanned) PDF bank or card statement, without AI.
+
+    Each transaction line starts with a date and has its amount after the description. Bank statements
+    with a running balance are read by how the balance moves; card statements and others by the sign or
+    Cr/Dr mark on the amount. Returns (rows, credits, currency) - rows and credits are empty when the PDF
+    has no readable transaction lines (e.g. a scan); currency is "USD", "INR" or ""."""
+    entries, opening, full_text = [], None, []
     for page in reader.pages:
         try:
             text = page.extract_text(extraction_mode="layout") or ""
         except Exception:
             text = page.extract_text() or ""
+        full_text.append(text)
         for line in text.splitlines():
             if not line.strip():
                 continue
             m = _PDF_TXN_LINE.match(line)
             money = list(_PDF_MONEY.finditer(line))
-            if not m:
-                if opening is None and money and re.search(r"opening\s+balance|balance\s+b/?f|brought forward", line, re.I):
-                    opening = _pdf_money_value(money[-1])
+            if not m or not money:
+                if not m and opening is None and money and \
+                        re.search(r"opening\s+balance|balance\s+b/?f|brought forward", line, re.I):
+                    opening = _pdf_money(money[-1])["value"]
                 # A wrapped description continues on the next line with words only
-                elif entries and not money and not _PDF_SKIP_LINE.search(line) and len(line.strip()) < 90 \
-                        and not entries[-1]["closed"]:
-                    entries[-1]["description"] += " " + line.strip()
+                elif not m and entries and not money and not _PDF_SKIP_LINE.search(line) \
+                        and len(line.strip()) < 90 and not entries[-1]["closed"]:
+                    extra = " ".join(_PDF_NOISE.sub(" ", line).split())
+                    if extra:
+                        entries[-1]["description"] += " " + extra
                 elif entries:
                     entries[-1]["closed"] = True
                 continue
-            if not money:
-                continue
             rest = m.group(2)
-            desc = _PDF_MONEY.sub(" ", rest)
+            # The description is what comes before the first amount; text after the amounts is often a side panel
+            first = _PDF_MONEY.search(rest)
+            desc = rest[:first.start()] if first else rest
             desc = re.sub(r"^\s*\d{1,2}[-/ ][A-Za-z]{3}[-/ ,]+\d{2,4}\b", " ", desc)  # value date like 13 Apr 2026
             desc = re.sub(r"(?<!\S)(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{8,})(?!\S)", " ", desc)  # value date, ref no.
-            amt_tok = money[-2] if len(money) >= 2 else money[0]
-            entries.append({
-                "date_raw": m.group(1),
-                "description": " ".join(desc.split()),
-                "amount": float(amt_tok.group(1).replace(",", "")),
-                "mark": (amt_tok.group(2) or "").upper(),
-                "balance": _pdf_money_value(money[-1]) if len(money) >= 2 else None,
-                "closed": False,
-            })
+            entries.append({"date_raw": m.group(1), "description": " ".join(desc.split()),
+                            "money": [_pdf_money(x) for x in money], "closed": False})
     if not entries:
-        return [], 0
+        return [], 0, ""
+    doc_text = "\n".join(full_text)
 
     # Indian banks write 03/04/2026 for 3 April; switch only if a date proves month-first
     day_first = True
     for e in entries:
-        if d := re.match(r"^(\d{1,2})[-/.](\d{1,2})[-/.]", e["date_raw"]):
+        if d := re.match(r"^(\d{1,2})[-/.](\d{1,2})", e["date_raw"]):
             if int(d[1]) > 12:
                 break
             if int(d[2]) > 12:
                 day_first = False
                 break
+
+    # Card statements often print dates without a year: take it from the latest full date on the statement
+    latest = None
+    for a, b, y in _PDF_FULL_DATE.findall(doc_text):
+        d, mo = (int(a), int(b)) if day_first else (int(b), int(a))
+        if 1 <= mo <= 12 and 1 <= d <= 31 and 1990 < int(y) < 2100:
+            latest = max(latest or (0, 0), (int(y), mo))
     for e in entries:
-        e["date"] = _parse_statement_date(e["date_raw"], day_first)
+        raw_date = e["date_raw"]
+        if (yl := re.fullmatch(r"(\d{1,2})[-/](\d{1,2})", raw_date)) and latest:
+            d, mo = (int(yl[1]), int(yl[2])) if day_first else (int(yl[2]), int(yl[1]))
+            year = latest[0] - 1 if mo > latest[1] else latest[0]
+            try:
+                e["date"] = datetime(year, mo, d).strftime("%Y-%m-%d")
+            except ValueError:
+                e["date"] = ""
+        else:
+            e["date"] = _parse_statement_date(raw_date, day_first)
     dated = [e for e in entries if e["date"]]
     if len(dated) > 1 and dated[0]["date"] > dated[-1]["date"]:
         entries.reverse()  # newest-first statements: walk the balance in date order
         opening = None
 
+    # Use the running balance only if it really is one: most balance moves must equal the amount
+    checks = matches = 0
+    prev = opening
+    for e in entries:
+        if len(e["money"]) >= 2:
+            amt, bal = e["money"][-2]["size"], e["money"][-1]["value"]
+            if prev is not None:
+                checks += 1
+                matches += abs(abs(bal - prev) - amt) < 0.011
+            prev = bal
+    balance_mode = matches >= 1 and matches >= 0.6 * checks
+    is_card = bool(_CARD_STATEMENT.search(doc_text))
+    any_negative = any(e["money"][0]["sign"] == "-" for e in entries)
+
     rows, credits, prev = [], 0, opening
     for e in entries:
-        bal, amount = e["balance"], e["amount"]
+        tok = e["money"][-2] if balance_mode and len(e["money"]) >= 2 else e["money"][0]
+        bal = e["money"][-1]["value"] if balance_mode and len(e["money"]) >= 2 else None
         unknown = False
-        if e["mark"] in ("DR", "CR"):
-            direction = "debit" if e["mark"] == "DR" else "credit"
-        elif prev is not None and bal is not None and abs(bal - prev) > 0.005:
+        if tok["mark"] in ("DR", "CR"):
+            direction = "debit" if tok["mark"] == "DR" else "credit"
+        elif balance_mode and prev is not None and bal is not None and abs(bal - prev) > 0.005:
             direction = "debit" if bal < prev else "credit"
-        elif _CREDIT_HINT.search(e["description"]):
+        elif tok["sign"] == "-":
+            # On a card statement a minus is a payment or refund; on a bank statement it's money out
+            direction = "credit" if is_card else "debit"
+        elif is_card:
+            direction = "debit"
+        elif _CREDIT_HINT.search(e["description"]) or (any_negative and not balance_mode):
             direction = "credit"
         else:
             direction, unknown = "debit", True
         if bal is not None:
             prev = bal
-        if not e["date"] or not amount:
+        if not e["date"] or not tok["size"]:
             continue
         if direction == "credit":
             credits += 1
             continue
-        rows.append({"date": e["date"], "description": e["description"], "amount": round(amount, 2),
+        rows.append({"date": e["date"], "description": e["description"], "amount": round(tok["size"], 2),
                      "direction_unknown": unknown})
-    return rows, credits
 
-
-def _pdf_money_value(match) -> float:
-    """Signed value of a money token; a 'DR' after a balance means the account is overdrawn."""
-    value = float(match.group(1).replace(",", ""))
-    return -value if (match.group(2) or "").upper() == "DR" else value
+    curs = {x["cur"] for e in entries for x in e["money"] if x["cur"]}
+    currency = "USD" if curs & {"$", "USD"} else ("INR" if curs else "")
+    return rows, credits, currency
 
 
 def _statement_rows_from_pdf(raw: bytes, expense_types, categories_by_type):
@@ -25158,12 +25206,12 @@ def bank_statement_parse():
         return jsonify({"error": "No file uploaded"}), 400
     raw = f.read()
     expense_types, categories_by_type = _expense_type_options()
-    ai_note = ""
+    notes = []
     try:
-        needs_suggestions = True
+        needs_suggestions, currency = True, ""
         if f.filename.lower().endswith(".pdf"):
             reader = _open_statement_pdf(raw, request.form.get("pdf_password", ""))
-            rows, credits = _statement_rows_from_pdf_text(reader)
+            rows, credits, currency = _statement_rows_from_pdf_text(reader)
             if not rows and not credits:
                 # No text lines to read (usually a scanned statement): only AI can read it
                 try:
@@ -25175,6 +25223,14 @@ def bank_statement_parse():
                                      " Download the statement as Excel or CSV from your bank instead.")
         else:
             rows, credits = _statement_rows_from_table(_read_statement_table(f.filename, raw))
+        if currency == "USD":
+            # The books are kept in rupees: convert at the rate set in Settings, keeping the dollar figure
+            rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 0)) or 110
+            for r in rows:
+                r["original_amount"], r["original_currency"] = r["amount"], "USD"
+                r["amount"] = round(r["amount"] * rate, 2)
+            notes.append(f"This statement is in US dollars. Amounts were converted at {CURRENCY_SYMBOL}{rate:g} "
+                         f"per $1 (Settings → Company → INR Exchange Rate); the $ amount is kept in each expense's notes.")
         if needs_suggestions:
             if rows:
                 try:
@@ -25182,8 +25238,8 @@ def bank_statement_parse():
                 except Exception as e:
                     log.warning(f"Bank statement categorisation failed: {e}")
                     reason = str(e) if isinstance(e, RuntimeError) else "the AI service had an error"
-                    ai_note = (f"AI suggestions unavailable: {reason} Categories were guessed from the bank "
-                               f"description instead. Check them and fill in any blanks before importing.")
+                    notes.append(f"AI suggestions unavailable: {reason} Categories were guessed from the bank "
+                                 f"description instead. Check them and fill in any blanks before importing.")
         _rule_based_suggestions(rows, categories_by_type)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -25206,7 +25262,7 @@ def bank_statement_parse():
         for k in ("expense_type", "category", "vendor"):
             r.setdefault(k, "")
 
-    return jsonify({"rows": rows, "credits_skipped": credits, "ai_note": ai_note,
+    return jsonify({"rows": rows, "credits_skipped": credits, "ai_note": " ".join(notes),
                     "expense_types": expense_types, "categories_by_type": categories_by_type})
 
 
@@ -25241,7 +25297,9 @@ def bank_statement_import():
             "date":              date,
             "vendor":            str(r.get("vendor", "")).strip(),
             "project_number":    "",
-            "notes":             f"Imported from bank statement: {description}",
+            "notes":             f"Imported from bank statement: {description}" + (
+                f" (original US${_safe_float(r.get('original_amount')):,.2f})"
+                if r.get("original_currency") == "USD" else ""),
             "created_by":        session.get("user_email", ""),
             "submitted_by_name": session.get("user_name", ""),
             "submitted_by_uid":  session.get("user_uid", ""),
