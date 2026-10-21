@@ -1029,16 +1029,11 @@ a[href*="filter_expense"]:hover {
                   <button type="button" class="btn btn-xs btn-outline-secondary" data-exp-id="{{ exp.firebase_id }}" onclick="handleEditExpense('{{ exp.firebase_id }}')" title="Edit">
                   <i class="bi bi-pencil"></i>
                 </button>
-                {% if exp.get('receipt_filename') or exp.get('has_receipt') %}
-                <button type="button" class="btn btn-xs btn-outline-primary" onclick="viewReceipt('{{ exp.firebase_id }}')" title="View Receipt">
+                {% if exp.get('receipt_filename') or exp.get('has_receipt') or exp.get('has_statement_file') %}
+                <button type="button" class="btn btn-xs btn-outline-primary" onclick="viewReceipt('{{ exp.firebase_id }}')"
+                        title="View Receipt{{ ': ' ~ (exp.get('receipt_filename') or exp.get('import_file')) if (exp.get('receipt_filename') or exp.get('import_file')) }}">
                   <i class="bi bi-paperclip"></i>
                 </button>
-                {% endif %}
-                {% if exp.get('has_statement_file') and exp.get('import_batch') %}
-                <a class="btn btn-xs btn-outline-info" href="/financial/bank-statement/file/{{ exp.import_batch }}" target="_blank"
-                   rel="noopener" title="View bank statement{{ ': ' ~ exp.import_file if exp.get('import_file') }}">
-                  <i class="bi bi-bank"></i>
-                </a>
                 {% endif %}
                 {% if user_role in ('admin', 'accountant') %}
                 <button type="button" class="btn btn-xs btn-outline-danger" title="Delete" onclick="handleFinanceExpenseDelete('{{ exp.firebase_id }}')">

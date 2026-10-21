@@ -18136,7 +18136,7 @@ def expense_delete(exp_id):
 
     # The last expense of a statement import takes the saved statement file with it
     batch = bs_data.get("import_batch")
-    if batch and bs_data.get("has_statement_file"):
+    if batch:
         still_used = any(isinstance(e, dict) and e.get("import_batch") == batch
                          for e in (fb_get("/balance_sheet_expenses") or {}).values())
         if not still_used:
@@ -18633,12 +18633,15 @@ def remove_expense_receipt(exp_id):
 
     try:
         # Remove from /balance_sheet_expenses
-        fb_update(f"/balance_sheet_expenses/{exp_id}", {
+        unlink = {
             "receipt_base64": "",
             "receipt_filename": "",
             "receipt_type": "",
             "has_receipt": False
-        })
+        }
+        if (fb_get(f"/balance_sheet_expenses/{exp_id}") or {}).get("has_statement_file"):
+            unlink["has_statement_file"] = False  # the statement stays with the rest of its import
+        fb_update(f"/balance_sheet_expenses/{exp_id}", unlink)
 
         # Remove from /expense_receipts (primary storage location)
         fb_delete(f"/expense_receipts/{exp_id}")
@@ -19129,6 +19132,19 @@ def get_expense_receipt(exp_id):
                 "receipt": med_receipt.get("receipt_base64"),
                 "fileType": med_receipt.get("receipt_type", "image/jpeg"),
                 "filename": med_receipt.get("receipt_filename", "receipt"),
+            })
+
+    # Fallback: an expense imported from a bank statement uses that statement as its receipt
+    exp_rec = fb_get(f"/balance_sheet_expenses/{exp_id}") or {}
+    if isinstance(exp_rec, dict) and exp_rec.get("has_statement_file") and exp_rec.get("import_batch") \
+            and not exp_rec.get("receipt_base64"):  # a receipt attached later by Edit takes priority
+        stmt = fb_get(f"/statement_files/{exp_rec['import_batch']}") or {}
+        if stmt.get("file_base64"):
+            return jsonify({
+                "success": True,
+                "receipt": stmt["file_base64"],
+                "fileType": stmt.get("content_type") or "application/octet-stream",
+                "filename": stmt.get("filename") or exp_rec.get("import_file") or "statement",
             })
 
     # Fallback: check if receipt is stored in expense data (legacy entries or medical claims)
@@ -25400,6 +25416,8 @@ def bank_statement_import():
             "import_batch":      batch_id,
             "import_file":       file_name,
             "has_statement_file": has_file,
+            **({"has_receipt": True, "receipt_filename": upload.filename[:150],
+                "receipt_type": upload.content_type or "application/octet-stream"} if has_file else {}),
             "statement_fp":      _statement_fp(r),
             "statement_line":    {"date": date, "description": description,
                                   "amount": _safe_float(r.get("original_amount") or amount),
