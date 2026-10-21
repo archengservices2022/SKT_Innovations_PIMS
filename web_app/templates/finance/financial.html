@@ -2603,6 +2603,18 @@ function submitExpenseModal() {
 <div class="modal fade" id="bankImportModal" tabindex="-1">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
+      <div id="bankConfirm" role="dialog" aria-modal="true" aria-labelledby="bankConfirmTitle"
+           style="display:none;position:absolute;inset:0;z-index:20;background:rgba(15,23,42,.45);
+                  align-items:center;justify-content:center;padding:16px;border-radius:inherit;">
+        <div class="bg-white rounded-3 shadow p-3" style="max-width:520px;width:100%;max-height:90%;overflow:auto;">
+          <h6 class="fw-bold mb-2" id="bankConfirmTitle"></h6>
+          <div class="small" id="bankConfirmBody"></div>
+          <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="bankConfirmCancel">Cancel</button>
+            <button type="button" class="btn btn-sm" id="bankConfirmOk"></button>
+          </div>
+        </div>
+      </div>
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-bank me-2"></i>Import Bank Statement</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -2676,7 +2688,7 @@ function submitExpenseModal() {
             <div class="small" id="bankSummary"></div>
             <div class="d-flex align-items-center gap-2">
               <div class="small fw-semibold" id="bankSelectedTotal"></div>
-              <button type="button" class="btn btn-sm btn-primary py-0" onclick="importBankRows()">
+              <button type="button" class="btn btn-sm btn-primary py-0 bank-import-go" onclick="importBankRows()">
                 <i class="bi bi-check-circle me-1"></i>Import Selected
               </button>
             </div>
@@ -2702,7 +2714,7 @@ function submitExpenseModal() {
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-sm btn-primary" id="bankImportBtn" style="display:none;" onclick="importBankRows()">
+        <button type="button" class="btn btn-sm btn-primary bank-import-go" id="bankImportBtn" style="display:none;" onclick="importBankRows()">
           <i class="bi bi-check-circle me-1"></i>Import Selected
         </button>
       </div>
@@ -2853,6 +2865,29 @@ function updateBankTotal() {
 
 let bankImportsChanged = false;
 
+// Ask inside the import window instead of a browser pop-up; resolves true for OK, false for Cancel
+function bankConfirm(title, bodyHtml, okLabel, okClass) {
+  return new Promise(resolve => {
+    const box = document.getElementById('bankConfirm');
+    const ok = document.getElementById('bankConfirmOk');
+    const cancel = document.getElementById('bankConfirmCancel');
+    document.getElementById('bankConfirmTitle').textContent = title;
+    document.getElementById('bankConfirmBody').innerHTML = bodyHtml;
+    ok.textContent = okLabel;
+    ok.className = 'btn btn-sm ' + (okClass || 'btn-primary');
+    const done = answer => {
+      box.style.display = 'none';
+      ok.onclick = cancel.onclick = box.onkeydown = null;
+      resolve(answer);
+    };
+    ok.onclick = () => done(true);
+    cancel.onclick = () => done(false);
+    box.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+    box.style.display = 'flex';
+    cancel.focus();
+  });
+}
+
 function toggleBankImports() {
   const panel = document.getElementById('bankImportsPanel');
   const show = panel.style.display === 'none';
@@ -2892,10 +2927,17 @@ function loadBankImports() {
     .catch(err => { status.innerHTML = '<span class="text-danger">Couldn\'t load past imports: ' + bankEsc(err.message) + '</span>'; });
 }
 
-function undoBankImport(btn) {
-  const count = btn.dataset.count;
-  if (!confirm('Delete all ' + count + ' expense(s) from this import (' + bankMoney(btn.dataset.total) + ')?\n\n' +
-               'They are removed from the Expense Log and totals. A copy is kept in the deleted-expenses archive.')) return;
+async function undoBankImport(btn) {
+  const row = btn.closest('tr');
+  const file = row.children[1].textContent.trim();
+  const ok = await bankConfirm('Undo this import?',
+    '<p class="mb-2">Delete all <strong>' + bankEsc(btn.dataset.count) + ' expense(s)</strong> from this import (' +
+    bankMoney(btn.dataset.total) + ')' + (file && file !== '—' ? ', file <strong>' + bankEsc(file.split('\n')[0]) + '</strong>' : '') + '?</p>' +
+    '<p class="mb-0 text-muted">They are removed from the Expense Log and totals, and the saved statement file is deleted. ' +
+    'A copy of each expense is kept in the deleted-expenses archive.</p>',
+    'Delete ' + btn.dataset.count + ' expense(s)', 'btn-danger');
+  if (!ok) return;
+  const status = document.getElementById('bankImportsStatus');
   btn.disabled = true;
   fetch('/financial/bank-statement/imports/delete', {
     method: 'POST',
@@ -2904,20 +2946,22 @@ function undoBankImport(btn) {
   })
     .then(r => r.json())
     .then(res => {
-      if (!res.success) { btn.disabled = false; alert(res.error || 'Couldn\'t undo this import.'); return; }
+      if (!res.success) { btn.disabled = false; status.innerHTML = '<span class="text-danger">' + bankEsc(res.error || 'Couldn\'t undo this import.') + '</span>'; return; }
       bankImportsChanged = true;
       document.getElementById('bankImportsStatus').innerHTML =
         '<span class="text-success">Deleted ' + res.deleted + ' expense(s). The page refreshes when you close this window.</span>';
       btn.closest('tr').remove();
     })
-    .catch(err => { btn.disabled = false; alert('Couldn\'t undo this import: ' + err.message); });
+    .catch(err => { btn.disabled = false; status.innerHTML = '<span class="text-danger">Couldn\'t undo this import: ' + bankEsc(err.message) + '</span>'; });
 }
 
 document.getElementById('bankImportModal').addEventListener('hidden.bs.modal', () => {
+  const cancel = document.getElementById('bankConfirmCancel');
+  if (cancel.onclick) cancel.onclick();
   if (bankImportsChanged) location.reload();
 });
 
-function importBankRows() {
+async function importBankRows() {
   const rows = selectedBankRows();
   const status = document.getElementById('bankStatus');
   if (!rows.length) { status.innerHTML = '<span class="text-danger">Tick at least one row to import.</span>'; return; }
@@ -2938,15 +2982,19 @@ function importBankRows() {
   const unticked = bankRowsData.filter(r => !rows.includes(r));
   const untickedNew = unticked.filter(r => !r.duplicate_of);
   if (untickedNew.length) {
-    const list = untickedNew.slice(0, 8).map(r => '  • ' + r.date + '  ' + bankMoney(r.amount) + '  ' + (r.description || '').slice(0, 40)).join('\n');
-    const more = untickedNew.length > 8 ? '\n  …and ' + (untickedNew.length - 8) + ' more' : '';
+    const list = untickedNew.slice(0, 8).map(r =>
+      '<li>' + bankEsc(r.date) + ' &middot; ' + bankMoney(r.amount) + ' &middot; ' + bankEsc((r.description || '').slice(0, 45)) + '</li>').join('');
+    const more = untickedNew.length > 8 ? '<li class="text-muted">…and ' + (untickedNew.length - 8) + ' more</li>' : '';
     const dupNote = unticked.length > untickedNew.length
-      ? '\n\n(' + (unticked.length - untickedNew.length) + ' other unticked row(s) look already recorded.)' : '';
-    if (!confirm(untickedNew.length + ' row(s) are unticked and will NOT be imported:\n\n' + list + more + dupNote +
-                 '\n\nImport the other ' + rows.length + ' row(s)?')) return;
+      ? '<p class="text-muted mb-0 mt-2">' + (unticked.length - untickedNew.length) + ' other unticked row(s) look already recorded, so leaving them out is expected.</p>' : '';
+    const ok = await bankConfirm(untickedNew.length + ' row(s) will NOT be imported',
+      '<p class="mb-1">These rows are unticked:</p><ul class="mb-2 ps-3">' + list + more + '</ul>' + dupNote +
+      '<p class="mb-0 mt-2">Import the other <strong>' + rows.length + '</strong> row(s)?</p>',
+      'Import ' + rows.length + ' row(s)', 'btn-primary');
+    if (!ok) return;
   }
-  const btn = document.getElementById('bankImportBtn');
-  btn.disabled = true;
+  const buttons = document.querySelectorAll('.bank-import-go');
+  buttons.forEach(b => b.disabled = true);
   status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving ' + rows.length + ' expense(s)...';
   const fd = new FormData();
   const file = document.getElementById('bankStatementFile').files[0];
@@ -2956,14 +3004,14 @@ function importBankRows() {
   fetch('/financial/bank-statement/import', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(res => {
-      btn.disabled = false;
+      if (!res.success) buttons.forEach(b => b.disabled = false);
       if (!res.success) { status.innerHTML = '<span class="text-danger">' + bankEsc(res.error || 'Import failed') + '</span>'; return; }
       status.innerHTML = '<span class="text-success">Imported ' + res.saved + ' expense(s).' +
         (res.skipped ? ' ' + res.skipped + ' row(s) skipped.' : '') + ' Refreshing...</span>';
       setTimeout(() => location.reload(), 900);
     })
     .catch(err => {
-      btn.disabled = false;
+      buttons.forEach(b => b.disabled = false);
       status.innerHTML = '<span class="text-danger">Import failed: ' + bankEsc(err.message) + '</span>';
     });
 }
