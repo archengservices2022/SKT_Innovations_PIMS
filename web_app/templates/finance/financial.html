@@ -2619,6 +2619,22 @@ function submitExpenseModal() {
                    placeholder="PDF password (only if your bank locked the PDF)">
           </div>
           <div class="form-text">CSV, Excel and PDFs downloaded from net banking are all read directly. Scanned PDFs need AI credit.</div>
+          <div class="mt-3">
+            <a href="#" class="small" onclick="toggleBankImports(); return false;">
+              <i class="bi bi-clock-history me-1"></i><span id="bankImportsToggleText">Show past imports (undo an import)</span>
+            </a>
+            <div id="bankImportsPanel" class="mt-2" style="display:none;">
+              <div id="bankImportsStatus" class="small text-muted"></div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0" style="font-size:12px;">
+                  <thead class="table-light">
+                    <tr><th>Imported</th><th>File</th><th>Statement dates</th><th class="text-end">Rows</th><th class="text-end">Total</th><th></th></tr>
+                  </thead>
+                  <tbody id="bankImportsRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
         <div id="bankStatus" class="small mt-3"></div>
         <div id="bankReviewStep" style="display:none;">
@@ -2676,6 +2692,8 @@ function openBankImportModal() {
   document.getElementById('bankReviewStep').style.display = 'none';
   document.getElementById('bankImportBtn').style.display = 'none';
   document.getElementById('bankUploadStep').style.display = '';
+  document.getElementById('bankImportsPanel').style.display = 'none';
+  document.getElementById('bankImportsToggleText').textContent = 'Show past imports (undo an import)';
   new bootstrap.Modal(document.getElementById('bankImportModal')).show();
 }
 
@@ -2769,17 +2787,90 @@ function updateBankTotal() {
   document.getElementById('bankSelectedTotal').textContent = sel.length + ' selected · ' + bankMoney(total);
 }
 
+let bankImportsChanged = false;
+
+function toggleBankImports() {
+  const panel = document.getElementById('bankImportsPanel');
+  const show = panel.style.display === 'none';
+  panel.style.display = show ? '' : 'none';
+  document.getElementById('bankImportsToggleText').textContent = show ? 'Hide past imports' : 'Show past imports (undo an import)';
+  if (show) loadBankImports();
+}
+
+function loadBankImports() {
+  const status = document.getElementById('bankImportsStatus');
+  const body = document.getElementById('bankImportsRows');
+  status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading past imports...';
+  body.innerHTML = '';
+  fetch('/financial/bank-statement/imports')
+    .then(r => r.json())
+    .then(res => {
+      const list = res.imports || [];
+      status.textContent = list.length ? '' : 'No statement imports yet.';
+      body.innerHTML = list.map(b => {
+        const when = b.imported_at ? new Date(b.imported_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+        const range = b.first_date === b.last_date ? b.first_date : b.first_date + ' → ' + b.last_date;
+        return '<tr>' +
+          '<td class="text-nowrap">' + bankEsc(when) + (b.by ? '<div class="text-muted" style="font-size:11px;">' + bankEsc(b.by) + '</div>' : '') + '</td>' +
+          '<td>' + bankEsc(b.file || '—') + '</td>' +
+          '<td class="text-nowrap">' + bankEsc(range) + '</td>' +
+          '<td class="text-end">' + b.count + '</td>' +
+          '<td class="text-end text-nowrap">' + bankMoney(b.total) + '</td>' +
+          '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger py-0" ' +
+            'data-key="' + bankEsc(b.key) + '" data-count="' + b.count + '" data-total="' + b.total + '" onclick="undoBankImport(this)">' +
+            '<i class="bi bi-arrow-counterclockwise me-1"></i>Undo import</button></td>' +
+          '</tr>';
+      }).join('');
+    })
+    .catch(err => { status.innerHTML = '<span class="text-danger">Couldn\'t load past imports: ' + bankEsc(err.message) + '</span>'; });
+}
+
+function undoBankImport(btn) {
+  const count = btn.dataset.count;
+  if (!confirm('Delete all ' + count + ' expense(s) from this import (' + bankMoney(btn.dataset.total) + ')?\n\n' +
+               'They are removed from the Expense Log and totals. A copy is kept in the deleted-expenses archive.')) return;
+  btn.disabled = true;
+  fetch('/financial/bank-statement/imports/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: btn.dataset.key })
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (!res.success) { btn.disabled = false; alert(res.error || 'Couldn\'t undo this import.'); return; }
+      bankImportsChanged = true;
+      document.getElementById('bankImportsStatus').innerHTML =
+        '<span class="text-success">Deleted ' + res.deleted + ' expense(s). The page refreshes when you close this window.</span>';
+      btn.closest('tr').remove();
+    })
+    .catch(err => { btn.disabled = false; alert('Couldn\'t undo this import: ' + err.message); });
+}
+
+document.getElementById('bankImportModal').addEventListener('hidden.bs.modal', () => {
+  if (bankImportsChanged) location.reload();
+});
+
 function importBankRows() {
   const rows = selectedBankRows();
   const status = document.getElementById('bankStatus');
   if (!rows.length) { status.innerHTML = '<span class="text-danger">Tick at least one row to import.</span>'; return; }
+  const unticked = bankRowsData.filter(r => !rows.includes(r));
+  const untickedNew = unticked.filter(r => !r.duplicate_of);
+  if (untickedNew.length) {
+    const list = untickedNew.slice(0, 8).map(r => '  • ' + r.date + '  ' + bankMoney(r.amount) + '  ' + (r.description || '').slice(0, 40)).join('\n');
+    const more = untickedNew.length > 8 ? '\n  …and ' + (untickedNew.length - 8) + ' more' : '';
+    const dupNote = unticked.length > untickedNew.length
+      ? '\n\n(' + (unticked.length - untickedNew.length) + ' other unticked row(s) look already recorded.)' : '';
+    if (!confirm(untickedNew.length + ' row(s) are unticked and will NOT be imported:\n\n' + list + more + dupNote +
+                 '\n\nImport the other ' + rows.length + ' row(s)?')) return;
+  }
   const btn = document.getElementById('bankImportBtn');
   btn.disabled = true;
   status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving ' + rows.length + ' expense(s)...';
   fetch('/financial/bank-statement/import', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rows: rows })
+    body: JSON.stringify({ rows: rows, file_name: (document.getElementById('bankStatementFile').files[0] || {}).name || '' })
   })
     .then(r => r.json())
     .then(res => {

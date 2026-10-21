@@ -25270,7 +25270,10 @@ def bank_statement_parse():
 @role_required("financial")
 def bank_statement_import():
     """Save the reviewed bank statement rows as finance expenses, stored like ones added by hand."""
-    rows = (request.get_json(silent=True) or {}).get("rows") or []
+    payload = request.get_json(silent=True) or {}
+    rows = payload.get("rows") or []
+    file_name = str(payload.get("file_name") or "")[:150]
+    batch_id = f"imp_{uuid.uuid4().hex[:16]}"
     exchange_rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 110)) or 110
     now = datetime.now(timezone.utc).isoformat()
     fallback_type, fallback_cat = _fallback_expense_type(_expense_type_options()[1])
@@ -25305,6 +25308,8 @@ def bank_statement_import():
             "submitted_by_uid":  session.get("user_uid", ""),
             "status":            "Approved",
             "source":            "bank_statement",
+            "import_batch":      batch_id,
+            "import_file":       file_name,
             "created_at":        now,
             "updated_at":        now,
         }
@@ -25313,6 +25318,65 @@ def bank_statement_import():
         else:
             skipped.append(description or date)
     return jsonify({"success": True, "saved": saved, "skipped": len(skipped), "skipped_rows": skipped[:20]})
+
+
+def _statement_import_batches():
+    """Group imported expenses by the upload they came from: {batch key: [(expense id, expense), ...]}.
+
+    Imports made before batch ids existed are grouped by their save time, which every row of one
+    import shares."""
+    batches = {}
+    for eid, e in (fb_get("/balance_sheet_expenses") or {}).items():
+        if isinstance(e, dict) and e.get("source") == "bank_statement":
+            key = e.get("import_batch") or f"legacy_{str(e.get('created_at', ''))[:19]}"
+            batches.setdefault(key, []).append((eid, e))
+    return batches
+
+
+@app.route("/financial/bank-statement/imports")
+@role_required("financial")
+def bank_statement_imports():
+    """List past statement imports, newest first, so a whole import can be undone."""
+    out = []
+    for key, items in _statement_import_batches().items():
+        first = items[0][1]
+        dates = sorted(str(e.get("date", "")) for _, e in items if e.get("date"))
+        out.append({
+            "key": key,
+            "imported_at": first.get("created_at", ""),
+            "file": first.get("import_file", ""),
+            "by": first.get("submitted_by_name") or first.get("created_by", ""),
+            "count": len(items),
+            "total": round(sum(_safe_float(e.get("amount")) for _, e in items), 2),
+            "first_date": dates[0] if dates else "",
+            "last_date": dates[-1] if dates else "",
+        })
+    out.sort(key=lambda b: b["imported_at"], reverse=True)
+    return jsonify({"imports": out})
+
+
+@app.route("/financial/bank-statement/imports/delete", methods=["POST"])
+@role_required("financial")
+def bank_statement_import_delete():
+    """Delete every expense from one statement import, archiving them like a normal expense delete."""
+    key = str((request.get_json(silent=True) or {}).get("key") or "")
+    items = _statement_import_batches().get(key) if key else None
+    if not items:
+        return jsonify({"success": False, "error": "That import wasn't found. It may already be deleted."}), 404
+    now_utc = datetime.now(timezone.utc).isoformat()
+    now_readable = datetime.now(COMPANY_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    deleted_by = session.get("user_name") or session.get("username") or session.get("user_email", "")
+    archive = {}
+    for eid, e in items:
+        archive[eid] = dict(e, firebase_id=eid, deleted_at=now_utc, deleted_at_readable=now_readable,
+                            deleted_by=deleted_by, deleted_by_email=session.get("user_email", ""),
+                            deleted_by_uid=session.get("user_uid", ""), deleted_reason="Statement import undone")
+    # Two multi-path writes instead of one call per expense
+    if not fb_update("/deleted_expenses", archive) or \
+            not fb_update("/balance_sheet_expenses", {eid: None for eid, _ in items}):
+        return jsonify({"success": False, "error": "Couldn't delete this import. Try again."}), 500
+    log.info(f"Statement import {key} undone by {deleted_by}: {len(items)} expense(s) deleted")
+    return jsonify({"success": True, "deleted": len(items)})
 
 
 # ── AI Routes ─────────────────────────────────────────────────────────────────
