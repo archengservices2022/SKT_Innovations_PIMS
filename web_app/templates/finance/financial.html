@@ -1096,7 +1096,7 @@ a[href*="filter_expense"]:hover {
         <tbody>
           {% for exp in deleted_expenses %}
           <tr>
-            <td class="text-muted small">{{ exp.get('date','—') }}</td>
+            <td class="text-muted small">{{ exp.get('date','—') | format_date }}</td>
             <td>{{ exp.get('description') or exp.get('name','—') }}</td>
             <td><span class="badge bg-secondary">{{ exp.get('category','—') }}</span></td>
             <td class="fw-bold">{{ currency_symbol }}{{ "{:,.2f}".format(exp.get('amount',0)|float) }}</td>
@@ -2856,7 +2856,7 @@ function renderBankRows(types) {
       '<option' + (t === r.expense_type ? ' selected' : '') + '>' + bankEsc(t) + '</option>').join('');
     return '<tr' + (r.duplicate_of ? ' class="table-warning"' : '') + '>' +
       '<td><input type="checkbox" class="bank-row-check" data-i="' + i + '"' + (r.duplicate_of ? '' : ' checked') + ' onchange="updateBankTotal()"></td>' +
-      '<td class="text-nowrap">' + bankEsc(r.date) + '</td>' +
+      '<td class="text-nowrap">' + bankEsc(fmtMDY(r.date)) + '</td>' +
       '<td>' + bankEsc(r.description) +
         (r.duplicate_of ? '<div class="text-danger" style="font-size:11px;">Possible duplicate of "' + bankEsc(r.duplicate_of) + '"</div>' : '') + '</td>' +
       '<td class="text-end text-nowrap">' + bankMoney(r.amount) + '</td>' +
@@ -2940,8 +2940,12 @@ function loadBankImports() {
       const list = res.imports || [];
       status.textContent = list.length ? '' : 'No statement imports yet.';
       body.innerHTML = list.map(b => {
-        const when = b.imported_at ? new Date(b.imported_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-        const range = b.first_date === b.last_date ? b.first_date : b.first_date + ' → ' + b.last_date;
+        const at = b.imported_at ? new Date(b.imported_at) : null;
+        const when = at && !isNaN(at)
+          ? fmtMDY(at.getFullYear() + '-' + String(at.getMonth() + 1).padStart(2, '0') + '-' + String(at.getDate()).padStart(2, '0')) +
+            ' ' + at.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+          : '—';
+        const range = b.first_date === b.last_date ? fmtMDY(b.first_date) : fmtMDY(b.first_date) + ' → ' + fmtMDY(b.last_date);
         return '<tr>' +
           '<td class="text-nowrap">' + bankEsc(when) + (b.by ? '<div class="text-muted" style="font-size:11px;">' + bankEsc(b.by) + '</div>' : '') + '</td>' +
           '<td>' + (b.has_file
@@ -3016,7 +3020,7 @@ async function importBankRows() {
   const untickedNew = unticked.filter(r => !r.duplicate_of);
   if (untickedNew.length) {
     const list = untickedNew.slice(0, 8).map(r =>
-      '<li>' + bankEsc(r.date) + ' &middot; ' + bankMoney(r.amount) + ' &middot; ' + bankEsc((r.description || '').slice(0, 45)) + '</li>').join('');
+      '<li>' + bankEsc(fmtMDY(r.date)) + ' &middot; ' + bankMoney(r.amount) + ' &middot; ' + bankEsc((r.description || '').slice(0, 45)) + '</li>').join('');
     const more = untickedNew.length > 8 ? '<li class="text-muted">…and ' + (untickedNew.length - 8) + ' more</li>' : '';
     const dupNote = unticked.length > untickedNew.length
       ? '<p class="text-muted mb-0 mt-2">' + (unticked.length - untickedNew.length) + ' other unticked row(s) look already recorded, so leaving them out is expected.</p>' : '';
@@ -3192,7 +3196,7 @@ function editGroupExpenseModal(expId, expData) {
         const row = `
           <tr class="expense-row-${index}">
             <td style="font-size:12px; white-space:nowrap; padding:8px;">
-              ${childExp.date || '—'}
+              ${fmtMDY(childExp.date)}
             </td>
             <td style="font-size:12px; padding:8px;">
               ${childExp.category || '—'}

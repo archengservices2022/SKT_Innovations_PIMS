@@ -103,7 +103,7 @@
               <tr>
                 <td>{{ expense.category or '—' }}</td>
                 <td>{{ expense.expense_name or '—' }}</td>
-                <td>{{ expense.date or '—' }}</td>
+                <td>{{ (expense.date or '—') | format_date }}</td>
                 <td>{{ expense.vendor or '—' }}</td>
                 <td style="text-align:right;">₹{{ "{:,.2f}".format(expense.amount or 0) }}</td>
                 <td style="text-align:center;">

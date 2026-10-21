@@ -24865,6 +24865,8 @@ def _statement_rows_from_table(table):
         if not date:
             continue  # opening balance, totals, page footers
         description = " ".join(str(cell(r, "description") or "").split())
+        if _BALANCE_LINE.search(description):
+            continue
         direction = None
         if "debit" in cols:
             amount, _ = _parse_statement_amount(cell(r, "debit"))
@@ -25010,7 +25012,12 @@ _PDF_SKIP_LINE = re.compile(r"\b(page|total|statement|generated|summary|balance|
                             r"purchases|payments and credits|continued)\b", re.I)
 _PDF_NOISE = re.compile(r"\b(?:APPLE|GOOGLE|SAMSUNG) PAY ENDING IN \d+\b|(?<!\S)(?=\S*\d)[A-Z0-9]{6,}(?!\S)", re.I)
 _CREDIT_HINT = re.compile(r"\b(NEFT CR|RTGS CR|IMPS CR|BY TRANSFER|BY CLG|DEPOSIT|INT\.? ?PD|INTEREST|REFUND|"
-                          r"REVERSAL|SALARY CR|CASH DEP)\b", re.I)
+                          r"REVERSAL|SALARY CR|CASH DEP|ACH CREDIT|DIRECT DEP\w*|MOBILE DEPOSIT|INTEREST CREDIT)\b", re.I)
+# "Opening balance", "Closing balance", "Balance B/F" lines carry a date and amount but aren't transactions
+_BALANCE_LINE = re.compile(r"^\s*(opening|closing|beginning|ending|previous|starting)\s+balance\b|"
+                           r"\bbalance\s+(b/?f|c/?f|brought|carried)\b|\b(brought|carried)\s+forward\b", re.I)
+# A statement that only says "USD" in its column headings, e.g. "Amount (USD)" or "Balance USD"
+_USD_HEADING = re.compile(r"\b(amount|balance|debit|credit|withdrawals?|deposits?)\b[^\n\d]{0,4}\(?(USD|US\$)\)?", re.I)
 _CARD_STATEMENT = re.compile(r"credit card|card ending|card number|card no\b|minimum (payment|amount) due|"
                              r"payment due date|total amount due", re.I)
 
@@ -25083,6 +25090,10 @@ def _statement_rows_from_pdf_text(reader):
             desc = rest[:first.start()] if first else rest
             desc = re.sub(r"^\s*\d{1,2}[-/ ][A-Za-z]{3}[-/ ,]+\d{2,4}\b", " ", desc)  # value date like 13 Apr 2026
             desc = re.sub(r"(?<!\S)(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{8,})(?!\S)", " ", desc)  # value date, ref no.
+            if _BALANCE_LINE.search(desc):
+                if opening is None and not entries and re.match(r"\s*(opening|beginning|previous|starting)|.*b/?f|.*brought", desc, re.I):
+                    opening = _pdf_money(money[-1])["value"]
+                continue
             entries.append({"date_raw": m.group(1), "description": " ".join(desc.split()),
                             "money": [_pdf_money(x) for x in money], "closed": False})
     if not entries:
@@ -25149,7 +25160,7 @@ def _statement_rows_from_pdf_text(reader):
             direction = "credit" if is_card else "debit"
         elif is_card:
             direction = "debit"
-        elif _CREDIT_HINT.search(e["description"]) or (any_negative and not balance_mode):
+        elif _CREDIT_HINT.search(e["description"]) or any_negative:
             direction = "credit"
         else:
             direction, unknown = "debit", True
@@ -25165,6 +25176,8 @@ def _statement_rows_from_pdf_text(reader):
 
     curs = {x["cur"] for e in entries for x in e["money"] if x["cur"]}
     currency = "USD" if curs & {"$", "USD"} else ("INR" if curs else "")
+    if not currency and _USD_HEADING.search(doc_text):
+        currency = "USD"
     return rows, credits, currency
 
 
@@ -25246,7 +25259,11 @@ def bank_statement_parse():
                                      "needs AI to read, and AI isn't available right now: " + str(e) +
                                      " Download the statement as Excel or CSV from your bank instead.")
         else:
-            rows, credits = _statement_rows_from_table(_read_statement_table(f.filename, raw))
+            table = _read_statement_table(f.filename, raw)
+            rows, credits = _statement_rows_from_table(table)
+            head_text = "\n".join(" ".join(str(c) for c in r if c not in (None, "")) for r in table[:60])
+            if _USD_HEADING.search(head_text) or re.search(r"(?<![A-Za-z])(US)?\$\s?\d", head_text):
+                currency = "USD"
         if currency == "USD":
             # The books are kept in rupees: convert at the rate set in Settings, keeping the dollar figure
             rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 0)) or 110

@@ -2081,7 +2081,7 @@ function openGroupEditModal(expense) {
         const row = `
           <tr class="expense-row-${index}" data-index="${index}" data-expense-name="${String(childExp.expense_name || '').replace(/"/g, '&quot;')}" data-category="${String(childExp.category || '').replace(/"/g, '&quot;')}" data-date="${String(childExp.date || '').replace(/"/g, '&quot;')}" data-amount="${childExp.amount || 0}" data-description="${String(childExp.description || '').replace(/"/g, '&quot;')}" data-receipt="${String(childExp.receipt_filename || '').replace(/"/g, '&quot;')}">
             <td style="font-size:12px; white-space:nowrap; padding:8px;">
-              ${childExp.date || '—'}
+              ${fmtMDY(childExp.date)}
             </td>
             <td style="font-size:12px; padding:8px;">
               ${childExp.category || '—'}
@@ -2175,7 +2175,7 @@ function addExpenseToGroupTable() {
 
   const row = `
     <tr class="expense-row-${index}" data-index="${index}" data-expense-name="${String(name || '').replace(/"/g, '&quot;')}" data-category="${String(category || '').replace(/"/g, '&quot;')}" data-date="${String(date || '').replace(/"/g, '&quot;')}" data-amount="${amount}" data-description="${String(description || '').replace(/"/g, '&quot;')}" data-receipt="${String(receiptFile ? receiptFile.name : '').replace(/"/g, '&quot;')}">
-      <td style="font-size:12px; white-space:nowrap; padding:8px;">${date}</td>
+      <td style="font-size:12px; white-space:nowrap; padding:8px;">${fmtMDY(date)}</td>
       <td style="font-size:12px; padding:8px;">${category}</td>
       <td style="font-size:12px; padding:8px;">${name}</td>
       <td style="font-size:12px; text-align:right; padding:8px;">₹${parseFloat(amount).toFixed(2)}</td>
@@ -2396,7 +2396,7 @@ function updateExistingItem(index) {
   const safeReceiptName = (receiptName || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
   row.innerHTML = `
-    <td style="font-size:12px; white-space:nowrap; padding:8px;">${date}</td>
+    <td style="font-size:12px; white-space:nowrap; padding:8px;">${fmtMDY(date)}</td>
     <td style="font-size:12px; padding:8px;">${category}</td>
     <td style="font-size:12px; padding:8px;">${name}</td>
     <td style="font-size:12px; text-align:right; padding:8px;">₹${parseFloat(amount).toFixed(2)}</td>
