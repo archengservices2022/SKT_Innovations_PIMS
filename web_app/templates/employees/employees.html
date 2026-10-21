@@ -3189,7 +3189,7 @@ window.saveDirEdit = async function() {
     hourly_rate:    parseFloat(document.getElementById('dirEditRate').value)   || 0,
     monthly_salary: parseFloat(document.getElementById('dirEditSalary').value) || 0,
   };
-  msg.innerHTML = '<span class="text-muted">Saving?</span>';
+  msg.innerHTML = '<span class="text-muted">Saving...</span>';
   try {
     const res  = await fetch('/api/users/' + uid + '/details', {
       method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
@@ -3618,7 +3618,7 @@ window.openEmpExpenseReject = function(expId, empName) {
 
 window.viewEmpReceipt = function(expId) {
   var body = document.getElementById('empReceiptViewBody');
-  body.innerHTML = '<div class="text-muted">Loading?</div>';
+  body.innerHTML = '<div class="text-muted">Loading...</div>';
   new bootstrap.Modal(document.getElementById('empReceiptViewModal')).show();
   fetch('/employees/expenses/' + expId + '/receipt')
     .then(r => r.json())

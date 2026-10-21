@@ -1485,7 +1485,7 @@ function performSubmit(entries) {
   if (!btn) return;
 
   btn.disabled = true;
-  btn.innerHTML = '<i class="bi bi-send me-1"></i>Submitting?';
+  btn.innerHTML = '<i class="bi bi-send me-1"></i>Submitting...';
 
   fetch('/api/timesheets', {
     method:'POST',
@@ -1565,7 +1565,7 @@ function saveSheet(action) {
   }
   const btn = event.target;
   btn.disabled = true;
-  btn.innerHTML = action==='submit' ? '<i class="bi bi-send me-1"></i>Submitting?' : '<i class="bi bi-floppy me-1"></i>Saving?';
+  btn.innerHTML = action==='submit' ? '<i class="bi bi-send me-1"></i>Submitting...' : '<i class="bi bi-floppy me-1"></i>Saving...';
   fetch('/api/timesheets', {
     method:'POST',
     headers:{'Content-Type':'application/json'},

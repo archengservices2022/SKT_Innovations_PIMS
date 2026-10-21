@@ -1247,11 +1247,10 @@ function deleteExpenseItem(expId, itemIndex) {
 
 // View main expense receipt
 function viewExpenseReceipt(expId) {
-  fetch(`/api/expense/${expId}/receipt`)
-    .then(r => r.json())
+  loadReceiptFile(expId)
     .then(data => {
       if (data.success && data.receipt) {
-        const dataUrl = `data:${data.fileType || 'image/jpeg'};base64,${data.receipt}`;
+        const dataUrl = data.url;
         const fileType = data.fileType || 'image/jpeg';
 
         // Create backdrop
@@ -1681,11 +1680,10 @@ function filterEditProjectDropdown(value) {
 
 
 function viewCurrentReceipt(expId) {
-  fetch(`/api/expense/${expId}/receipt`)
-    .then(r => r.json())
+  loadReceiptFile(expId)
     .then(data => {
       if (data.success && data.receipt) {
-        const dataUrl = `data:${data.fileType || 'image/jpeg'};base64,${data.receipt}`;
+        const dataUrl = data.url;
         const fileType = data.fileType || 'image/jpeg';
 
         const backdrop = document.createElement('div');
@@ -2631,7 +2629,7 @@ function handleEditExpense(expId) {
 
         // Display existing receipt if it exists
         const receiptPreviewDiv = document.getElementById('receiptPreview');
-        fetch(`/api/expense/${expId}/receipt`)
+        fetch(`/api/expense/${expId}/receipt?meta=1`)
           .then(r => r.json())
           .then(data => {
             if (data.success && data.filename) {
@@ -3063,11 +3061,10 @@ function updateModalBdtDisplay() {
 }
 
 function viewReceipt(expId) {
-  fetch(`/api/expense/${expId}/receipt`)
-    .then(r => r.json())
+  loadReceiptFile(expId)
     .then(data => {
       if (data.success && data.receipt) {
-        const dataUrl = `data:${data.fileType || 'image/jpeg'};base64,${data.receipt}`;
+        const dataUrl = data.url;
         const fileType = data.fileType || 'image/jpeg';
 
         const backdrop = document.createElement('div');

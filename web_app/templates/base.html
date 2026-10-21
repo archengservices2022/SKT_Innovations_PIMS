@@ -86,6 +86,24 @@
       const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
       return m ? m[2] + '-' + m[3] + '-' + m[1] : (value || '—');
     }
+    // Load an expense's receipt as a file (fast, cached for this page). Resolves to the same shape the
+    // old JSON gave ({success, receipt, fileType, filename}) plus url, an object URL to show it.
+    const _receiptFiles = {};
+    function loadReceiptFile(expId) {
+      if (!_receiptFiles[expId]) {
+        _receiptFiles[expId] = fetch('/api/expense/' + encodeURIComponent(expId) + '/receipt/file')
+          .then(r => {
+            if (!r.ok) { delete _receiptFiles[expId]; return { success: false }; }
+            const cd = r.headers.get('content-disposition') || '';
+            const m = /filename="([^"]*)"/.exec(cd);
+            return r.blob().then(b => ({ success: true, receipt: true, url: URL.createObjectURL(b),
+                                         fileType: b.type || 'application/octet-stream', filename: m ? m[1] : 'receipt' }));
+          })
+          .catch(err => { delete _receiptFiles[expId]; throw err; });
+      }
+      return _receiptFiles[expId];
+    }
+    function forgetReceiptFile(expId) { delete _receiptFiles[expId]; }
   </script>
 </head>
 <body>

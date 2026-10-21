@@ -1209,7 +1209,7 @@ if (sendReminderBtn) {
     const invoiceId = sendReminderBtn.dataset.invoiceId;
     const origHtml  = sendReminderBtn.innerHTML;
     sendReminderBtn.disabled = true;
-    sendReminderBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending?';
+    sendReminderBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
     try {
       const res  = await fetch(`/invoicing/${invoiceId}/send-reminder`, { method: 'POST' });
       const data = await res.json();
@@ -1240,7 +1240,7 @@ if (sendAiReminderBtn) {
     if (!invoiceId) return;
     const origHtml = sendAiReminderBtn.innerHTML;
     sendAiReminderBtn.disabled = true;
-    sendAiReminderBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending?';
+    sendAiReminderBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
     try {
       const res  = await fetch(`/invoicing/${invoiceId}/send-reminder`, { method: 'POST' });
       const data = await res.json();

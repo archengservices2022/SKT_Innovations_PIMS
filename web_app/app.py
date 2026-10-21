@@ -18143,6 +18143,7 @@ def expense_delete(exp_id):
                 if not fb_get(f"/statement_imports/{batch}/expense_ids"):
                     fb_delete(f"/statement_files/{batch}")
                     fb_delete(f"/statement_imports/{batch}")
+                    _STATEMENT_CACHE.pop(batch, None)
             elif batch in (fb_get_shallow("/statement_files") or {}):
                 # Imports made before the per-import list existed: check the table once
                 still_used = any(isinstance(e, dict) and e.get("import_batch") == batch
@@ -19124,68 +19125,118 @@ def get_expense_data(exp_id):
         app.logger.exception("Error fetching expense data")
         return jsonify({"success": False, "error": str(e)}), 500
 
+# Statement files are shared by every expense of an import and never change, so keep a few in memory
+_STATEMENT_CACHE = {}
+_STATEMENT_CACHE_MAX = 6
+
+
+def _statement_file_cached(batch_id):
+    rec = _STATEMENT_CACHE.get(batch_id)
+    if rec is None:
+        rec = fb_get(f"/statement_files/{batch_id}") or {}
+        if rec.get("file_base64"):
+            if len(_STATEMENT_CACHE) >= _STATEMENT_CACHE_MAX:
+                _STATEMENT_CACHE.pop(next(iter(_STATEMENT_CACHE)))
+            _STATEMENT_CACHE[batch_id] = rec
+    return rec
+
+
+def _receipt_mime(filename, ctype):
+    """Content type for a stored receipt, guessing from the file name when it was saved as generic."""
+    ctype = (ctype or "").lower()
+    if ctype and ctype != "application/octet-stream":
+        return ctype
+    ext = (filename or "").rsplit(".", 1)[-1].lower()
+    return {"pdf": "application/pdf", "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+            "gif": "image/gif", "webp": "image/webp", "csv": "text/csv",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}.get(ext, "application/octet-stream")
+
+
+@app.route("/api/expense/<exp_id>/receipt/file", methods=["GET"])
+@role_required("financial")
+def get_expense_receipt_file(exp_id):
+    """The receipt itself as a file (no base64/JSON), so the browser can show and cache it quickly."""
+    from flask import Response as _Resp
+    data = _expense_receipt_payload(exp_id)
+    if not data or not data.get("receipt"):
+        return jsonify({"success": False, "error": "Receipt not found"}), 404
+    fname = re.sub(r'["\\\r\n]', "", data.get("filename") or "receipt")
+    return _Resp(base64.b64decode(data["receipt"]), mimetype=_receipt_mime(fname, data.get("fileType")),
+                 headers={"Content-Disposition": f'inline; filename="{fname}"',
+                          "Cache-Control": "no-store"})
+
+
 @app.route("/api/expense/<exp_id>/receipt", methods=["GET"])
 @role_required("financial")
 def get_expense_receipt(exp_id):
-    """Retrieve receipt from Firebase - stored separately in /expense_receipts"""
+    """Receipt as JSON (base64). With ?meta=1 only the name and type are returned, for the Edit dialog."""
+    data = _expense_receipt_payload(exp_id)
+    if not data:
+        return jsonify({"success": False, "error": "Receipt not found"})
+    if request.args.get("meta"):
+        data = {k: v for k, v in data.items() if k != "receipt"}
+    return jsonify(data)
+
+
+def _expense_receipt_payload(exp_id):
+    """Find an expense's receipt: {"success", "receipt" (base64 or None), "fileType", "filename"} or None."""
+    # Imported expenses: one read of the record, then the (usually cached) statement. A receipt attached
+    # later by Edit lives in the record and takes priority, so nothing else needs checking.
+    exp_rec = fb_get(f"/balance_sheet_expenses/{exp_id}") or {}
+    if isinstance(exp_rec, dict) and exp_rec.get("has_statement_file") and exp_rec.get("import_batch") \
+            and not exp_rec.get("receipt_base64"):
+        stmt = _statement_file_cached(exp_rec["import_batch"])
+        if stmt.get("file_base64"):
+            return {
+                "success": True,
+                "receipt": stmt["file_base64"],
+                "fileType": stmt.get("content_type") or "application/octet-stream",
+                "filename": stmt.get("filename") or exp_rec.get("import_file") or "statement",
+            }
+
     # First try /expense_receipts (primary storage location for all receipts)
     receipt_data = fb_get(f"/expense_receipts/{exp_id}") or {}
     if isinstance(receipt_data, dict) and receipt_data.get('receipt_base64'):
-        return jsonify({
+        return {
             "success": True,
             "receipt": receipt_data.get('receipt_base64'),
             "fileType": receipt_data.get('receipt_type', 'image/jpeg'),
             "filename": receipt_data.get('receipt_filename', 'receipt')
-        })
+        }
 
     # Fallback: check /medical_claim_receipts (expenses sourced from medical claims)
     med_receipt = fb_get(f"/medical_claim_receipts/{exp_id}") or {}
     if isinstance(med_receipt, dict):
         # Return success if receipt_base64 exists, or just if receipt_filename exists
         if med_receipt.get("receipt_base64") or med_receipt.get("receipt_filename"):
-            return jsonify({
+            return {
                 "success": True,
                 "receipt": med_receipt.get("receipt_base64"),
                 "fileType": med_receipt.get("receipt_type", "image/jpeg"),
                 "filename": med_receipt.get("receipt_filename", "receipt"),
-            })
+            }
 
-    # Fallback: an expense imported from a bank statement uses that statement as its receipt
-    exp_rec = fb_get(f"/balance_sheet_expenses/{exp_id}") or {}
-    if isinstance(exp_rec, dict) and exp_rec.get("has_statement_file") and exp_rec.get("import_batch") \
-            and not exp_rec.get("receipt_base64"):  # a receipt attached later by Edit takes priority
-        stmt = fb_get(f"/statement_files/{exp_rec['import_batch']}") or {}
-        if stmt.get("file_base64"):
-            return jsonify({
+    # Fallback: receipt stored in the expense record itself (legacy entries, receipts attached by Edit)
+    exp = exp_rec
+    if isinstance(exp, dict) and exp:
+        # Check if receipt_base64 is stored in expense
+        if 'receipt_base64' in exp:
+            return {
                 "success": True,
-                "receipt": stmt["file_base64"],
-                "fileType": stmt.get("content_type") or "application/octet-stream",
-                "filename": stmt.get("filename") or exp_rec.get("import_file") or "statement",
-            })
-
-    # Fallback: check if receipt is stored in expense data (legacy entries or medical claims)
-    expenses = fb_get("/balance_sheet_expenses") or {}
-    if isinstance(expenses, dict) and exp_id in expenses:
-        exp = expenses[exp_id]
-        if isinstance(exp, dict):
-            # Check if receipt_base64 is stored in expense
-            if 'receipt_base64' in exp:
-                return jsonify({
-                    "success": True,
-                    "receipt": exp.get('receipt_base64'),
-                    "fileType": exp.get('receipt_type', 'image/jpeg'),
-                    "filename": exp.get('receipt_filename', 'receipt')
-                })
-            # If expense has receipt_filename but not base64 (medical claim case), still return success
-            # This allows the UI to show receipt preview even if full data isn't loaded yet
-            if exp.get('receipt_filename'):
-                return jsonify({
-                    "success": True,
-                    "receipt": None,
-                    "fileType": exp.get('receipt_type', 'image/jpeg'),
-                    "filename": exp.get('receipt_filename', 'receipt')
-                })
-    return jsonify({"success": False, "error": "Receipt not found"})
+                "receipt": exp.get('receipt_base64'),
+                "fileType": exp.get('receipt_type', 'image/jpeg'),
+                "filename": exp.get('receipt_filename', 'receipt')
+            }
+        # If expense has receipt_filename but not base64 (medical claim case), still return success
+        # This allows the UI to show receipt preview even if full data isn't loaded yet
+        if exp.get('receipt_filename'):
+            return {
+                "success": True,
+                "receipt": None,
+                "fileType": exp.get('receipt_type', 'image/jpeg'),
+                "filename": exp.get('receipt_filename', 'receipt')
+            }
+    return None
 
 @app.route("/api/expense/<exp_id>/item-receipt/<int:item_index>", methods=["GET"])
 @role_required("financial")
@@ -25527,6 +25578,7 @@ def bank_statement_import_delete():
     if key.startswith("imp_"):
         fb_delete(f"/statement_files/{key}")
         fb_delete(f"/statement_imports/{key}")
+        _STATEMENT_CACHE.pop(key, None)
     log.info(f"Statement import {key} undone by {deleted_by}: {len(items)} expense(s) deleted")
     return jsonify({"success": True, "deleted": len(items)})
 
