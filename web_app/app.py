@@ -18134,6 +18134,14 @@ def expense_delete(exp_id):
     # Always delete from balance_sheet_expenses
     fb_delete(f"/balance_sheet_expenses/{exp_id}")
 
+    # The last expense of a statement import takes the saved statement file with it
+    batch = bs_data.get("import_batch")
+    if batch and bs_data.get("has_statement_file"):
+        still_used = any(isinstance(e, dict) and e.get("import_batch") == batch
+                         for e in (fb_get("/balance_sheet_expenses") or {}).values())
+        if not still_used:
+            fb_delete(f"/statement_files/{batch}")
+
     # Only delete from /expenses if it's an employee expense
     if is_emp_expense:
         fb_delete(f"/expenses/{exp_id}")
@@ -25219,6 +25227,8 @@ def bank_statement_parse():
     if not f or not f.filename:
         return jsonify({"error": "No file uploaded"}), 400
     raw = f.read()
+    if not raw.strip():
+        return jsonify({"error": "This file is empty. Download the statement from your bank again and re-upload it."}), 400
     expense_types, categories_by_type = _expense_type_options()
     notes = []
     try:
@@ -25261,7 +25271,8 @@ def bank_statement_parse():
         return jsonify({"error": str(e)}), 503
     except Exception as e:
         log.exception("Bank statement read failed")
-        return jsonify({"error": f"Couldn't read this statement: {e}"}), 400
+        return jsonify({"error": "Couldn't read this file. Make sure it's the statement exactly as downloaded from your "
+                                 "bank (PDF, Excel .xlsx or CSV), not a copy that was renamed or edited."}), 400
 
     # Flag rows already recorded. Imported expenses remember the statement line they came from, so a
     # re-upload still recognises them after the expense is edited. Each expense matches one row at most.
@@ -25343,8 +25354,12 @@ def bank_statement_import():
         amount = round(_safe_float(r.get("amount")), 2)
         date = str(r.get("date") or "")
         description = str(r.get("description") or "").strip()
-        if amount <= 0 or not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
-            skipped.append(description or date)
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            date = ""
+        if amount <= 0 or not date:
+            skipped.append(description or str(r.get("date") or ""))
             continue
         data = {
             "expense_type":      str(r.get("expense_type", "")),

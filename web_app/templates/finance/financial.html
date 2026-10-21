@@ -2646,7 +2646,7 @@ function submitExpenseModal() {
             <strong>Import Selected</strong>.
           </p>
           <div class="d-flex gap-2 align-items-center">
-            <input type="file" id="bankStatementFile" class="form-control form-control-sm" accept=".csv,.xlsx,.xlsm,.pdf,.txt"
+            <input type="file" id="bankStatementFile" class="form-control form-control-sm" accept=".csv,.xlsx,.pdf"
                    onchange="bankFileChosen(this)">
             <button type="button" class="btn btn-sm btn-teal text-nowrap" id="bankReadBtn" onclick="readBankStatement()">
               <i class="bi bi-search me-1"></i>Read Statement
@@ -2730,6 +2730,27 @@ function bankEsc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+const BANK_MAX_MB = 12;
+
+function bankJson(r) {
+  const type = r.headers.get('content-type') || '';
+  if (type.indexOf('application/json') !== -1) return r.json();
+  return r.text().then(text => {
+    let msg;
+    if (r.redirected && /login/i.test(r.url)) msg = 'Your login has expired. Refresh the page, log in again, then retry.';
+    else if (r.status === 413) msg = 'This file is too large. The limit is ' + BANK_MAX_MB + ' MB.';
+    else if (r.status === 400) {
+      const m = text.match(/<p>([\s\S]*?)<\/p>/);
+      msg = (m ? m[1] : 'The server rejected this request.')
+        .replace('Please upload a PDF or image.', 'Upload the statement as PDF, Excel (.xlsx) or CSV.');
+    }
+    else if (r.status === 403) msg = 'You don\'t have permission to do this.';
+    else if (r.status >= 500) msg = 'The server had a problem (error ' + r.status + '). Wait a minute and try again.';
+    else msg = 'Unexpected reply from the server (status ' + r.status + '). Refresh the page and try again.';
+    return { error: msg, success: false };
+  });
+}
+
 function bankMoney(n) {
   return CURRENCY_SYMBOL + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
@@ -2774,6 +2795,17 @@ function readBankStatement() {
   const file = document.getElementById('bankStatementFile').files[0];
   const status = document.getElementById('bankStatus');
   if (!file) { status.innerHTML = '<span class="text-danger">Choose a statement file first.</span>'; return; }
+  if (!/\.(pdf|xlsx|csv)$/i.test(file.name)) {
+    status.innerHTML = '<span class="text-danger">"' + bankEsc(file.name) + '" isn\'t a supported file. Upload the statement as ' +
+      'PDF, Excel (.xlsx) or CSV. For an old .xls file, open it in Excel and save as .xlsx.</span>';
+    return;
+  }
+  if (file.size > BANK_MAX_MB * 1024 * 1024) {
+    status.innerHTML = '<span class="text-danger">This file is ' + (file.size / 1048576).toFixed(1) + ' MB. The limit is ' +
+      BANK_MAX_MB + ' MB. Download a shorter date range from your bank.</span>';
+    return;
+  }
+  if (!file.size) { status.innerHTML = '<span class="text-danger">This file is empty. Download the statement again.</span>'; return; }
   const btn = document.getElementById('bankReadBtn');
   btn.disabled = true;
   status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Reading statement and suggesting categories. Large statements can take a minute...';
@@ -2781,7 +2813,7 @@ function readBankStatement() {
   fd.append('statement', file);
   fd.append('pdf_password', document.getElementById('bankPdfPassword').value);
   fetch('/financial/bank-statement/parse', { method: 'POST', body: fd })
-    .then(r => r.json())
+    .then(bankJson)
     .then(res => {
       btn.disabled = false;
       if (res.error) { status.innerHTML = '<span class="text-danger">' + bankEsc(res.error) + '</span>'; return; }
@@ -2902,8 +2934,9 @@ function loadBankImports() {
   status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading past imports...';
   body.innerHTML = '';
   fetch('/financial/bank-statement/imports')
-    .then(r => r.json())
+    .then(bankJson)
     .then(res => {
+      if (res.error) { status.innerHTML = '<span class="text-danger">' + bankEsc(res.error) + '</span>'; return; }
       const list = res.imports || [];
       status.textContent = list.length ? '' : 'No statement imports yet.';
       body.innerHTML = list.map(b => {
@@ -2944,7 +2977,7 @@ async function undoBankImport(btn) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key: btn.dataset.key })
   })
-    .then(r => r.json())
+    .then(bankJson)
     .then(res => {
       if (!res.success) { btn.disabled = false; status.innerHTML = '<span class="text-danger">' + bankEsc(res.error || 'Couldn\'t undo this import.') + '</span>'; return; }
       bankImportsChanged = true;
@@ -3002,7 +3035,7 @@ async function importBankRows() {
   fd.append('file_name', file ? file.name : '');
   if (file) fd.append('statement', file);
   fetch('/financial/bank-statement/import', { method: 'POST', body: fd })
-    .then(r => r.json())
+    .then(bankJson)
     .then(res => {
       if (!res.success) buttons.forEach(b => b.disabled = false);
       if (!res.success) { status.innerHTML = '<span class="text-danger">' + bankEsc(res.error || 'Import failed') + '</span>'; return; }
