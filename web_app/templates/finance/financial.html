@@ -7420,24 +7420,32 @@ function handleFinanceExpenseDelete(expId) {
       fetch(`/financial/expense/${expId}/delete`, {
         method: 'POST',
         body: formData,
-        signal: controller.signal
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+        redirect: 'manual'   // a redirect here means the login expired (the delete answers with JSON)
       })
       .then(r => {
         clearTimeout(timeoutId);
-        console.log('Delete response status:', r.status);
+        console.log('Delete response status:', r.status, r.type);
+        if (r.type === 'opaqueredirect') {
+          throw new Error('Your login has expired. Refresh the page, log in again, then retry. Nothing was deleted.');
+        }
         if (r.ok) {
           showSuccessToast('Expense Deleted', 'The expense has been archived and removed from the list');
           setTimeout(() => {
             window.location.href = `/financial?tab=expenses&page=${currentPage}`;
           }, 2000);
         } else {
-          throw new Error(`Failed to delete: ${r.status}`);
+          throw new Error(r.status >= 500
+            ? 'The server had a problem (error ' + r.status + '). Refresh the page to check whether it was deleted, then try again.'
+            : 'The delete was refused (error ' + r.status + '). Refresh the page and try again.');
         }
       })
       .catch(err => {
         clearTimeout(timeoutId);
         console.error('Delete error:', err);
-        alert('Error deleting expense: ' + (err.name === 'AbortError' ? 'Request timeout - server took too long to respond' : err.message));
+        alert('Could not delete the expense. ' + (err.name === 'AbortError'
+          ? 'The server took too long. Refresh the page to check whether it was deleted.' : err.message));
       });
     }
   );

@@ -18137,10 +18137,20 @@ def expense_delete(exp_id):
     # The last expense of a statement import takes the saved statement file with it
     batch = bs_data.get("import_batch")
     if batch:
-        still_used = any(isinstance(e, dict) and e.get("import_batch") == batch
-                         for e in (fb_get("/balance_sheet_expenses") or {}).values())
-        if not still_used:
-            fb_delete(f"/statement_files/{batch}")
+        try:
+            if fb_get(f"/statement_imports/{batch}/expense_ids"):
+                fb_delete(f"/statement_imports/{batch}/expense_ids/{exp_id}")
+                if not fb_get(f"/statement_imports/{batch}/expense_ids"):
+                    fb_delete(f"/statement_files/{batch}")
+                    fb_delete(f"/statement_imports/{batch}")
+            elif batch in (fb_get_shallow("/statement_files") or {}):
+                # Imports made before the per-import list existed: check the table once
+                still_used = any(isinstance(e, dict) and e.get("import_batch") == batch
+                                 for e in (fb_get("/balance_sheet_expenses") or {}).values())
+                if not still_used:
+                    fb_delete(f"/statement_files/{batch}")
+        except Exception as e:  # tidying the file must never make the delete itself fail
+            log.warning(f"Statement file cleanup for {batch} failed: {e}")
 
     # Only delete from /expenses if it's an employee expense
     if is_emp_expense:
@@ -18315,6 +18325,9 @@ def expense_delete(exp_id):
             # Also delete the medical claim receipt if it exists
             fb_delete(f"/medical_claim_receipts/{medical_claim_id}")
 
+    # The Expense Log's delete button asks for JSON and shows its own message, then reloads the page
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify({"success": True})
     flash("Expense deleted and archived for recovery.", "success")
     return redirect(url_for("financial", tab="expenses"))
 
@@ -25383,7 +25396,7 @@ def bank_statement_import():
     exchange_rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 110)) or 110
     now = datetime.now(timezone.utc).isoformat()
     fallback_type, fallback_cat = _fallback_expense_type(_expense_type_options()[1])
-    saved, skipped = 0, []
+    saved, skipped, saved_ids = 0, [], {}
     for r in rows[:1000]:
         if not r.get("expense_type"):
             r["expense_type"], r["category"] = fallback_type, fallback_cat
@@ -25428,10 +25441,16 @@ def bank_statement_import():
             "created_at":        now,
             "updated_at":        now,
         }
-        if fb_push("/balance_sheet_expenses", data):
+        new_id = fb_push("/balance_sheet_expenses", data)
+        if new_id:
             saved += 1
+            saved_ids[new_id] = True
         else:
             skipped.append(description or date)
+    if saved_ids:
+        fb_update(f"/statement_imports/{batch_id}", {"expense_ids": saved_ids, "has_file": has_file})
+    elif has_file:
+        fb_delete(f"/statement_files/{batch_id}")  # nothing was saved, so don't keep the file
     return jsonify({"success": True, "saved": saved, "skipped": len(skipped), "skipped_rows": skipped[:20]})
 
 
@@ -25507,6 +25526,7 @@ def bank_statement_import_delete():
         return jsonify({"success": False, "error": "Couldn't delete this import. Try again."}), 500
     if key.startswith("imp_"):
         fb_delete(f"/statement_files/{key}")
+        fb_delete(f"/statement_imports/{key}")
     log.info(f"Statement import {key} undone by {deleted_by}: {len(items)} expense(s) deleted")
     return jsonify({"success": True, "deleted": len(items)})
 
