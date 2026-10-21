@@ -25197,6 +25197,20 @@ def _statement_rows_from_pdf(raw: bytes, expense_types, categories_by_type):
     return rows, credits
 
 
+def _norm_statement_desc(text) -> str:
+    """Bank description reduced to letters and digits, for matching the same line across uploads."""
+    return re.sub(r"[^A-Z0-9]", "", str(text or "").upper())[:80]
+
+
+def _statement_fp(r) -> str:
+    """Identity of a statement line: date, the amount as printed on the statement, and the description."""
+    amount = r.get("original_amount") if r.get("original_currency") else r.get("amount")
+    return f"{r.get('date', '')}|{_safe_float(amount):.2f}|{_norm_statement_desc(r.get('description'))}"
+
+
+_STATEMENT_FILE_MAX = 10 * 1024 * 1024
+
+
 @app.route("/financial/bank-statement/parse", methods=["POST"])
 @role_required("financial")
 def bank_statement_parse():
@@ -25249,14 +25263,33 @@ def bank_statement_parse():
         log.exception("Bank statement read failed")
         return jsonify({"error": f"Couldn't read this statement: {e}"}), 400
 
-    # Flag rows that look already recorded: same date and amount as an existing finance expense
-    existing = {}
+    # Flag rows already recorded. Imported expenses remember the statement line they came from, so a
+    # re-upload still recognises them after the expense is edited. Each expense matches one row at most.
+    by_fp, by_desc, by_amount = {}, {}, {}
     for e in (fb_get("/balance_sheet_expenses") or {}).values():
-        if isinstance(e, dict):
-            key = (str(e.get("date", ""))[:10], round(_safe_float(e.get("amount")), 2))
-            existing.setdefault(key, e.get("expense_name") or e.get("description") or "an existing expense")
+        if not isinstance(e, dict):
+            continue
+        cand = {"label": e.get("expense_name") or e.get("description") or "an existing expense", "used": False}
+        date = str(e.get("date", ""))[:10]
+        if e.get("statement_fp"):
+            by_fp.setdefault(e["statement_fp"], []).append(cand)
+            continue
+        if e.get("source") == "bank_statement":
+            # Imported before statement lines were remembered: the bank description outlives amount edits
+            by_desc.setdefault((date, _norm_statement_desc(e.get("description"))), []).append(cand)
+        by_amount.setdefault((date, round(_safe_float(e.get("amount")), 2)), []).append(cand)
+
+    def _take(cands):
+        for cand in cands or []:
+            if not cand["used"]:
+                cand["used"] = True
+                return cand["label"]
+        return ""
+
     for r in rows:
-        r["duplicate_of"] = existing.get((r["date"], r["amount"]), "")
+        r["duplicate_of"] = (_take(by_fp.get(_statement_fp(r)))
+                             or _take(by_desc.get((r["date"], _norm_statement_desc(r["description"]))))
+                             or _take(by_amount.get((r["date"], r["amount"]))))
         if not r.get("expense_name"):
             r["expense_name"] = r["description"][:80]
         for k in ("expense_type", "category", "vendor"):
@@ -25270,17 +25303,41 @@ def bank_statement_parse():
 @role_required("financial")
 def bank_statement_import():
     """Save the reviewed bank statement rows as finance expenses, stored like ones added by hand."""
-    payload = request.get_json(silent=True) or {}
-    rows = payload.get("rows") or []
+    payload = request.get_json(silent=True)
+    if payload is None:  # sent as a form so the statement file can come along
+        try:
+            payload = {"rows": json.loads(request.form.get("rows") or "[]"),
+                       "file_name": request.form.get("file_name", "")}
+        except ValueError:
+            return jsonify({"success": False, "error": "The rows sent were unreadable. Read the statement again."}), 400
+    rows = [r for r in (payload.get("rows") or []) if isinstance(r, dict)]
     file_name = str(payload.get("file_name") or "")[:150]
+    no_vendor = [r for r in rows if not str(r.get("vendor") or "").strip()]
+    if no_vendor:
+        return jsonify({"success": False, "error": f"{len(no_vendor)} ticked row(s) have no vendor. "
+                                                   f"Enter a vendor for each, or untick them."}), 400
     batch_id = f"imp_{uuid.uuid4().hex[:16]}"
+
+    # Keep the uploaded statement with the import so it can be opened later
+    has_file = False
+    upload = request.files.get("statement")
+    if upload and upload.filename and rows:
+        content = upload.read()
+        if 0 < len(content) <= _STATEMENT_FILE_MAX:
+            has_file = fb_update(f"/statement_files/{batch_id}", {
+                "file_base64":  base64.b64encode(content).decode("ascii"),
+                "filename":     upload.filename[:150],
+                "content_type": upload.content_type or "application/octet-stream",
+                "size":         len(content),
+                "uploaded_at":  datetime.now(timezone.utc).isoformat(),
+                "uploaded_by":  session.get("user_email", ""),
+            })
+        file_name = file_name or upload.filename[:150]
     exchange_rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 110)) or 110
     now = datetime.now(timezone.utc).isoformat()
     fallback_type, fallback_cat = _fallback_expense_type(_expense_type_options()[1])
     saved, skipped = 0, []
     for r in rows[:1000]:
-        if not isinstance(r, dict):
-            continue
         if not r.get("expense_type"):
             r["expense_type"], r["category"] = fallback_type, fallback_cat
         amount = round(_safe_float(r.get("amount")), 2)
@@ -25310,6 +25367,11 @@ def bank_statement_import():
             "source":            "bank_statement",
             "import_batch":      batch_id,
             "import_file":       file_name,
+            "has_statement_file": has_file,
+            "statement_fp":      _statement_fp(r),
+            "statement_line":    {"date": date, "description": description,
+                                  "amount": _safe_float(r.get("original_amount") or amount),
+                                  "currency": r.get("original_currency") or CURRENCY_CODE},
             "created_at":        now,
             "updated_at":        now,
         }
@@ -25318,6 +25380,19 @@ def bank_statement_import():
         else:
             skipped.append(description or date)
     return jsonify({"success": True, "saved": saved, "skipped": len(skipped), "skipped_rows": skipped[:20]})
+
+
+@app.route("/financial/bank-statement/file/<batch_id>")
+@role_required("financial")
+def bank_statement_file(batch_id):
+    """Open the statement file that an import came from."""
+    from flask import Response as _Resp
+    rec = fb_get(f"/statement_files/{batch_id}") if re.fullmatch(r"imp_[0-9a-f]{16}", batch_id) else None
+    if not rec or not rec.get("file_base64"):
+        abort(404, "The statement file for this import wasn't saved (imports before this feature didn't keep it).")
+    fname = re.sub(r'["\\\r\n]', "", rec.get("filename") or "statement")
+    return _Resp(base64.b64decode(rec["file_base64"]), mimetype=rec.get("content_type") or "application/octet-stream",
+                 headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 
 def _statement_import_batches():
@@ -25338,6 +25413,7 @@ def _statement_import_batches():
 def bank_statement_imports():
     """List past statement imports, newest first, so a whole import can be undone."""
     out = []
+    stored_files = fb_get_shallow("/statement_files") or {}
     for key, items in _statement_import_batches().items():
         first = items[0][1]
         dates = sorted(str(e.get("date", "")) for _, e in items if e.get("date"))
@@ -25350,6 +25426,7 @@ def bank_statement_imports():
             "total": round(sum(_safe_float(e.get("amount")) for _, e in items), 2),
             "first_date": dates[0] if dates else "",
             "last_date": dates[-1] if dates else "",
+            "has_file": key in stored_files,
         })
     out.sort(key=lambda b: b["imported_at"], reverse=True)
     return jsonify({"imports": out})
@@ -25375,6 +25452,8 @@ def bank_statement_import_delete():
     if not fb_update("/deleted_expenses", archive) or \
             not fb_update("/balance_sheet_expenses", {eid: None for eid, _ in items}):
         return jsonify({"success": False, "error": "Couldn't delete this import. Try again."}), 500
+    if key.startswith("imp_"):
+        fb_delete(f"/statement_files/{key}")
     log.info(f"Statement import {key} undone by {deleted_by}: {len(items)} expense(s) deleted")
     return jsonify({"success": True, "deleted": len(items)})
 

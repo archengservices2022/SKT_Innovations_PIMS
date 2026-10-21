@@ -1034,6 +1034,12 @@ a[href*="filter_expense"]:hover {
                   <i class="bi bi-paperclip"></i>
                 </button>
                 {% endif %}
+                {% if exp.get('has_statement_file') and exp.get('import_batch') %}
+                <a class="btn btn-xs btn-outline-info" href="/financial/bank-statement/file/{{ exp.import_batch }}" target="_blank"
+                   rel="noopener" title="View bank statement{{ ': ' ~ exp.import_file if exp.get('import_file') }}">
+                  <i class="bi bi-bank"></i>
+                </a>
+                {% endif %}
                 {% if user_role in ('admin', 'accountant') %}
                 <button type="button" class="btn btn-xs btn-outline-danger" title="Delete" onclick="handleFinanceExpenseDelete('{{ exp.firebase_id }}')">
                   <i class="bi bi-trash"></i>
@@ -2602,14 +2608,34 @@ function submitExpenseModal() {
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+        <style>
+          .bank-steps { display:flex; gap:8px; margin-bottom:14px; }
+          .bank-step { flex:1; display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border-radius:8px;
+                       border:1px solid #e2e8f0; background:#f8fafc; color:#64748b; font-size:12px; line-height:1.35; }
+          .bank-step .num { flex:none; width:22px; height:22px; border-radius:50%; display:flex; align-items:center;
+                            justify-content:center; font-weight:700; background:#e2e8f0; color:#475569; }
+          .bank-step.active { border-color:#0d9488; background:#f0fdfa; color:#0f172a; }
+          .bank-step.active .num { background:#0d9488; color:#fff; }
+          .bank-step.done .num { background:#99f6e4; color:#115e59; }
+          .bank-step strong { display:block; font-size:12.5px; }
+          @media (max-width: 576px) { .bank-steps { flex-direction:column; } }
+        </style>
+        <div class="bank-steps" id="bankSteps">
+          <div class="bank-step active" data-step="1"><span class="num">1</span>
+            <div><strong>Choose file</strong>Bank or card statement: Excel, CSV or PDF</div></div>
+          <div class="bank-step" data-step="2"><span class="num">2</span>
+            <div><strong>Click Read Statement</strong>Payments going out are listed below</div></div>
+          <div class="bank-step" data-step="3"><span class="num">3</span>
+            <div><strong>Review &amp; Import Selected</strong>Tick rows, fill any vendor, then import</div></div>
+        </div>
         <div id="bankUploadStep">
           <p class="small text-muted mb-2">
-            Upload a statement as CSV, Excel (.xlsx) or PDF. Every payment going out is listed for you to review.
-            Deposits are skipped. Nothing is saved until you click Import.
+            Deposits and card payments are skipped automatically. Nothing is saved until you click
+            <strong>Import Selected</strong>.
           </p>
           <div class="d-flex gap-2 align-items-center">
             <input type="file" id="bankStatementFile" class="form-control form-control-sm" accept=".csv,.xlsx,.xlsm,.pdf,.txt"
-                   onchange="document.getElementById('bankPdfPasswordWrap').style.display = /\.pdf$/i.test(this.value) ? '' : 'none'">
+                   onchange="bankFileChosen(this)">
             <button type="button" class="btn btn-sm btn-teal text-nowrap" id="bankReadBtn" onclick="readBankStatement()">
               <i class="bi bi-search me-1"></i>Read Statement
             </button>
@@ -2618,7 +2644,11 @@ function submitExpenseModal() {
             <input type="password" id="bankPdfPassword" class="form-control form-control-sm" autocomplete="off"
                    placeholder="PDF password (only if your bank locked the PDF)">
           </div>
-          <div class="form-text">CSV, Excel and PDFs downloaded from net banking are all read directly. Scanned PDFs need AI credit.</div>
+          <div id="bankNextHint" class="small fw-semibold mt-2" style="color:#0d9488;display:none;">
+            <i class="bi bi-arrow-up-right-circle me-1"></i>File chosen. Now click <strong>Read Statement</strong> to see its transactions.
+          </div>
+          <div class="form-text">CSV, Excel and PDFs downloaded from net banking are all read directly. Scanned PDFs need AI credit.
+            The statement file is saved with the import so you can open it later.</div>
           <div class="mt-3">
             <a href="#" class="small" onclick="toggleBankImports(); return false;">
               <i class="bi bi-clock-history me-1"></i><span id="bankImportsToggleText">Show past imports (undo an import)</span>
@@ -2638,9 +2668,18 @@ function submitExpenseModal() {
         </div>
         <div id="bankStatus" class="small mt-3"></div>
         <div id="bankReviewStep" style="display:none;">
+          <div class="small mb-2 px-2 py-1 rounded" style="background:#f0fdfa;color:#115e59;">
+            <i class="bi bi-info-circle me-1"></i>Check each row, untick anything that isn't a company expense, make sure every
+            ticked row has a <strong>Vendor</strong>, then click <strong>Import Selected</strong>.
+          </div>
           <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
             <div class="small" id="bankSummary"></div>
-            <div class="small fw-semibold" id="bankSelectedTotal"></div>
+            <div class="d-flex align-items-center gap-2">
+              <div class="small fw-semibold" id="bankSelectedTotal"></div>
+              <button type="button" class="btn btn-sm btn-primary py-0" onclick="importBankRows()">
+                <i class="bi bi-check-circle me-1"></i>Import Selected
+              </button>
+            </div>
           </div>
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0" style="font-size:12px;">
@@ -2683,8 +2722,30 @@ function bankMoney(n) {
   return CURRENCY_SYMBOL + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
+function setBankStep(n) {
+  document.querySelectorAll('#bankSteps .bank-step').forEach(el => {
+    const step = +el.dataset.step;
+    el.classList.toggle('active', step === n);
+    el.classList.toggle('done', step < n);
+  });
+}
+
+function bankFileChosen(input) {
+  const chosen = !!input.files.length;
+  document.getElementById('bankPdfPasswordWrap').style.display = /\.pdf$/i.test(input.value) ? '' : 'none';
+  document.getElementById('bankNextHint').style.display = chosen ? '' : 'none';
+  // A new file means the table below no longer applies
+  bankRowsData = [];
+  document.getElementById('bankReviewStep').style.display = 'none';
+  document.getElementById('bankImportBtn').style.display = 'none';
+  document.getElementById('bankStatus').innerHTML = '';
+  setBankStep(chosen ? 2 : 1);
+}
+
 function openBankImportModal() {
   bankRowsData = [];
+  setBankStep(1);
+  document.getElementById('bankNextHint').style.display = 'none';
   document.getElementById('bankStatementFile').value = '';
   document.getElementById('bankPdfPassword').value = '';
   document.getElementById('bankPdfPasswordWrap').style.display = 'none';
@@ -2727,6 +2788,8 @@ function readBankStatement() {
         (dupes ? ', <span class="text-danger">' + dupes + ' look already recorded (unticked)</span>' : '');
       document.getElementById('bankReviewStep').style.display = bankRowsData.length ? '' : 'none';
       document.getElementById('bankImportBtn').style.display = bankRowsData.length ? '' : 'none';
+      document.getElementById('bankNextHint').style.display = 'none';
+      if (bankRowsData.length) setBankStep(3);
       if (!bankRowsData.length) status.innerHTML += '<div>No outgoing payments found in this file.</div>';
       updateBankTotal();
     })
@@ -2756,7 +2819,7 @@ function renderBankRows(types) {
       '<td><input type="text" class="form-control form-control-sm" data-i="' + i + '" data-f="expense_name" value="' + bankEsc(r.expense_name) + '" oninput="setBankField(this)"></td>' +
       '<td><select class="form-select form-select-sm" data-i="' + i + '" data-f="expense_type" onchange="setBankField(this); refreshBankCategories(' + i + ')">' + typeOpts + '</select></td>' +
       '<td><select class="form-select form-select-sm" id="bankCat' + i + '" data-i="' + i + '" data-f="category" onchange="setBankField(this)">' + bankCategoryOptions(r.expense_type, r.category) + '</select></td>' +
-      '<td><input type="text" class="form-control form-control-sm" data-i="' + i + '" data-f="vendor" value="' + bankEsc(r.vendor) + '" oninput="setBankField(this)"></td>' +
+      '<td><input type="text" class="form-control form-control-sm" data-i="' + i + '" data-f="vendor" value="' + bankEsc(r.vendor) + '" placeholder="Required" oninput="setBankField(this)"></td>' +
       '</tr>';
   }).join('');
   document.getElementById('bankSelectAll').checked = bankRowsData.every(r => !r.duplicate_of);
@@ -2764,6 +2827,7 @@ function renderBankRows(types) {
 
 function setBankField(el) {
   bankRowsData[+el.dataset.i][el.dataset.f] = el.value;
+  if (el.dataset.f === 'vendor' && el.value.trim()) el.classList.remove('is-invalid');
 }
 
 function refreshBankCategories(i) {
@@ -2812,7 +2876,10 @@ function loadBankImports() {
         const range = b.first_date === b.last_date ? b.first_date : b.first_date + ' → ' + b.last_date;
         return '<tr>' +
           '<td class="text-nowrap">' + bankEsc(when) + (b.by ? '<div class="text-muted" style="font-size:11px;">' + bankEsc(b.by) + '</div>' : '') + '</td>' +
-          '<td>' + bankEsc(b.file || '—') + '</td>' +
+          '<td>' + (b.has_file
+              ? '<a href="/financial/bank-statement/file/' + encodeURIComponent(b.key) + '" target="_blank" rel="noopener">' +
+                '<i class="bi bi-file-earmark-text me-1"></i>' + bankEsc(b.file || 'View statement') + '</a>'
+              : bankEsc(b.file || '—') + (b.key.indexOf('imp_') === 0 ? '' : '<div class="text-muted" style="font-size:11px;">file not kept (older import)</div>')) + '</td>' +
           '<td class="text-nowrap">' + bankEsc(range) + '</td>' +
           '<td class="text-end">' + b.count + '</td>' +
           '<td class="text-end text-nowrap">' + bankMoney(b.total) + '</td>' +
@@ -2854,6 +2921,20 @@ function importBankRows() {
   const rows = selectedBankRows();
   const status = document.getElementById('bankStatus');
   if (!rows.length) { status.innerHTML = '<span class="text-danger">Tick at least one row to import.</span>'; return; }
+  let firstNoVendor = null, noVendor = 0;
+  document.querySelectorAll('.bank-row-check').forEach(cb => {
+    const input = cb.closest('tr').querySelector('input[data-f="vendor"]');
+    const missing = cb.checked && !(bankRowsData[+cb.dataset.i].vendor || '').trim();
+    input.classList.toggle('is-invalid', missing);
+    if (missing) { noVendor++; if (!firstNoVendor) firstNoVendor = input; }
+  });
+  if (noVendor) {
+    status.innerHTML = '<span class="text-danger">' + noVendor + ' ticked row(s) have no <strong>Vendor</strong> (outlined in red). ' +
+      'Type the vendor for each, or untick the row, then click Import Selected again.</span>';
+    firstNoVendor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    firstNoVendor.focus({ preventScroll: true });
+    return;
+  }
   const unticked = bankRowsData.filter(r => !rows.includes(r));
   const untickedNew = unticked.filter(r => !r.duplicate_of);
   if (untickedNew.length) {
@@ -2867,11 +2948,12 @@ function importBankRows() {
   const btn = document.getElementById('bankImportBtn');
   btn.disabled = true;
   status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving ' + rows.length + ' expense(s)...';
-  fetch('/financial/bank-statement/import', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rows: rows, file_name: (document.getElementById('bankStatementFile').files[0] || {}).name || '' })
-  })
+  const fd = new FormData();
+  const file = document.getElementById('bankStatementFile').files[0];
+  fd.append('rows', JSON.stringify(rows));
+  fd.append('file_name', file ? file.name : '');
+  if (file) fd.append('statement', file);
+  fetch('/financial/bank-statement/import', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(res => {
       btn.disabled = false;
