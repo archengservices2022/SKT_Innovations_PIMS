@@ -18790,7 +18790,10 @@ def expense_edit(exp_id):
                     }), 403
 
                 # Delete receipt from all locations
-                fb_update(f"/balance_sheet_expenses/{exp_id}", {"receipt_base64": None, "receipt_filename": None, "receipt_type": None, "has_receipt": False})
+                cleared = {"receipt_base64": None, "receipt_filename": None, "receipt_type": None, "has_receipt": False}
+                if existing.get("has_statement_file"):
+                    cleared["has_statement_file"] = False  # unlink the bank statement; the rest of its import keeps it
+                fb_update(f"/balance_sheet_expenses/{exp_id}", cleared)
                 fb_update(f"/expenses/{exp_id}", {"receipt_base64": None, "receipt_filename": None, "receipt_type": None, "has_receipt": False})
                 fb_delete(f"/expense_receipts/{exp_id}")
 
