@@ -3285,7 +3285,7 @@ function editExpenseModal(expId, expData) {
     document.getElementById('expenseModalSaveBtn').textContent = isCommission
       ? 'Update Commission'
       : 'Save';
-    document.getElementById('expenseModalSaveBtn').className = 'btn btn-warning';
+    document.getElementById('expenseModalSaveBtn').className = 'btn btn-teal';
     // IMPORTANT: Set exchange rate FIRST before setting amount (to prevent oninput from using wrong rate)
     currentExchangeRate = parseFloat(expData.exchange_rate) || companyBdtExchangeRate;
     console.log('Commission/Expense exchange_rate:', currentExchangeRate);

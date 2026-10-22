@@ -2572,8 +2572,8 @@ function handleEditExpense(expId) {
 
         document.getElementById('expenseId').value = expId;
         document.getElementById('expenseModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Expense';
-        document.getElementById('expenseModalSaveBtn').textContent = '✓ Save';
-        document.getElementById('expenseModalSaveBtn').className = 'btn btn-warning';
+        document.getElementById('expenseModalSaveBtn').textContent = 'Save';
+        document.getElementById('expenseModalSaveBtn').className = 'btn btn-teal';
 
         // IMPORTANT: Set exchange rate BEFORE setting amount (to prevent oninput from using wrong rate)
         currentExchangeRate = parseFloat(expense.exchange_rate) || 110;
