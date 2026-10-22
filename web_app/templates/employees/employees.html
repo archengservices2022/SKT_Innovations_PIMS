@@ -3523,7 +3523,7 @@ window.openEmpExpenseEdit = function(exp) {
   // Mark as editing
   document.getElementById('empEditingExpenseId').value = exp.firebase_id;
   document.getElementById('empCancelEditBtn').style.display = 'block';
-  document.getElementById('empExpenseSubmitBtn').innerHTML = '<i class="bi bi-pencil me-1"></i>Update Expense';
+  document.getElementById('empExpenseSubmitBtn').innerHTML = '<i class="bi bi-pencil me-1"></i>Save';
 
   // Make receipt optional when editing
   var receiptInput = document.getElementById('empReceiptInput');

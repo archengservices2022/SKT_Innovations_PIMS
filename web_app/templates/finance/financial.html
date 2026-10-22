@@ -2002,7 +2002,7 @@ function addExpense(event) {
     alert('Please fill in all required fields');
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.textContent = window.editingExpenseId ? 'Update Expense' : 'Add Expense';
+      submitBtn.textContent = window.editingExpenseId ? 'Save' : 'Add Expense';
     }
     return;
   }
@@ -2052,12 +2052,12 @@ function addExpense(event) {
         expensesTab.show();
         setTimeout(() => location.reload(), 300);
       } else {
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isUpdate ? 'Update Expense' : 'Add Expense'; }
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isUpdate ? 'Save' : 'Add Expense'; }
         alert('Error: ' + (res.error || 'Unknown error'));
       }
     })
     .catch(err => {
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isUpdate ? 'Update Expense' : 'Add Expense'; }
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = isUpdate ? 'Save' : 'Add Expense'; }
       console.error('Expense operation error:', err);
       alert('Failed to ' + (isUpdate ? 'update' : 'add') + ' expense: ' + err.message);
     });
@@ -3153,7 +3153,7 @@ function editGroupExpenseModal(expId, expData) {
     // Change modal title and subtitle
     document.getElementById('groupExpenseModalTitle').innerHTML = '<i class="bi bi-folder-open me-2"></i>Edit Group Expenses';
     document.getElementById('groupExpenseModalSubtitle').textContent = 'Edit group expense details and add/modify individual expense items';
-    document.getElementById('groupExpenseSaveBtn').textContent = 'Update Expense';
+    document.getElementById('groupExpenseSaveBtn').textContent = 'Save';
 
     // Reset form
     document.getElementById('groupExpenseForm').reset();
@@ -3284,7 +3284,7 @@ function editExpenseModal(expId, expData) {
       : '<i class="bi bi-pencil me-2"></i>Edit Expense';
     document.getElementById('expenseModalSaveBtn').textContent = isCommission
       ? 'Update Commission'
-      : 'Update Expense';
+      : 'Save';
     document.getElementById('expenseModalSaveBtn').className = 'btn btn-warning';
     // IMPORTANT: Set exchange rate FIRST before setting amount (to prevent oninput from using wrong rate)
     currentExchangeRate = parseFloat(expData.exchange_rate) || companyBdtExchangeRate;
@@ -3502,7 +3502,7 @@ function proceedRemoveReceipt() {
   if (!_pendingReceiptDeleteId) return;
   const expId = _pendingReceiptDeleteId;
 
-  // Mark receipt for deletion (will be deleted when user clicks Update Expense)
+  // Mark receipt for deletion (will be deleted when user clicks Save)
   _receiptToDelete = expId;
 
   // Hide the confirmation modal
@@ -3515,7 +3515,7 @@ function proceedRemoveReceipt() {
   const toastEl = document.createElement('div');
   toastEl.className = 'position-fixed bottom-0 end-0 p-3';
   toastEl.style.zIndex = 9999;
-  toastEl.innerHTML = '<div class="toast show align-items-center text-bg-info border-0" role="alert"><div class="d-flex"><div class="toast-body"><i class="bi bi-info-circle me-2"></i>Receipt marked for removal. Click Update Expense to save.</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>';
+  toastEl.innerHTML = '<div class="toast show align-items-center text-bg-info border-0" role="alert"><div class="d-flex"><div class="toast-body"><i class="bi bi-info-circle me-2"></i>Receipt marked for removal. Click Save to apply.</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>';
   document.body.appendChild(toastEl);
   setTimeout(() => toastEl.remove(), 5000);
 }
