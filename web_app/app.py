@@ -25448,7 +25448,8 @@ def bank_statement_import():
     now = datetime.now(timezone.utc).isoformat()
     fallback_type, fallback_cat = _fallback_expense_type(_expense_type_options()[1])
     saved, skipped, saved_ids = 0, [], {}
-    for r in rows[:1000]:
+    row_ids = [None] * len(rows)  # new expense id per sent row, so the page can attach each row's receipt
+    for idx, r in enumerate(rows[:1000]):
         if not r.get("expense_type"):
             r["expense_type"], r["category"] = fallback_type, fallback_cat
         amount = round(_safe_float(r.get("amount")), 2)
@@ -25496,13 +25497,44 @@ def bank_statement_import():
         if new_id:
             saved += 1
             saved_ids[new_id] = True
+            row_ids[idx] = new_id
         else:
             skipped.append(description or date)
     if saved_ids:
         fb_update(f"/statement_imports/{batch_id}", {"expense_ids": saved_ids, "has_file": has_file})
     elif has_file:
         fb_delete(f"/statement_files/{batch_id}")  # nothing was saved, so don't keep the file
-    return jsonify({"success": True, "saved": saved, "skipped": len(skipped), "skipped_rows": skipped[:20]})
+    return jsonify({"success": True, "saved": saved, "skipped": len(skipped), "skipped_rows": skipped[:20],
+                    "row_ids": row_ids})
+
+
+@app.route("/financial/bank-statement/receipt/<exp_id>", methods=["POST"])
+@role_required("financial")
+def bank_statement_receipt(exp_id):
+    """Attach the receipt picked for one row of a statement import. Sent one expense at a time so a
+    stack of phone photos doesn't hit the upload size limit."""
+    upload = request.files.get("receipt")
+    if not upload or not upload.filename:
+        return jsonify({"success": False, "error": "No receipt file was sent."}), 400
+    exp = fb_get(f"/balance_sheet_expenses/{exp_id}") if re.fullmatch(r"[-\w]{1,64}", exp_id) else None
+    if not isinstance(exp, dict) or exp.get("source") != "bank_statement":
+        return jsonify({"success": False, "error": "That imported expense wasn't found."}), 404
+    content = upload.read()
+    if not content:
+        return jsonify({"success": False, "error": "The receipt file is empty."}), 400
+    ctype = upload.content_type or "application/octet-stream"
+    if not fb_update(f"/expense_receipts/{exp_id}", {
+        "receipt_base64":   base64.b64encode(content).decode("ascii"),
+        "receipt_filename": upload.filename[:150],
+        "receipt_type":     ctype,
+    }):
+        return jsonify({"success": False, "error": "Couldn't save the receipt. Try again."}), 500
+    # The row's own receipt replaces the statement as what opens from the Expense Log
+    fb_update(f"/balance_sheet_expenses/{exp_id}", {
+        "has_receipt": True, "receipt_filename": upload.filename[:150], "receipt_type": ctype,
+        "has_statement_file": False, "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return jsonify({"success": True})
 
 
 @app.route("/financial/bank-statement/file/<batch_id>")
@@ -25575,6 +25607,7 @@ def bank_statement_import_delete():
     if not fb_update("/deleted_expenses", archive) or \
             not fb_update("/balance_sheet_expenses", {eid: None for eid, _ in items}):
         return jsonify({"success": False, "error": "Couldn't delete this import. Try again."}), 500
+    fb_update("/expense_receipts", {eid: None for eid, _ in items})  # receipts attached to the imported rows
     if key.startswith("imp_"):
         fb_delete(f"/statement_files/{key}")
         fb_delete(f"/statement_imports/{key}")

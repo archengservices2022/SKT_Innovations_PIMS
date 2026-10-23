@@ -2633,7 +2633,7 @@ function submitExpenseModal() {
           <div class="bank-step" data-step="2"><span class="num">2</span>
             <div><strong>Click Read Statement</strong>Payments going out are listed below</div></div>
           <div class="bank-step" data-step="3"><span class="num">3</span>
-            <div><strong>Review &amp; Import Selected</strong>Tick rows, fill any vendor, then import</div></div>
+            <div><strong>Review &amp; Import Selected</strong>Tick rows, fill any vendor, attach receipts, then import</div></div>
         </div>
         <div id="bankUploadStep">
           <p class="small text-muted mb-2">
@@ -2677,7 +2677,8 @@ function submitExpenseModal() {
         <div id="bankReviewStep" style="display:none;">
           <div class="small mb-2 px-2 py-1 rounded" style="background:#f0fdfa;color:#115e59;">
             <i class="bi bi-info-circle me-1"></i>Check each row, untick anything that isn't a company expense, make sure every
-            ticked row has a <strong>Vendor</strong>, then click <strong>Import Selected</strong>.
+            ticked row has a <strong>Vendor</strong>, attach each expense's <strong>Receipt</strong> (photo or PDF), then click
+            <strong>Import Selected</strong>.
           </div>
           <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
             <div class="small" id="bankSummary"></div>
@@ -2700,6 +2701,7 @@ function submitExpenseModal() {
                   <th style="min-width:160px;">Type</th>
                   <th style="min-width:170px;">Category</th>
                   <th style="min-width:130px;">Vendor</th>
+                  <th style="min-width:130px;">Receipt</th>
                 </tr>
               </thead>
               <tbody id="bankRows"></tbody>
@@ -2720,6 +2722,7 @@ function submitExpenseModal() {
 <script>
 let bankRowsData = [];
 let bankCategoriesByType = {};
+let bankReceiptFiles = {};  // row index -> receipt File, uploaded to each new expense after the import
 
 function bankEsc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2764,6 +2767,7 @@ function bankFileChosen(input) {
   document.getElementById('bankNextHint').style.display = chosen ? '' : 'none';
   // A new file means the table below no longer applies
   bankRowsData = [];
+  bankReceiptFiles = {};
   document.getElementById('bankReviewStep').style.display = 'none';
   document.getElementById('bankImportBtn').style.display = 'none';
   document.getElementById('bankStatus').innerHTML = '';
@@ -2772,6 +2776,7 @@ function bankFileChosen(input) {
 
 function openBankImportModal() {
   bankRowsData = [];
+  bankReceiptFiles = {};
   setBankStep(1);
   document.getElementById('bankNextHint').style.display = 'none';
   document.getElementById('bankStatementFile').value = '';
@@ -2813,6 +2818,7 @@ function readBankStatement() {
       btn.disabled = false;
       if (res.error) { status.innerHTML = '<span class="text-danger">' + bankEsc(res.error) + '</span>'; return; }
       bankRowsData = res.rows || [];
+      bankReceiptFiles = {};
       bankCategoriesByType = res.categories_by_type || {};
       renderBankRows(res.expense_types || []);
       const dupes = bankRowsData.filter(r => r.duplicate_of).length;
@@ -2859,9 +2865,72 @@ function renderBankRows(types) {
       '<td><select class="form-select form-select-sm" data-i="' + i + '" data-f="expense_type" onchange="setBankField(this); refreshBankCategories(' + i + ')">' + typeOpts + '</select></td>' +
       '<td><select class="form-select form-select-sm" id="bankCat' + i + '" data-i="' + i + '" data-f="category" onchange="setBankField(this)">' + bankCategoryOptions(r.expense_type, r.category) + '</select></td>' +
       '<td><input type="text" class="form-control form-control-sm" data-i="' + i + '" data-f="vendor" value="' + bankEsc(r.vendor) + '" placeholder="Required" oninput="setBankField(this)"></td>' +
+      '<td id="bankReceipt' + i + '">' + bankReceiptCell(i) + '</td>' +
       '</tr>';
   }).join('');
   document.getElementById('bankSelectAll').checked = bankRowsData.every(r => !r.duplicate_of);
+}
+
+function bankReceiptCell(i) {
+  const f = bankReceiptFiles[i];
+  if (f) {
+    return '<div class="d-flex align-items-center gap-1" style="max-width:150px;">' +
+      '<i class="bi bi-paperclip text-success"></i>' +
+      '<span class="text-truncate" title="' + bankEsc(f.name) + '">' + bankEsc(f.name) + '</span>' +
+      '<button type="button" class="btn btn-sm btn-link text-danger p-0" title="Remove receipt" onclick="clearBankReceipt(' + i + ')">' +
+      '<i class="bi bi-x-circle"></i></button></div>';
+  }
+  return '<label class="btn btn-sm btn-outline-secondary py-0 mb-0 text-nowrap">' +
+    '<i class="bi bi-upload me-1"></i>Attach' +
+    '<input type="file" class="d-none" accept="image/*,.pdf" onchange="setBankReceipt(' + i + ', this)"></label>';
+}
+
+function setBankReceipt(i, input) {
+  const f = input.files[0];
+  const status = document.getElementById('bankStatus');
+  if (!f) return;
+  if (!/^image\//.test(f.type) && !/\.pdf$/i.test(f.name)) {
+    status.innerHTML = '<span class="text-danger">"' + bankEsc(f.name) + '" isn\'t a photo or PDF. Attach the receipt as an image or PDF.</span>';
+    input.value = '';
+    return;
+  }
+  if (f.size > BANK_MAX_MB * 1024 * 1024 - 65536) {
+    status.innerHTML = '<span class="text-danger">"' + bankEsc(f.name) + '" is ' + (f.size / 1048576).toFixed(1) +
+      ' MB. Receipts must be under ' + BANK_MAX_MB + ' MB.</span>';
+    input.value = '';
+    return;
+  }
+  if (!f.size) { status.innerHTML = '<span class="text-danger">"' + bankEsc(f.name) + '" is empty.</span>'; input.value = ''; return; }
+  status.innerHTML = '';
+  bankReceiptFiles[i] = f;
+  document.getElementById('bankReceipt' + i).innerHTML = bankReceiptCell(i);
+}
+
+function clearBankReceipt(i) {
+  delete bankReceiptFiles[i];
+  document.getElementById('bankReceipt' + i).innerHTML = bankReceiptCell(i);
+}
+
+// Upload each row's receipt to its new expense, a few at a time; resolves to the rows whose upload failed
+async function uploadBankReceipts(jobs, onProgress) {
+  const failed = [];
+  let next = 0, done = 0;
+  async function worker() {
+    while (next < jobs.length) {
+      const job = jobs[next++];
+      const fd = new FormData();
+      fd.append('receipt', job.file);
+      try {
+        const res = await fetch('/financial/bank-statement/receipt/' + encodeURIComponent(job.id), { method: 'POST', body: fd }).then(bankJson);
+        if (!res.success) failed.push(job.row);
+      } catch (e) {
+        failed.push(job.row);
+      }
+      onProgress(++done);
+    }
+  }
+  await Promise.all([worker(), worker(), worker()]);
+  return failed;
 }
 
 function setBankField(el) {
@@ -3035,12 +3104,50 @@ async function importBankRows() {
   if (file) fd.append('statement', file);
   fetch('/financial/bank-statement/import', { method: 'POST', body: fd })
     .then(bankJson)
-    .then(res => {
+    .then(async res => {
       if (!res.success) buttons.forEach(b => b.disabled = false);
       if (!res.success) { status.innerHTML = '<span class="text-danger">' + bankEsc(res.error || 'Import failed') + '</span>'; return; }
-      status.innerHTML = '<span class="text-success">Imported ' + res.saved + ' expense(s).' +
-        (res.skipped ? ' ' + res.skipped + ' row(s) skipped.' : '') + ' Refreshing...</span>';
-      setTimeout(() => location.reload(), 900);
+      // The expenses are saved; now attach each row's receipt to its new expense
+      const ids = res.row_ids || [];
+      const jobs = [], noReceipt = [];
+      rows.forEach((r, k) => {
+        if (!ids[k]) return;  // row was skipped by the server
+        const file = bankReceiptFiles[bankRowsData.indexOf(r)];
+        if (file) jobs.push({ id: ids[k], file: file, row: r });
+        else noReceipt.push(r);
+      });
+      const savedMsg = 'Imported ' + res.saved + ' expense(s).' + (res.skipped ? ' ' + res.skipped + ' row(s) skipped.' : '');
+      let failed = [];
+      if (jobs.length) {
+        failed = await uploadBankReceipts(jobs, n => {
+          status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + bankEsc(savedMsg) +
+            ' Uploading receipts ' + n + ' of ' + jobs.length + '...';
+        });
+      }
+      if (!noReceipt.length && !failed.length) {
+        status.innerHTML = '<span class="text-success">' + bankEsc(savedMsg) + ' Refreshing...</span>';
+        setTimeout(() => location.reload(), 900);
+        return;
+      }
+      // Saved, but some expenses have no receipt: say which, and refresh when the window is closed
+      bankImportsChanged = true;
+      document.getElementById('bankReviewStep').style.display = 'none';
+      document.getElementById('bankImportBtn').style.display = 'none';
+      const line = r => '<li>' + bankEsc(fmtMDY(r.date)) + ' &middot; ' + bankMoney(r.amount) + ' &middot; ' +
+        bankEsc(r.vendor || '') + ' &middot; ' + bankEsc((r.expense_name || r.description || '').slice(0, 45)) + '</li>';
+      let html = '<div class="text-success mb-2"><i class="bi bi-check-circle me-1"></i>' + bankEsc(savedMsg) + '</div>';
+      if (noReceipt.length) {
+        html += '<div class="alert alert-danger py-2 mb-2"><i class="bi bi-exclamation-triangle me-1"></i>' +
+          '<strong>' + noReceipt.length + ' expense(s) have no receipt.</strong> Open each one in the Expense Log, click Edit and attach its receipt.' +
+          '<ul class="mb-0 mt-1 ps-3">' + noReceipt.map(line).join('') + '</ul></div>';
+      }
+      if (failed.length) {
+        html += '<div class="alert alert-danger py-2 mb-2"><i class="bi bi-exclamation-triangle me-1"></i>' +
+          '<strong>' + failed.length + ' receipt(s) couldn\'t be uploaded.</strong> The expenses were saved; attach these receipts from Edit.' +
+          '<ul class="mb-0 mt-1 ps-3">' + failed.map(line).join('') + '</ul></div>';
+      }
+      status.innerHTML = html + '<div class="text-muted">Close this window to refresh the Expense Log.</div>';
+      status.scrollIntoView({ behavior: 'smooth', block: 'start' });
     })
     .catch(err => {
       buttons.forEach(b => b.disabled = false);
