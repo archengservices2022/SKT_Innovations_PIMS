@@ -4872,7 +4872,7 @@ def project_detail(project_id):
         if not isinstance(co, dict):
             co_plan_stages.append([])
             continue
-        linked = [s for s in project_stages if _co_stage_matches(s, co, co_idx)]
+        linked = [(i, s) for i, s in enumerate(project_stages) if _co_stage_matches(s, co, co_idx)]
         planned = not linked
         co_plan_stages.append([{
             "label":          s.get("co_stage_label") or "Full Payment",
@@ -4881,7 +4881,9 @@ def project_detail(project_id):
             "invoice_id":     s.get("invoice_id", ""),
             "invoice_number": s.get("invoice_number", ""),
             "planned":        planned,
-        } for s in (linked or _co_payment_stages(co, co_idx))])
+            "stage_index":    i,
+            "editable":       not planned and not _stage_is_billed(s),
+        } for i, s in (linked or [(None, s) for s in _co_payment_stages(co, co_idx)])])
 
     _uid  = session.get("user_uid", "")
     _role = normalize_role(session.get("user_role", ""))
@@ -5208,6 +5210,69 @@ def co_update_amount(project_id, co_idx):
     })
     cache_bust("projects_list")
     flash(f"{co.get('co_number', 'CO')} updated.", "success")
+    return _redirect_project_detail(project_id, "#tab-change-orders")
+
+@app.route("/projects/<project_id>/change-orders/<int:co_idx>/stage-amount", methods=["POST"])
+@role_required("projects")
+def co_stage_amount(project_id, co_idx):
+    """Change one payment of a CO's payment plan. Invoiced payments are locked; the difference is
+    spread over the CO's other uninvoiced payments so the CO total stays the same (if there are none,
+    the CO total and contract value change instead)."""
+    project = fb_get(f"/projects/{project_id}") or {}
+    if not project:
+        abort(404)
+    cos = _normalise_list(project.get("change_orders"))
+    resolved_idx = _resolve_co_idx(cos, co_idx, request.form.get("co_firebase_id", ""))
+    if resolved_idx is None:
+        flash("This change order no longer exists on this project — the page was out of date. Please refresh and try again.", "warning")
+        return _redirect_project_detail(project_id, "#tab-change-orders")
+    co_idx = resolved_idx
+    co = cos[co_idx]
+    co_label = co.get("co_number") or "This CO"
+
+    stages = _normalise_list(project.get("payment_stages"))
+    s_idx = int(_safe_float(request.form.get("stage_index", -1)))
+    if not (0 <= s_idx < len(stages)) or not _co_stage_matches(stages[s_idx], co, co_idx):
+        flash("That payment stage has changed since the page loaded. Please refresh and try again.", "warning")
+        return _redirect_project_detail(project_id, "#tab-change-orders")
+    if _stage_is_billed(stages[s_idx]):
+        flash(f"That {co_label} payment is already invoiced, so its amount is locked.", "warning")
+        return _redirect_project_detail(project_id, "#tab-change-orders")
+    new_amt = round(_safe_float(request.form.get("amount", 0)), 2)
+    if new_amt <= 0:
+        flash("A payment amount must be more than zero.", "danger")
+        return _redirect_project_detail(project_id, "#tab-change-orders")
+
+    base_value = _base_contract_value(project, cos)
+    diff = round(new_amt - _safe_float(stages[s_idx].get("amount", 0)), 2)
+    others = [i for i, s in enumerate(stages)
+              if i != s_idx and _co_stage_matches(s, co, co_idx) and not _stage_is_billed(s)]
+    if others and diff:
+        per = round(diff / len(others), 2)
+        new_others = {}
+        for n, i in enumerate(others):
+            share = per if n < len(others) - 1 else round(diff - per * (len(others) - 1), 2)
+            new_others[i] = round(_safe_float(stages[i].get("amount", 0)) - share, 2)
+        if any(v <= 0 for v in new_others.values()):
+            flash(f"That's more than the rest of {co_label}'s uninvoiced payments can cover. "
+                  f"Enter a smaller amount, or change the CO amount instead.", "danger")
+            return _redirect_project_detail(project_id, "#tab-change-orders")
+        for i, v in new_others.items():
+            stages[i]["amount"] = v
+    stages[s_idx]["amount"] = new_amt
+    _sync_co_amounts_from_stages(stages, cos)
+    fb_update(f"/projects/{project_id}", {
+        "payment_stages": stages,
+        "change_orders": cos,
+        "base_contract_value": base_value,
+        "contract_value": base_value + _approved_co_total(cos),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+    cache_bust("projects_list")
+    if others:
+        flash(f"{co_label} payment updated. The difference was spread over its other uninvoiced payments.", "success")
+    else:
+        flash(f"{co_label} payment updated — the CO total and contract value changed to match.", "success")
     return _redirect_project_detail(project_id, "#tab-change-orders")
 
 @app.route("/api/change-orders/<project_id>/<int:co_idx>/check-delete-approval", methods=["GET"])
@@ -6864,20 +6929,37 @@ def _compute_project_invoice_pending(proj: dict, all_invoices: dict) -> dict:
         }
         all_pending = []
         next_idx = proj.get("next_stage_index")
-        for s_idx, stage in enumerate(proj.get("payment_stages") or []):
+        all_stages = proj.get("payment_stages") or []
+        cos_next_done = set()  # COs whose next payment has already been listed
+        for s_idx, stage in enumerate(all_stages):
             if not isinstance(stage, dict) or s_idx in invoiced_s:
                 continue
-            # Skip CO-linked stages — they appear in the approved_pending_cos section
+            co_key = None
             if stage.get("co_number"):
-                continue
+                # A CO with its own payment plan lists each payment here, like project stages;
+                # a single-payment CO still appears in the approved_pending_cos section
+                if not stage.get("co_stage_label"):
+                    continue
+                co_key = stage.get("co_firebase_id") or stage.get("co_number")
             s_name = stage.get("name", f"Stage {s_idx + 1}")
-            blocked = any(pi not in invoiced_s for pi in range(s_idx))
+            if co_key:
+                # Only earlier payments of the same CO hold this one back
+                blocked = any(pi not in invoiced_s for pi in range(s_idx)
+                              if isinstance(all_stages[pi], dict) and
+                              (all_stages[pi].get("co_firebase_id") or all_stages[pi].get("co_number")) == co_key)
+                is_next = not blocked and co_key not in cos_next_done
+                cos_next_done.add(co_key)
+            else:
+                blocked = any(pi not in invoiced_s for pi in range(s_idx)
+                              if not (isinstance(all_stages[pi], dict) and all_stages[pi].get("co_number")))
+                is_next = (s_idx == next_idx)
             all_pending.append({
                 "stage_idx":  s_idx,
                 "stage_name": s_name,
                 "amount":     _safe_float(stage.get("amount", 0)),
-                "is_next":    (s_idx == next_idx),
+                "is_next":    is_next,
                 "blocked":    blocked,
+                "co_number":  stage.get("co_number", ""),
                 "reason":     "Ready to invoice" if not blocked else "Prior stage not yet invoiced",
             })
         proj["all_pending_stages"] = all_pending
@@ -6934,6 +7016,9 @@ def _compute_project_invoice_pending(proj: dict, all_invoices: dict) -> dict:
             continue
         co_num = co.get("co_number", "")
         co_fb  = co.get("firebase_id", "")
+        # A CO with its own payment plan is listed payment by payment in all_pending_stages
+        if any(_co_stage_matches(s, co, co_idx) and s.get("co_stage_label") for s in co_pstages):
+            continue
         if co_fb and co_fb in invoiced_co_fb_ids:
             continue
         if co_num and co_num in invoiced_co_numbers:
