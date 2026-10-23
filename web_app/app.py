@@ -316,6 +316,60 @@ def _is_co_stage(s: dict) -> bool:
     return bool(s.get("co_number")) or "CO-" in s.get("name", "")
 
 
+def _co_plan_from_form(form, co: dict = None) -> tuple:
+    """(down payment %, installment count) for a change order, read from a submitted form.
+    Fields left out of the form keep the CO's current plan."""
+    co = co or {}
+    raw_down = form.get("co_down_payment_percent")
+    raw_inst = form.get("co_installment_count")
+    down = _safe_float(raw_down if raw_down not in (None, "") else co.get("down_payment_percent", 0))
+    inst = int(_safe_float(raw_inst if raw_inst not in (None, "") else co.get("installment_count", 1)) or 1)
+    return max(0.0, min(100.0, down)), max(1, min(inst, 6))
+
+
+def _co_payment_stages(co: dict, co_idx: int, single_name: str = None) -> list:
+    """Payment stages for an approved change order, split by its own payment plan the same way a
+    project's contract value is. A CO with no plan (0% down, 1 installment) is one stage as before."""
+    co_num = co.get("co_number", "")
+    amount = _safe_float(co.get("amount", 0))
+    down_pct = _safe_float(co.get("down_payment_percent", 0))
+    installments = int(_safe_float(co.get("installment_count", 1)) or 1)
+    link = {"amount_paid": "0", "status": "Pending Invoice", "co_number": co_num,
+            "co_index": co_idx, "co_firebase_id": co.get("firebase_id")}
+    if down_pct <= 0 and installments <= 1:
+        return [dict(link, name=single_name or co_num, amount=amount)]
+    return [dict(link, name=f"{co_num} – {s['name']}", amount=s["amount"], co_stage_label=s["name"], invoice_id="")
+            for s in _compute_payment_stages(amount, down_pct, installments)]
+
+
+def _co_stage_matches(stage: dict, co: dict, co_idx: int) -> bool:
+    """True if a payment stage belongs to this change order."""
+    if not isinstance(stage, dict) or not _is_co_stage(stage):
+        return False
+    fb_id = co.get("firebase_id")
+    if fb_id and stage.get("co_firebase_id"):
+        return stage["co_firebase_id"] == fb_id
+    co_num = co.get("co_number", "")
+    if stage.get("co_number"):
+        return bool(co_num) and stage["co_number"] == co_num
+    return stage.get("co_index") == co_idx or bool(co_num and str(stage.get("name", "")).split(" ")[0] == co_num)
+
+
+def _stage_is_billed(stage: dict) -> bool:
+    return isinstance(stage, dict) and (bool(stage.get("invoice_id")) or
+                                        stage.get("status", "Pending Invoice") != "Pending Invoice")
+
+
+def _sync_co_amounts_from_stages(stages: list, cos: list) -> None:
+    """Set each change order's amount to the total of its payment stages (a CO with a payment plan has several)."""
+    for idx, co in enumerate(cos):
+        if not isinstance(co, dict):
+            continue
+        linked = [s for s in stages if _co_stage_matches(s, co, idx)]
+        if linked:
+            co["amount"] = round(sum(_safe_float(s.get("amount", 0)) for s in linked), 2)
+
+
 def _heal_co_stages(project_id: str, project: dict) -> bool:
     """Create missing payment stages for approved COs that have no linked stage.
     Called on project page load to silently fix Excel-imported projects."""
@@ -361,14 +415,7 @@ def _heal_co_stages(project_id: str, project: dict) -> bool:
         )
         if not has_stage:
             co_title = co.get("title", co_num)
-            stages.append({
-                "name":         f"{co_num} – {co_title}" if co_title else co_num,
-                "amount":       _safe_float(co.get("amount", 0)),
-                "amount_paid":  "0",
-                "status":       "Pending Invoice",
-                "co_number":    co_num,
-                "co_index":     co_idx,
-            })
+            stages.extend(_co_payment_stages(co, co_idx, single_name=f"{co_num} – {co_title}" if co_title else co_num))
             changed = True
     if changed:
         fb_update(f"/projects/{project_id}", {
@@ -4897,7 +4944,10 @@ def co_new(project_id):
     # convention as editing an existing CO's date), keeping today's time —
     # falls back to "now" if the field was left blank.
     created_at_str = (co_date + now_str[10:]) if co_date else now_str
+    co_down_pct, co_installments = _co_plan_from_form(request.form)
     new_co = {
+        "down_payment_percent": co_down_pct,
+        "installment_count": co_installments,
         "firebase_id":      _generate_co_firebase_id(),
         "co_number":        co_num,
         "title":            request.form.get("title", "").strip(),
@@ -4974,15 +5024,9 @@ def co_status(project_id, co_idx):
         co_title  = cos[co_idx].get("title", cos[co_idx].get("co_number", ""))
         old_value = _safe_float(project.get("contract_value", 0))
         new_value = old_value + co_amount
-        stages.append({
-            "name":   cos[co_idx]['co_number'],
-            "amount": co_amount,
-            "amount_paid": "0",  # Track payments same as regular installments
-            "status": "Pending Invoice",
-            "co_number": cos[co_idx]['co_number'],  # Link back to change order
-            "co_index": co_idx,  # Store CO index for reference
-            "co_firebase_id": cos[co_idx].get("firebase_id"),  # Link to CO firebase ID
-        })
+        # One stage, or one per payment when the CO has its own payment plan
+        new_co_stages = _co_payment_stages(cos[co_idx], co_idx)
+        stages.extend(new_co_stages)
         update_data = {
             "change_orders":  cos,
             "contract_value": new_value,
@@ -4993,7 +5037,9 @@ def co_status(project_id, co_idx):
             update_data["status"] = "In Progress"
             update_data["updated_at"] = now_str
         fb_update(f"/projects/{project_id}", update_data)
-        flash(f"{cos[co_idx]['co_number']} approved — contract updated to {CURRENCY_SYMBOL}{new_value:,.0f} and new payment stage added.", "success")
+        stage_note = (f"{len(new_co_stages)} payment stages added" if len(new_co_stages) > 1
+                      else "new payment stage added")
+        flash(f"{cos[co_idx]['co_number']} approved — contract updated to {CURRENCY_SYMBOL}{new_value:,.0f} and {stage_note}.", "success")
         return _redirect_project_detail(project_id, "#tab-change-orders")
     fb_update(f"/projects/{project_id}", {"change_orders": cos})
     flash(f"{cos[co_idx]['co_number']} status updated to {new_status}.", "success")
@@ -5073,33 +5119,65 @@ def co_update_amount(project_id, co_idx):
     else:
         new_co_num_req = None  # no rename
 
+    # The CO's own payment plan (down payment % and number of installments)
+    new_down_pct, new_installments = _co_plan_from_form(request.form, co)
+    plan_changed = (abs(new_down_pct - _safe_float(co.get("down_payment_percent", 0))) > 0.001 or
+                    new_installments != int(_safe_float(co.get("installment_count", 1)) or 1))
+    co_updates["down_payment_percent"] = new_down_pct
+    co_updates["installment_count"] = new_installments
+    amount_changed = abs(new_amount - _safe_float(co.get("amount", 0))) > 0.005
+
+    stages = _normalise_list(project.get("payment_stages"))
+    linked = [idx for idx, stage in enumerate(stages) if _co_stage_matches(stage, co, co_idx)]
+    billed = any(_stage_is_billed(stages[i]) for i in linked)
+    if linked and billed and (plan_changed or (amount_changed and len(linked) > 1)):
+        flash(f"{old_co_num or 'This CO'} already has an invoiced payment stage, so its payment plan and amount "
+              f"are locked. Edit the remaining stage amounts in the Payment Plan instead.", "warning")
+        return _redirect_project_detail(project_id, "#tab-change-orders")
+    rebuild = bool(linked) and not billed and (plan_changed or amount_changed)
+    if rebuild:
+        new_count = len(_co_payment_stages(dict(co, **co_updates), co_idx))
+        # Invoices point at stages by position: changing how many stages this CO has must not
+        # shift a stage that's already invoiced
+        if new_count != len(linked) and any(_stage_is_billed(s) for i, s in enumerate(stages)
+                                            if i > linked[0] and i not in linked):
+            flash("Can't change the number of payments for this CO because payment stages after it are already "
+                  "invoiced.", "warning")
+            return _redirect_project_detail(project_id, "#tab-change-orders")
+
     # Apply locally too, so the stage-matching/contract-value math below sees
     # the new values without another round trip.
     co.update(co_updates)
     fb_update(f"/projects/{project_id}/change_orders/{co_idx}", co_updates)
 
-    # Sync linked payment stage(s) with the same targeted-update approach —
-    # only amount/name/co_number, never status/invoice_id/amount_paid.
-    stages = _normalise_list(project.get("payment_stages"))
-    for idx, stage in enumerate(stages):
-        if not isinstance(stage, dict):
-            continue
-        stage_co_idx = stage.get("co_index")
-        stage_co_num = stage.get("co_number", "")
-        stage_name = str(stage.get("name", ""))
-        if stage_co_idx == co_idx or (old_co_num and (stage_co_num == old_co_num or old_co_num in stage_name)):
-            stage_updates = {"amount": new_amount}
+    if rebuild:
+        # Nothing invoiced yet: replace this CO's stages with ones split by its current plan
+        new_stages = _co_payment_stages(co, co_idx, single_name=(
+            f"{co.get('co_number', '')} – {co.get('title')}" if co.get("title") else None))
+        kept = [s for i, s in enumerate(stages) if i not in linked]
+        kept[linked[0]:linked[0]] = new_stages
+        fb_update(f"/projects/{project_id}", {"payment_stages": kept})
+    else:
+        # Sync linked payment stage(s) with the same targeted-update approach —
+        # only amount/name/co_number, never status/invoice_id/amount_paid.
+        for idx in linked:
+            stage = stages[idx]
+            stage_name = str(stage.get("name", ""))
+            stage_updates = {"amount": new_amount} if len(linked) == 1 else {}
             curr_co_num = co.get("co_number", old_co_num)
             if new_co_num_req:
                 stage_updates["co_number"] = new_co_num_req
             # Rebuild stage name to reflect current CO number and title
             curr_title = co.get("title", "")
-            if curr_title:
+            if stage.get("co_stage_label"):
+                stage_updates["name"] = f"{curr_co_num} – {stage['co_stage_label']}"
+            elif curr_title:
                 stage_updates["name"] = f"{curr_co_num} – {curr_title}"
             elif new_co_num_req and old_co_num and old_co_num in stage_name:
                 stage_updates["name"] = stage_name.replace(old_co_num, new_co_num_req, 1)
-            stage.update(stage_updates)
-            fb_update(f"/projects/{project_id}/payment_stages/{idx}", stage_updates)
+            if stage_updates:
+                stage.update(stage_updates)
+                fb_update(f"/projects/{project_id}/payment_stages/{idx}", stage_updates)
 
     # Contract value is derived from every CO's amount — recompute and store
     # as its own small targeted update.
@@ -5179,16 +5257,8 @@ def co_delete(project_id, co_idx):
     co = cos[co_idx]
     co_number = str(co.get("co_number", "") or "").strip()
     stages = _normalise_list(project.get("payment_stages"))
-    linked_stage_idx = None
-    linked_stage = None
-    for idx, stage in enumerate(stages):
-        if not isinstance(stage, dict):
-            continue
-        stage_name = str(stage.get("name", "") or "")
-        if stage.get("co_index") == co_idx or (co_number and (stage.get("co_number") == co_number or co_number in stage_name)):
-            linked_stage_idx = idx
-            linked_stage = stage
-            break
+    # Every stage of this CO (several when it has its own payment plan)
+    linked_stage_idxs = [idx for idx, stage in enumerate(stages) if _co_stage_matches(stage, co, co_idx)]
 
     raw_invoices = fb_get("/invoices") or {}
     linked_invoice_numbers = []
@@ -5201,9 +5271,9 @@ def co_delete(project_id, co_idx):
             if co_number and meta.get("co_number") == co_number:
                 linked_invoice_numbers.append(meta.get("invoice_number", "invoice"))
                 continue
-            if linked_stage_idx is not None and meta.get("project_number") == project_number:
+            if linked_stage_idxs and meta.get("project_number") == project_number:
                 try:
-                    if int(meta.get("payment_stage_index", -1)) == linked_stage_idx:
+                    if int(meta.get("payment_stage_index", -1)) in linked_stage_idxs:
                         linked_invoice_numbers.append(meta.get("invoice_number", "invoice"))
                         continue
                 except Exception:
@@ -5217,19 +5287,16 @@ def co_delete(project_id, co_idx):
     if linked_invoice_numbers:
         log.warning(f"Deleting CO {co_number} that is linked to invoices: {linked_invoice_numbers}")
 
-    # Allow deletion of CO with invoiced payment stage - will remove the stage
-    if linked_stage and (
-        linked_stage.get("invoice_id")
-        or linked_stage.get("invoice_number")
-        or linked_stage.get("status") in ("Invoiced", "Paid", "Partially Paid", "Overdue")
-    ):
-        log.warning(f"Deleting CO {co_number} with invoiced payment stage: {linked_stage.get('name')}")
+    # Allow deletion of CO with invoiced payment stages - will remove the stages
+    for i in linked_stage_idxs:
+        if _stage_is_billed(stages[i]) or stages[i].get("invoice_number"):
+            log.warning(f"Deleting CO {co_number} with invoiced payment stage: {stages[i].get('name')}")
 
     base_value = _base_contract_value(project, cos)
     deleted_number = co_number or co.get("title", "CO")
     cos.pop(co_idx)
-    if linked_stage_idx is not None:
-        stages.pop(linked_stage_idx)
+    for i in reversed(linked_stage_idxs):
+        stages.pop(i)
     for stage in stages:
         if isinstance(stage, dict) and isinstance(stage.get("co_index"), int) and stage["co_index"] > co_idx:
             stage["co_index"] -= 1
@@ -5610,18 +5677,7 @@ def project_edit(project_id):
         if not isinstance(change_orders_to_sync, list):
             change_orders_to_sync = list(change_orders_to_sync.values()) if isinstance(change_orders_to_sync, dict) else []
 
-        for stage in updated_stages:
-            if isinstance(stage, dict) and _is_co_stage(stage):
-                stage_name = stage.get("name", "")
-                if True:
-                    # Prefer co_number field; fall back to extracting from name
-                    co_num = stage.get("co_number") or (stage_name.split(" ")[0] if " " in stage_name else stage_name)
-                    stage_amount = _safe_float(stage.get("amount", 0))
-                    # Find and update matching change order
-                    for co in change_orders_to_sync:
-                        if isinstance(co, dict) and co.get("co_number", "") == co_num:
-                            co["amount"] = str(stage_amount)
-                            break
+        _sync_co_amounts_from_stages(updated_stages, change_orders_to_sync)
 
         if change_orders_to_sync:
             updated["change_orders"] = change_orders_to_sync
@@ -5880,14 +5936,20 @@ def _create_stage_invoice(project_id: str, stage_idx: int, mark_paid: bool = Fal
     inv_num    = _next_invoice_number()
     inv_status = "Paid" if mark_paid else "Draft"
 
-    # Collect any approved CO stages that are also pending invoice
+    # Collect any approved CO stages that are also pending invoice — only the next payment of each
+    # CO, since a CO with its own payment plan is billed one installment at a time
     co_pending = []
+    co_keys = {stage.get("co_firebase_id") or stage.get("co_number")} if _is_co_stage(stage) else set()
     for ci, s in enumerate(stages):
         if ci == stage_idx:
             continue
         if (isinstance(s, dict) and
                 s.get("status") == "Pending Invoice" and
                 _is_co_stage(s)):
+            key = s.get("co_firebase_id") or s.get("co_number") or s.get("name")
+            if key in co_keys:
+                continue
+            co_keys.add(key)
             co_pending.append((ci, s))
 
     # Build line items: base stage first, then CO stages
@@ -31982,21 +32044,9 @@ def update_project_payment_plan(project_id):
         for amount_data in amounts:
             idx = amount_data.get("index", 0)
             if idx < len(stages):
-                stage = stages[idx]
-                new_stage_amt = _safe_float(amount_data.get("amount", 0))
-                stage["amount"] = new_stage_amt
-                # Sync CO amount — try co_index first, then fall back to stage name match
-                co_idx = stage.get("co_index")
-                if co_idx is not None and isinstance(co_idx, int) and co_idx < len(change_orders):
-                    change_orders[co_idx]["amount"] = new_stage_amt
-                else:
-                    stage_name = stage.get("name", "")
-                    if "CO-" in stage_name:
-                        co_num = stage_name.split(" ")[0] if " " in stage_name else stage_name
-                        for co in change_orders:
-                            if isinstance(co, dict) and co.get("co_number", "") == co_num:
-                                co["amount"] = str(new_stage_amt)
-                                break
+                stages[idx]["amount"] = _safe_float(amount_data.get("amount", 0))
+        # A CO's amount is the total of its stages (several when it has its own payment plan)
+        _sync_co_amounts_from_stages(stages, change_orders)
 
         project["payment_stages"] = stages
         project["change_orders"] = change_orders
