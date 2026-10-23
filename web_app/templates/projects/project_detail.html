@@ -1008,14 +1008,10 @@
                     {% if can_manage_projects and not co_lock.billed %}
                     {# Pick the plan straight from the row; saved with the row's save button #}
                     <div class="d-flex align-items-center gap-1">
-                      <select name="co_down_payment_percent" form="coAmountForm{{ co_idx }}" class="form-select form-select-sm co-plan-select"
-                              title="Down payment" onchange="coPlanChanged({{ co_idx }})">
-                        {% set down_opts = [0, 10, 15, 20, 25, 30, 40, 50] %}
-                        {% if co_down|int not in down_opts %}<option value="{{ co_down|int }}" selected>{{ co_down|int }}% down</option>{% endif %}
-                        {% for p in down_opts %}
-                        <option value="{{ p }}" {{ 'selected' if co_down|int == p }}>{{ 'No down payment' if p == 0 else p ~ '% down' }}</option>
-                        {% endfor %}
-                      </select>
+                      <input type="number" name="co_down_payment_percent" form="coAmountForm{{ co_idx }}" min="0" max="100" step="1"
+                             value="{{ co_down|int }}" class="form-control form-control-sm text-end" style="width:56px;"
+                             title="Down payment %" oninput="coPlanChanged({{ co_idx }})">
+                      <span class="text-muted small">% down</span>
                       <select name="co_installment_count" form="coAmountForm{{ co_idx }}" class="form-select form-select-sm co-plan-select"
                               title="Balance installments" onchange="coPlanChanged({{ co_idx }})">
                         <option value="1" {{ 'selected' if co_inst <= 1 }}>1 payment</option>
@@ -1117,6 +1113,44 @@
                   </td>
                   {% endif %}
                 </tr>
+                {# This CO's payments — like the project's Payment Plan, one line per stage #}
+                {% set co_stages = co_plan_stages[co_idx] if co_plan_stages and co_idx < co_plan_stages|length else [] %}
+                {% if co_stages %}
+                <tr class="co-stages-row">
+                  <td colspan="{{ 7 if can_manage_projects else 6 }}">
+                    <div class="co-stages">
+                      <div class="co-stages-head">
+                        <i class="bi bi-list-check me-1"></i>{{ co.get('co_number','CO') }} payment plan
+                        <span class="text-muted fw-normal">· {{ co_stages|length }} payment{{ 's' if co_stages|length != 1 }}</span>
+                        {% if co_stages[0].planned %}
+                        <span class="text-muted fw-normal">· added to the Payment Plan when approved</span>
+                        {% endif %}
+                      </div>
+                      <table class="co-stages-table">
+                        {% for st in co_stages %}
+                        <tr>
+                          <td class="text-muted" style="width:28px;">{{ loop.index }}</td>
+                          <td>{{ st.label }}</td>
+                          <td class="text-end fw-semibold">{{ currency_symbol }}{{ "{:,.2f}".format(st.amount) }}</td>
+                          <td>
+                            {% if st.planned %}
+                            <span class="badge bg-light text-secondary border">Planned</span>
+                            {% else %}
+                            <span class="badge status-{{ {'Pending Invoice':'not-started','Invoiced':'invoiced','Partially Paid':'partial','Paid':'paid','Overdue':'overdue'}.get(st.status, st.status|lower|replace(' ','-')) }}">{{ st.status }}</span>
+                            {% endif %}
+                          </td>
+                          <td>
+                            {% if st.invoice_id %}
+                            <a href="{{ url_for('invoice_detail', invoice_id=st.invoice_id) }}" class="text-decoration-none">{{ st.invoice_number or 'View invoice' }}</a>
+                            {% endif %}
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+                {% endif %}
                 {% endfor %}
               </tbody>
               {% if co_approved_total > 0 %}
@@ -1326,6 +1360,12 @@
                   font-weight:600; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; white-space:nowrap; }
   .co-plan-pill.co-plan-split { background:#f0fdfa; color:#0f766e; border-color:#99f6e4; }
   .co-plan-select { width:auto; min-width:0; font-size:12px; padding-top:2px; padding-bottom:2px; }
+  tr.co-stages-row > td { border-top:0; padding-top:0; padding-bottom:12px; }
+  .co-stages { margin-left:12px; border-left:3px solid #99f6e4; background:#f8fafc; border-radius:0 8px 8px 0; padding:6px 10px; }
+  .co-stages-head { font-size:12px; font-weight:600; color:#0f766e; margin-bottom:4px; }
+  .co-stages-table { width:100%; max-width:620px; font-size:12px; }
+  .co-stages-table td { padding:3px 8px; border-top:1px solid #e2e8f0; }
+  .co-stages-table tr:first-child td { border-top:0; }
 </style>
 
 <script>

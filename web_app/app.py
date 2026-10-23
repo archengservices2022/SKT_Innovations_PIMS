@@ -4864,6 +4864,25 @@ def project_detail(project_id):
     # Base + co_contract_increase always equals contract_value exactly.
     co_contract_increase = max(0.0, _safe_float(data.get("contract_value", 0)) - base_contract)
 
+    # Each CO's payments, listed under it in the Change Orders tab: its real stages once approved,
+    # otherwise the stages its payment plan will add on approval
+    project_stages = _normalise_list(data.get("payment_stages"))
+    co_plan_stages = []
+    for co_idx, co in enumerate(change_orders):
+        if not isinstance(co, dict):
+            co_plan_stages.append([])
+            continue
+        linked = [s for s in project_stages if _co_stage_matches(s, co, co_idx)]
+        planned = not linked
+        co_plan_stages.append([{
+            "label":          s.get("co_stage_label") or "Full Payment",
+            "amount":         _safe_float(s.get("amount", 0)),
+            "status":         "Planned" if planned else (s.get("status") or "Pending Invoice"),
+            "invoice_id":     s.get("invoice_id", ""),
+            "invoice_number": s.get("invoice_number", ""),
+            "planned":        planned,
+        } for s in (linked or _co_payment_stages(co, co_idx))])
+
     _uid  = session.get("user_uid", "")
     _role = normalize_role(session.get("user_role", ""))
     _has_del_perm = _role in ("admin", "accountant") or bool(
@@ -4893,6 +4912,7 @@ def project_detail(project_id):
                            next_stage_name=next_stage_name,
                            next_stage_amount=next_stage_amount,
                            change_orders=change_orders,
+                           co_plan_stages=co_plan_stages,
                            co_approved_total=co_approved_total,
                            co_contract_increase=co_contract_increase,
                            base_contract=base_contract,
