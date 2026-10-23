@@ -1544,6 +1544,20 @@ def inject_globals():
         **clock_widget,
     }
 
+_CO_PLAN_LABEL_RE = re.compile(r"Down Payment \(\d+%\)|Installment \d+ of \d+|Final Payment|Full Payment", re.I)
+
+@app.template_filter('co_plan_label')
+def co_plan_label(item) -> str:
+    """Payment-plan stage of a CO line item ("Installment 1 of 3", "Down Payment (50%)"), read from
+    its stage name or description; blank when the CO has no payment plan (CO titles never show)."""
+    if not isinstance(item, dict):
+        return ""
+    for text in (item.get("stage_name"), item.get("display_stage_name"), item.get("description")):
+        m = _CO_PLAN_LABEL_RE.search(str(text or ""))
+        if m:
+            return m.group(0)
+    return ""
+
 # Register Jinja2 filters for date formatting
 @app.template_filter('format_date')
 def format_date_filter(date_str):
@@ -29560,7 +29574,10 @@ def _generate_invoice_pdf_bytes(invoice_id: str, job_style_header: bool = False,
             else:
                 co_part = co_clean.strip()
 
-            # Show only project number and CO# (no titles or names)
+            # Show only project number and CO# (no titles or names), plus its payment-plan stage
+            co_stage = co_plan_label(item)
+            if co_stage:
+                co_part = f"{co_part} · {co_stage}"
             project_number_display = f"{project_number}<br/><font size=8>{co_part}</font>"
             project_cell = Paragraph(project_number_display, left_style)
             log.debug(f"[PDF_CO_DEBUG] Setting project_cell - Project: {project_number}, CO: {co_part}")
