@@ -2882,7 +2882,7 @@ function renderBankRows(types) {
       '<td><input type="checkbox" class="bank-row-check" data-i="' + i + '"' + (r.duplicate_of ? '' : ' checked') + ' onchange="updateBankTotal()"></td>' +
       '<td class="text-nowrap">' + bankEsc(fmtMDY(r.date)) + '</td>' +
       '<td>' + bankEsc(r.description) +
-        (r.duplicate_of ? '<span class="bank-dup" title="Already recorded as: ' + bankEsc(r.duplicate_of) + '">Duplicate?</span>' : '') + '</td>' +
+        (r.duplicate_of ? '<span class="bank-dup" title="Already recorded as: ' + bankEsc(r.duplicate_of) + '">Duplicate</span>' : '') + '</td>' +
       '<td class="text-end text-nowrap">' + bankMoney(r.amount) + '</td>' +
       '<td><input type="text" class="form-control form-control-sm" data-i="' + i + '" data-f="expense_name" value="' + bankEsc(r.expense_name) + '" oninput="setBankField(this)"></td>' +
       '<td><select class="form-select form-select-sm" data-i="' + i + '" data-f="expense_type" onchange="setBankField(this); refreshBankCategories(' + i + ')">' + typeOpts + '</select></td>' +
