@@ -2626,6 +2626,23 @@ function submitExpenseModal() {
           .bank-step.done .num { background:#99f6e4; color:#115e59; }
           .bank-step strong { display:block; font-size:12.5px; }
           @media (max-width: 576px) { .bank-steps { flex-direction:column; } }
+          .bank-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px; }
+          .bank-chip { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:999px;
+                       font-size:12px; font-weight:600; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0;
+                       white-space:nowrap; }
+          .bank-chip-total { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+          .bank-chip-dup { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
+          button.bank-chip { cursor:pointer; }
+          button.bank-chip:hover { background:#e2e8f0; }
+          .bank-notes { font-size:11.5px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0;
+                        border-radius:8px; padding:6px 10px; margin-bottom:8px; }
+          .bank-table-wrap { max-height:58vh; overflow:auto; border:1px solid #e2e8f0; border-radius:8px; }
+          .bank-table thead th { position:sticky; top:0; z-index:2; }
+          .bank-table tbody tr.bank-off td { opacity:.5; }
+          .bank-table tbody tr.bank-off td:first-child { opacity:1; }
+          .bank-dup { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; font-size:10.5px;
+                      font-weight:600; background:#fff1f2; color:#be123c; border:1px solid #fecdd3; cursor:help;
+                      vertical-align:middle; }
         </style>
         <div class="bank-steps" id="bankSteps">
           <div class="bank-step active" data-step="1"><span class="num">1</span>
@@ -2675,22 +2692,21 @@ function submitExpenseModal() {
         </div>
         <div id="bankStatus" class="small mt-3"></div>
         <div id="bankReviewStep" style="display:none;">
-          <div class="small mb-2 px-2 py-1 rounded" style="background:#f0fdfa;color:#115e59;">
-            <i class="bi bi-info-circle me-1"></i>Check each row, untick anything that isn't a company expense, make sure every
-            ticked row has a <strong>Vendor</strong> and a <strong>Receipt</strong> (photo or PDF), then click
-            <strong>Import Selected</strong>.
-          </div>
-          <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-            <div class="small" id="bankSummary"></div>
-            <div class="d-flex align-items-center gap-2">
-              <div class="small fw-semibold" id="bankSelectedTotal"></div>
-              <button type="button" class="btn btn-sm btn-primary py-0 bank-import-go" onclick="importBankRows()">
+          <div class="bank-toolbar">
+            <div class="d-flex flex-wrap align-items-center gap-2" id="bankSummary"></div>
+            <div class="d-flex align-items-center gap-2 ms-auto">
+              <span class="bank-chip bank-chip-total" id="bankSelectedTotal"></span>
+              <button type="button" class="btn btn-sm btn-primary bank-import-go" onclick="importBankRows()">
                 <i class="bi bi-check-circle me-1"></i>Import Selected
               </button>
             </div>
           </div>
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0" style="font-size:12px;">
+          <div id="bankNotes" class="bank-notes" style="display:none;"></div>
+          <div class="text-muted mb-2" style="font-size:11.5px;">
+            Untick anything that isn't a company expense. Every ticked row needs a <strong>Vendor</strong> and a <strong>Receipt</strong>.
+          </div>
+          <div class="table-responsive bank-table-wrap">
+            <table class="table table-sm table-hover align-middle mb-0 bank-table" style="font-size:12px;">
               <thead class="table-light">
                 <tr>
                   <th><input type="checkbox" id="bankSelectAll" onchange="toggleAllBankRows(this.checked)"></th>
@@ -2823,14 +2839,21 @@ function readBankStatement() {
       renderBankRows(res.expense_types || []);
       const dupes = bankRowsData.filter(r => r.duplicate_of).length;
       const unsure = bankRowsData.filter(r => r.direction_unknown).length;
-      let msg = '';
-      if (res.ai_note) msg += '<div class="text-warning">' + bankEsc(res.ai_note) + '</div>';
-      if (unsure) msg += '<div class="text-warning">' + unsure + ' row(s) didn\'t say whether money went in or out. Untick any deposits.</div>';
-      status.innerHTML = msg;
+      status.innerHTML = '';
+      // Reader notes (currency conversion, AI unavailable, unclear rows) stay tucked behind a chip
+      const notes = [];
+      if (res.ai_note) notes.push(res.ai_note);
+      if (unsure) notes.push(unsure + ' row(s) didn\'t say whether money went in or out. Untick any deposits.');
+      const notesBox = document.getElementById('bankNotes');
+      notesBox.innerHTML = notes.map(n => '<div>' + bankEsc(n) + '</div>').join('');
+      notesBox.style.display = 'none';
       document.getElementById('bankSummary').innerHTML =
-        '<strong>' + bankRowsData.length + '</strong> payment(s) found' +
-        (res.credits_skipped ? ', ' + res.credits_skipped + ' deposit(s) skipped' : '') +
-        (dupes ? ', <span class="text-danger">' + dupes + ' look already recorded (unticked)</span>' : '');
+        '<span class="bank-chip"><i class="bi bi-arrow-up-right"></i>' + bankRowsData.length + ' payments</span>' +
+        (res.credits_skipped ? '<span class="bank-chip"><i class="bi bi-arrow-down-left"></i>' + res.credits_skipped + ' deposits skipped</span>' : '') +
+        (dupes ? '<span class="bank-chip bank-chip-dup" title="Unticked because a matching expense is already recorded">' +
+          '<i class="bi bi-files"></i>' + dupes + ' possible duplicates</span>' : '') +
+        (notes.length ? '<button type="button" class="bank-chip" onclick="toggleBankNotes()" title="Show import notes">' +
+          '<i class="bi bi-info-circle"></i>' + notes.length + (notes.length > 1 ? ' notes' : ' note') + '</button>' : '');
       document.getElementById('bankReviewStep').style.display = bankRowsData.length ? '' : 'none';
       document.getElementById('bankImportBtn').style.display = bankRowsData.length ? '' : 'none';
       document.getElementById('bankNextHint').style.display = 'none';
@@ -2855,11 +2878,11 @@ function renderBankRows(types) {
   document.getElementById('bankRows').innerHTML = bankRowsData.map((r, i) => {
     const typeOpts = '<option value="">Select type…</option>' + types.map(t =>
       '<option' + (t === r.expense_type ? ' selected' : '') + '>' + bankEsc(t) + '</option>').join('');
-    return '<tr' + (r.duplicate_of ? ' class="table-warning"' : '') + '>' +
+    return '<tr' + (r.duplicate_of ? ' class="bank-off"' : '') + '>' +
       '<td><input type="checkbox" class="bank-row-check" data-i="' + i + '"' + (r.duplicate_of ? '' : ' checked') + ' onchange="updateBankTotal()"></td>' +
       '<td class="text-nowrap">' + bankEsc(fmtMDY(r.date)) + '</td>' +
       '<td>' + bankEsc(r.description) +
-        (r.duplicate_of ? '<div class="text-danger" style="font-size:11px;">Possible duplicate of "' + bankEsc(r.duplicate_of) + '"</div>' : '') + '</td>' +
+        (r.duplicate_of ? '<span class="bank-dup" title="Already recorded as: ' + bankEsc(r.duplicate_of) + '">Duplicate?</span>' : '') + '</td>' +
       '<td class="text-end text-nowrap">' + bankMoney(r.amount) + '</td>' +
       '<td><input type="text" class="form-control form-control-sm" data-i="' + i + '" data-f="expense_name" value="' + bankEsc(r.expense_name) + '" oninput="setBankField(this)"></td>' +
       '<td><select class="form-select form-select-sm" data-i="' + i + '" data-f="expense_type" onchange="setBankField(this); refreshBankCategories(' + i + ')">' + typeOpts + '</select></td>' +
@@ -2955,7 +2978,14 @@ function selectedBankRows() {
   return Array.from(document.querySelectorAll('.bank-row-check:checked')).map(cb => bankRowsData[+cb.dataset.i]);
 }
 
+function toggleBankNotes() {
+  const box = document.getElementById('bankNotes');
+  box.style.display = box.style.display === 'none' ? '' : 'none';
+}
+
 function updateBankTotal() {
+  // Dim unticked rows so it's clear at a glance what will be imported
+  document.querySelectorAll('.bank-row-check').forEach(cb => cb.closest('tr').classList.toggle('bank-off', !cb.checked));
   const sel = selectedBankRows();
   const total = sel.reduce((s, r) => s + Number(r.amount || 0), 0);
   document.getElementById('bankSelectedTotal').textContent = sel.length + ' selected · ' + bankMoney(total);
