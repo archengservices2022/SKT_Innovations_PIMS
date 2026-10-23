@@ -1005,6 +1005,27 @@
                         {% if s.get('invoice_id') or (s.get('status') or 'Pending Invoice') != 'Pending Invoice' %}{% set co_lock.billed = true %}{% endif %}
                       {% endif %}
                     {% endfor %}
+                    {% if can_manage_projects and not co_lock.billed %}
+                    {# Pick the plan straight from the row; saved with the row's save button #}
+                    <div class="d-flex align-items-center gap-1">
+                      <select name="co_down_payment_percent" form="coAmountForm{{ co_idx }}" class="form-select form-select-sm co-plan-select"
+                              title="Down payment" onchange="coPlanChanged({{ co_idx }})">
+                        {% set down_opts = [0, 10, 15, 20, 25, 30, 40, 50] %}
+                        {% if co_down|int not in down_opts %}<option value="{{ co_down|int }}" selected>{{ co_down|int }}% down</option>{% endif %}
+                        {% for p in down_opts %}
+                        <option value="{{ p }}" {{ 'selected' if co_down|int == p }}>{{ 'No down payment' if p == 0 else p ~ '% down' }}</option>
+                        {% endfor %}
+                      </select>
+                      <select name="co_installment_count" form="coAmountForm{{ co_idx }}" class="form-select form-select-sm co-plan-select"
+                              title="Balance installments" onchange="coPlanChanged({{ co_idx }})">
+                        <option value="1" {{ 'selected' if co_inst <= 1 }}>1 payment</option>
+                        {% for n in range(2, 7) %}<option value="{{ n }}" {{ 'selected' if co_inst == n }}>{{ n }} installments</option>{% endfor %}
+                      </select>
+                    </div>
+                    <div class="text-primary mt-1 fw-semibold" id="coPlanUnsaved{{ co_idx }}" style="font-size:11px; display:none;">
+                      <i class="bi bi-floppy me-1"></i>Click save to apply
+                    </div>
+                    {% else %}
                     <div class="d-flex align-items-center gap-1">
                       <span class="co-plan-pill {{ 'co-plan-split' if (co_down > 0 or co_inst > 1) }}">
                         <i class="bi {{ 'bi-calendar2-week' if (co_down > 0 or co_inst > 1) else 'bi-cash' }}"></i>
@@ -1012,19 +1033,11 @@
                         {% elif co_inst > 1 %}{{ co_inst }} installments
                         {% else %}Single payment{% endif %}
                       </span>
-                      {% if can_manage_projects %}
-                      <input type="hidden" name="co_down_payment_percent" form="coAmountForm{{ co_idx }}" id="coPlanDown{{ co_idx }}" value="{{ co_down|int }}">
-                      <input type="hidden" name="co_installment_count" form="coAmountForm{{ co_idx }}" id="coPlanInst{{ co_idx }}" value="{{ co_inst }}">
                       {% if co_lock.billed %}
                       <i class="bi bi-lock-fill text-muted small" title="Locked: a payment stage of this CO is already invoiced"></i>
-                      {% else %}
-                      <button type="button" class="btn btn-xs btn-outline-secondary" title="Edit payment plan"
-                              onclick="openCoPlanModal({{ co_idx }}, '{{ co.get('co_number','CO')|e }}')">
-                        <i class="bi bi-pencil"></i>
-                      </button>
-                      {% endif %}
                       {% endif %}
                     </div>
+                    {% endif %}
                     {% if co_lock.count > 1 %}
                     <div class="text-muted mt-1" style="font-size:11px;">{{ co_lock.count }} stages in Payment Plan</div>
                     {% elif co.get('status') not in ('Approved', 'Invoiced', 'Paid') and (co_down > 0 or co_inst > 1) %}
@@ -1301,41 +1314,6 @@
   </div>
 </div>
 
-<!-- Change order payment plan editor -->
-<div class="modal fade" id="coPlanModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-calendar2-week me-2 text-teal"></i>Payment Plan · <span id="coPlanTitle"></span></h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-2">
-          <div class="col-6">
-            <label class="form-label small fw-600 mb-1">Down Payment (%)</label>
-            <input type="number" id="coPlanDownInput" class="form-control form-control-sm" min="0" max="100" step="1"
-                   oninput="refreshCoPlanModal()">
-            <div class="form-text mt-0">0 = no down payment</div>
-          </div>
-          <div class="col-6">
-            <label class="form-label small fw-600 mb-1">Balance Installments</label>
-            <select id="coPlanInstInput" class="form-select form-select-sm" onchange="refreshCoPlanModal()">
-              <option value="1">1 — Single payment</option>
-              {% for n in range(2, 7) %}<option value="{{ n }}">{{ n }} installments</option>{% endfor %}
-            </select>
-          </div>
-        </div>
-        <div id="coPlanModalPreview" class="co-plan-preview"></div>
-        <div class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>For an approved CO, its stages in the Payment Plan are rebuilt when you save.</div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-teal" onclick="saveCoPlanModal()"><i class="bi bi-check-lg me-1"></i>Save Plan</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <style>
   .co-plan-section { border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; background:#f8fafc; }
   .co-plan-head { font-weight:600; font-size:13px; margin-bottom:8px; color:#0f172a; }
@@ -1347,6 +1325,7 @@
   .co-plan-pill { display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:999px; font-size:11.5px;
                   font-weight:600; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; white-space:nowrap; }
   .co-plan-pill.co-plan-split { background:#f0fdfa; color:#0f766e; border-color:#99f6e4; }
+  .co-plan-select { width:auto; min-width:0; font-size:12px; padding-top:2px; padding-bottom:2px; }
 </style>
 
 <script>
@@ -1391,32 +1370,11 @@ function updateCoPlanPreview() {
     'Payment stages added when approved');
 }
 
-let coPlanIdx = null;
-function openCoPlanModal(idx, coNumber) {
-  coPlanIdx = idx;
-  document.getElementById('coPlanTitle').textContent = coNumber;
-  document.getElementById('coPlanDownInput').value = document.getElementById('coPlanDown' + idx).value;
-  document.getElementById('coPlanInstInput').value = document.getElementById('coPlanInst' + idx).value;
-  refreshCoPlanModal();
-  new bootstrap.Modal(document.getElementById('coPlanModal')).show();
-}
-
-function refreshCoPlanModal() {
-  const amountInput = document.querySelector('#coAmountForm' + coPlanIdx + ' input[name="amount"]');
-  renderCoPlan(document.getElementById('coPlanModalPreview'),
-    parseFloat(amountInput && amountInput.value) || 0,
-    parseFloat(document.getElementById('coPlanDownInput').value) || 0,
-    parseInt(document.getElementById('coPlanInstInput').value, 10) || 1,
-    'Payment stages');
-}
-
-// Saving goes through the CO's normal save form, so amount, title etc. typed in the row are saved too
-function saveCoPlanModal() {
-  const down = Math.min(100, Math.max(0, parseFloat(document.getElementById('coPlanDownInput').value) || 0));
-  document.getElementById('coPlanDown' + coPlanIdx).value = Math.round(down);
-  document.getElementById('coPlanInst' + coPlanIdx).value = document.getElementById('coPlanInstInput').value;
-  const form = document.getElementById('coAmountForm' + coPlanIdx);
-  if (form.requestSubmit) form.requestSubmit(); else form.submit();
+// A plan dropdown changed in the Change Orders table: point at the row's save button
+function coPlanChanged(idx) {
+  document.getElementById('coPlanUnsaved' + idx).style.display = '';
+  const btn = document.querySelector('button[type="submit"][form="coAmountForm' + idx + '"]');
+  if (btn) btn.classList.replace('btn-outline-primary', 'btn-primary');
 }
 </script>
 
