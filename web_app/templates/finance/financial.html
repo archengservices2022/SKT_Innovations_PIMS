@@ -2677,7 +2677,7 @@ function submitExpenseModal() {
         <div id="bankReviewStep" style="display:none;">
           <div class="small mb-2 px-2 py-1 rounded" style="background:#f0fdfa;color:#115e59;">
             <i class="bi bi-info-circle me-1"></i>Check each row, untick anything that isn't a company expense, make sure every
-            ticked row has a <strong>Vendor</strong>, attach each expense's <strong>Receipt</strong> (photo or PDF), then click
+            ticked row has a <strong>Vendor</strong> and a <strong>Receipt</strong> (photo or PDF), then click
             <strong>Import Selected</strong>.
           </div>
           <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -2701,7 +2701,7 @@ function submitExpenseModal() {
                   <th style="min-width:160px;">Type</th>
                   <th style="min-width:170px;">Category</th>
                   <th style="min-width:130px;">Vendor</th>
-                  <th style="min-width:130px;">Receipt</th>
+                  <th style="min-width:150px;">Receipt</th>
                 </tr>
               </thead>
               <tbody id="bankRows"></tbody>
@@ -2880,8 +2880,8 @@ function bankReceiptCell(i) {
       '<button type="button" class="btn btn-sm btn-link text-danger p-0" title="Remove receipt" onclick="clearBankReceipt(' + i + ')">' +
       '<i class="bi bi-x-circle"></i></button></div>';
   }
-  return '<label class="btn btn-sm btn-outline-secondary py-0 mb-0 text-nowrap">' +
-    '<i class="bi bi-upload me-1"></i>Attach' +
+  return '<label class="btn btn-sm btn-outline-secondary py-0 mb-0 text-nowrap bank-receipt-attach" title="Required: photo or PDF">' +
+    '<i class="bi bi-upload me-1"></i>Attach <span class="text-muted" style="font-size:10px;">(required)</span>' +
     '<input type="file" class="d-none" accept="image/*,.pdf" onchange="setBankReceipt(' + i + ', this)"></label>';
 }
 
@@ -3078,6 +3078,21 @@ async function importBankRows() {
       'Type the vendor for each, or untick the row, then click Import Selected again.</span>';
     firstNoVendor.scrollIntoView({ behavior: 'smooth', block: 'center' });
     firstNoVendor.focus({ preventScroll: true });
+    return;
+  }
+  let firstNoReceipt = null, noReceiptCount = 0;
+  document.querySelectorAll('.bank-row-check').forEach(cb => {
+    const attach = cb.closest('tr').querySelector('.bank-receipt-attach');
+    if (!attach) return;  // a receipt is attached
+    const missing = cb.checked;
+    attach.classList.toggle('btn-outline-danger', missing);
+    attach.classList.toggle('btn-outline-secondary', !missing);
+    if (missing) { noReceiptCount++; if (!firstNoReceipt) firstNoReceipt = attach; }
+  });
+  if (noReceiptCount) {
+    status.innerHTML = '<span class="text-danger">' + noReceiptCount + ' ticked row(s) have no <strong>Receipt</strong> (outlined in red). ' +
+      'Attach a photo or PDF for each, or untick the row, then click Import Selected again.</span>';
+    firstNoReceipt.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
   const unticked = bankRowsData.filter(r => !rows.includes(r));
