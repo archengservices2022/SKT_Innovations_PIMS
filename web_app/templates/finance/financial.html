@@ -2880,8 +2880,10 @@ function bankReceiptCell(i) {
       '<button type="button" class="btn btn-sm btn-link text-danger p-0" title="Remove receipt" onclick="clearBankReceipt(' + i + ')">' +
       '<i class="bi bi-x-circle"></i></button></div>';
   }
-  return '<label class="btn btn-sm btn-outline-secondary py-0 mb-0 text-nowrap bank-receipt-attach" title="Required: photo or PDF">' +
-    '<i class="bi bi-upload me-1"></i>Attach <span class="text-muted" style="font-size:10px;">(required)</span>' +
+  // Looks like the Vendor box: a field reading "Required" that opens the file picker
+  return '<label class="form-control form-control-sm mb-0 text-nowrap bank-receipt-attach" title="Attach a photo or PDF" ' +
+    'style="cursor:pointer;color:#6c757d;">' +
+    '<i class="bi bi-upload me-1"></i>Required' +
     '<input type="file" class="d-none" accept="image/*,.pdf" onchange="setBankReceipt(' + i + ', this)"></label>';
 }
 
@@ -3085,8 +3087,7 @@ async function importBankRows() {
     const attach = cb.closest('tr').querySelector('.bank-receipt-attach');
     if (!attach) return;  // a receipt is attached
     const missing = cb.checked;
-    attach.classList.toggle('btn-outline-danger', missing);
-    attach.classList.toggle('btn-outline-secondary', !missing);
+    attach.classList.toggle('is-invalid', missing);
     if (missing) { noReceiptCount++; if (!firstNoReceipt) firstNoReceipt = attach; }
   });
   if (noReceiptCount) {
