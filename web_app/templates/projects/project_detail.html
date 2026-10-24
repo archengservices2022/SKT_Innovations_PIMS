@@ -1035,9 +1035,10 @@
                         {% for n in range(2, 7) %}<option value="{{ n }}" {{ 'selected' if co_inst == n }}>{{ n }} installments</option>{% endfor %}
                       </select>
                     </div>
-                    <div class="text-primary mt-1 fw-semibold" id="coPlanUnsaved{{ co_idx }}" style="font-size:11px; display:none;">
-                      <i class="bi bi-floppy me-1"></i>Click save to apply
-                    </div>
+                    <button type="submit" form="coAmountForm{{ co_idx }}" class="btn btn-xs btn-primary mt-1" id="coPlanUnsaved{{ co_idx }}"
+                            style="display:none;" title="Rebuild this CO's payments with the new plan">
+                      <i class="bi bi-check-lg me-1"></i>Save plan
+                    </button>
                     {% else %}
                     <div class="d-flex align-items-center gap-1">
                       <span class="co-plan-pill {{ 'co-plan-split' if (co_down > 0 or co_inst > 1) }}">
@@ -1047,7 +1048,7 @@
                         {% else %}Single payment{% endif %}
                       </span>
                       {% if co_lock.billed %}
-                      <i class="bi bi-lock-fill text-muted small" title="Locked: a payment stage of this CO is already invoiced"></i>
+                      <i class="bi bi-lock-fill text-muted small" title="Plan locked: part of this CO is already invoiced. Uninvoiced payment amounts can still be edited below."></i>
                       {% endif %}
                     </div>
                     {% endif %}

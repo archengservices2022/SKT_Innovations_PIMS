@@ -7147,10 +7147,13 @@ def _duplicate_invoice_stage_rows(data):
         identities = []
         stage = item.get("payment_stage_index")
         if stage is not None and stage != "":
+            # A stage is its own identity: a CO with a payment plan has several stages,
+            # and billing two of them on one invoice is allowed
             identities.append((project, "stage", str(int(stage))))
-        for field in ("co_firebase_id", "co_number"):
-            if item.get(field):
-                identities.append((project, field, item[field]))
+        else:
+            for field in ("co_firebase_id", "co_number"):
+                if item.get(field):
+                    identities.append((project, field, item[field]))
         if any(identity in seen for identity in identities):
             return True
         seen.update(identities)
