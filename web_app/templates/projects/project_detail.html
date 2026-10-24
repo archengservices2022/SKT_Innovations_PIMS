@@ -947,99 +947,33 @@
               <tbody>
                 {% for co in change_orders %}
                 {% set co_idx = loop.index0 %}
+                {% set co_down = co.get('down_payment_percent', 0)|float %}
+                {% set co_inst = co.get('installment_count', 1)|int %}
+                {# Locked once any of this CO's payment stages is invoiced #}
+                {% set co_lock = namespace(billed=false, count=0) %}
+                {% for s in (project.get('payment_stages') or []) %}
+                  {% if s is mapping and ((co.get('firebase_id') and s.get('co_firebase_id') == co.get('firebase_id')) or
+                                          (not s.get('co_firebase_id') and co.get('co_number') and s.get('co_number') == co.get('co_number'))) %}
+                    {% set co_lock.count = co_lock.count + 1 %}
+                    {% if s.get('invoice_id') or (s.get('status') or 'Pending Invoice') != 'Pending Invoice' %}{% set co_lock.billed = true %}{% endif %}
+                  {% endif %}
+                {% endfor %}
                 <tr>
-                  <td class="fw-600 text-teal" style="min-width:120px;">
-                    {% if can_manage_projects %}
-                    <input type="text" name="new_co_number" form="coAmountForm{{ co_idx }}"
-                           value="{{ co.get('co_number','') }}"
-                           class="form-control form-control-sm fw-600 mb-1 w-100"
-                           placeholder="CO #">
-                    <input type="text" name="po_wo_number" form="coAmountForm{{ co_idx }}"
-                           value="{{ co.get('po_wo_number','') }}"
-                           class="form-control form-control-sm w-100"
-                           placeholder="PO/WO #">
-                    {% else %}
+                  <td class="fw-600 text-teal" style="min-width:110px;">
                     {{ co.get('co_number','—') }}
-                    {% if co.get('po_wo_number') %}
-                    <div class="text-muted small fw-400">{{ co.get('po_wo_number') }}</div>
-                    {% endif %}
-                    {% endif %}
+                    <div class="text-muted small fw-normal">{{ co.get('po_wo_number') or 'No PO/WO' }}</div>
                   </td>
                   <td style="min-width:200px;">
-                    {% if can_manage_projects %}
-                    <input type="text" name="title" form="coAmountForm{{ co_idx }}"
-                           value="{{ co.get('title','') }}"
-                           class="form-control form-control-sm fw-500 mb-1 w-100" placeholder="Title">
-                    <input type="text" name="description" form="coAmountForm{{ co_idx }}"
-                           value="{{ co.get('description','') }}"
-                           class="form-control form-control-sm w-100" style="font-size:0.82em;"
-                           placeholder="Description (optional)">
-                    {% else %}
-                    <div class="fw-500">{{ co.get('title','—') }}</div>
+                    <div class="fw-500">{{ co.get('title') or '—' }}</div>
                     {% if co.get('description') %}
                     <div class="text-muted small">{{ co.get('description') }}</div>
                     {% endif %}
-                    {% endif %}
-                    {% if can_manage_projects %}
-                    <div class="mt-1">
-                      <span class="text-muted small co-addr-display" id="addrDisplay{{ co_idx }}">
-                        <i class="bi bi-geo-alt"></i>
-                        {{ co.get('shipping_address') or 'Add shipping address' }}
-                        <button type="button" class="btn btn-link btn-sm p-0 ms-1" style="font-size:11px;"
-                                onclick="toggleCoAddr({{ co_idx }})" title="Edit shipping address">
-                          <i class="bi bi-pencil"></i>
-                        </button>
-                      </span>
-                      <textarea name="shipping_address" form="coAmountForm{{ co_idx }}"
-                                class="form-control form-control-sm mt-1 d-none"
-                                id="addrEdit{{ co_idx }}" rows="2"
-                                placeholder="Shipping address for this CO">{{ co.get('shipping_address','') }}</textarea>
-                    </div>
-                    {% elif co.get('shipping_address') %}
+                    {% if co.get('shipping_address') %}
                     <div class="text-muted small mt-1"><i class="bi bi-geo-alt me-1"></i>{{ co.get('shipping_address') }}</div>
                     {% endif %}
                   </td>
-                  <td class="text-end fw-600">
-                    {% if can_manage_projects %}
-                    <form id="coAmountForm{{ co_idx }}" method="POST" action="{{ url_for('co_update_amount', project_id=project.firebase_id, co_idx=co_idx) }}" class="d-inline-flex align-items-center justify-content-end gap-1">
-                      <span class="text-muted">{{ currency_symbol }}</span>
-                      <input type="number" name="amount" min="0" step="0.01" value="{{ '%.2f'|format(co.get('amount',0)|float) }}" class="form-control form-control-sm text-end" style="width:110px;">
-                      <input type="hidden" name="co_firebase_id" value="{{ co.get('firebase_id','') }}">
-                    </form>
-                    {% else %}
-                    {{ currency_symbol }}{{ "{:,.0f}".format(co.get('amount',0)|float) }}
-                    {% endif %}
-                  </td>
+                  <td class="text-end fw-600 text-nowrap">{{ currency_symbol }}{{ "{:,.2f}".format(co.get('amount',0)|float) }}</td>
                   <td style="min-width:170px;">
-                    {% set co_down = co.get('down_payment_percent', 0)|float %}
-                    {% set co_inst = co.get('installment_count', 1)|int %}
-                    {# Locked once any of this CO's payment stages is invoiced #}
-                    {% set co_lock = namespace(billed=false, count=0) %}
-                    {% for s in (project.get('payment_stages') or []) %}
-                      {% if s is mapping and ((co.get('firebase_id') and s.get('co_firebase_id') == co.get('firebase_id')) or
-                                              (not s.get('co_firebase_id') and co.get('co_number') and s.get('co_number') == co.get('co_number'))) %}
-                        {% set co_lock.count = co_lock.count + 1 %}
-                        {% if s.get('invoice_id') or (s.get('status') or 'Pending Invoice') != 'Pending Invoice' %}{% set co_lock.billed = true %}{% endif %}
-                      {% endif %}
-                    {% endfor %}
-                    {% if can_manage_projects and not co_lock.billed %}
-                    {# Pick the plan straight from the row; saved with the row's save button #}
-                    <div class="d-flex align-items-center gap-1">
-                      <input type="number" name="co_down_payment_percent" form="coAmountForm{{ co_idx }}" min="0" max="100" step="1"
-                             value="{{ co_down|int }}" class="form-control form-control-sm text-end" style="width:56px;"
-                             title="Down payment %" oninput="coPlanChanged({{ co_idx }})">
-                      <span class="text-muted small">% down</span>
-                      <select name="co_installment_count" form="coAmountForm{{ co_idx }}" class="form-select form-select-sm co-plan-select"
-                              title="Balance installments" onchange="coPlanChanged({{ co_idx }})">
-                        <option value="1" {{ 'selected' if co_inst <= 1 }}>1 payment</option>
-                        {% for n in range(2, 7) %}<option value="{{ n }}" {{ 'selected' if co_inst == n }}>{{ n }} installments</option>{% endfor %}
-                      </select>
-                    </div>
-                    <button type="submit" form="coAmountForm{{ co_idx }}" class="btn btn-xs btn-primary mt-1" id="coPlanUnsaved{{ co_idx }}"
-                            style="display:none;" title="Rebuild this CO's payments with the new plan">
-                      <i class="bi bi-check-lg me-1"></i>Save plan
-                    </button>
-                    {% else %}
                     <div class="d-flex align-items-center gap-1">
                       <span class="co-plan-pill {{ 'co-plan-split' if (co_down > 0 or co_inst > 1) }}">
                         <i class="bi {{ 'bi-calendar2-week' if (co_down > 0 or co_inst > 1) else 'bi-cash' }}"></i>
@@ -1051,7 +985,6 @@
                       <i class="bi bi-lock-fill text-muted small" title="Plan locked: part of this CO is already invoiced. Uninvoiced payment amounts can still be edited below."></i>
                       {% endif %}
                     </div>
-                    {% endif %}
                     {% if co_lock.count > 1 %}
                     <div class="text-muted mt-1" style="font-size:11px;">{{ co_lock.count }} stages in Payment Plan</div>
                     {% elif co.get('status') not in ('Approved', 'Invoiced', 'Paid') and (co_down > 0 or co_inst > 1) %}
@@ -1069,20 +1002,20 @@
                     <span class="badge bg-secondary">Draft</span>
                     {% endif %}
                   </td>
-                  <td>
-                    {% if can_manage_projects %}
-                    <input type="date" name="co_date" form="coAmountForm{{ co_idx }}"
-                           value="{{ co.get('created_at','')[:10] }}"
-                           class="form-control form-control-sm" style="width:130px;">
-                    {% else %}
-                    <span class="text-muted small">{{ co.get('created_at','')[:10] | format_date }}</span>
-                    {% endif %}
-                  </td>
+                  <td><span class="text-muted small text-nowrap">{{ co.get('created_at','')[:10] | format_date }}</span></td>
                   {% if can_manage_projects %}
                   <td>
                     <div class="d-flex align-items-center flex-wrap gap-1">
-                    <button type="submit" form="coAmountForm{{ co_idx }}" class="btn btn-xs btn-outline-primary" title="Save CO amount">
-                      <i class="bi bi-floppy"></i>
+                    <button type="button" class="btn btn-xs btn-outline-primary" title="Edit change order"
+                            data-action="{{ url_for('co_update_amount', project_id=project.firebase_id, co_idx=co_idx) }}"
+                            data-co='{{ {"firebase_id": co.get("firebase_id",""), "co_number": co.get("co_number",""),
+                                         "po_wo_number": co.get("po_wo_number",""), "title": co.get("title",""),
+                                         "description": co.get("description",""), "shipping_address": co.get("shipping_address",""),
+                                         "amount": co.get("amount",0)|float, "date": co.get("created_at","")[:10],
+                                         "down": co_down|int, "installments": co_inst,
+                                         "plan_locked": co_lock.billed, "amount_locked": co_lock.billed and co_lock.count > 1}|tojson }}'
+                            onclick="openEditCo(this)">
+                      <i class="bi bi-pencil"></i> Edit
                     </button>
                     {% if co.get('status') == 'Draft' %}
                     <form method="POST" action="{{ url_for('co_status', project_id=project.firebase_id, co_idx=co_idx) }}">
@@ -1354,9 +1287,9 @@
             <input type="text" name="title" class="form-control" placeholder="e.g. Additional MEP Calculations">
           </div>
           <div class="mb-3">
-            <label class="form-label fw-600">PO / WO Number <span class="text-danger">*</span></label>
-            <input type="text" name="po_wo_number" class="form-control" placeholder="Enter PO or WO number" required autocomplete="off">
-            <div class="form-text">Must be unique — different from the project PO/WO and all other change orders.</div>
+            <label class="form-label fw-600">PO / WO Number <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="text" name="po_wo_number" class="form-control" placeholder="Enter PO or WO number" autocomplete="off">
+            <div class="form-text">If entered, it must be unique — different from the project PO/WO and all other change orders.</div>
           </div>
           <div class="mb-3">
             <label class="form-label fw-600">Shipping Address</label>
@@ -1450,13 +1383,116 @@ function updateCoPlanPreview() {
     'Payment stages added when approved');
 }
 
-// A plan dropdown changed in the Change Orders table: point at the row's save button
-function coPlanChanged(idx) {
-  document.getElementById('coPlanUnsaved' + idx).style.display = '';
-  const btn = document.querySelector('button[type="submit"][form="coAmountForm' + idx + '"]');
-  if (btn) btn.classList.replace('btn-outline-primary', 'btn-primary');
+// Edit Change Order window, filled from the row's Edit button
+function openEditCo(btn) {
+  const co = JSON.parse(btn.dataset.co);
+  const form = document.getElementById('editCoForm');
+  form.action = btn.dataset.action;
+  form.elements['co_firebase_id'].value = co.firebase_id || '';
+  form.elements['new_co_number'].value = co.co_number || '';
+  form.elements['po_wo_number'].value = co.po_wo_number || '';
+  form.elements['co_date'].value = co.date || '';
+  form.elements['title'].value = co.title || '';
+  form.elements['description'].value = co.description || '';
+  form.elements['shipping_address'].value = co.shipping_address || '';
+  form.elements['amount'].value = Number(co.amount || 0).toFixed(2);
+  form.elements['amount'].readOnly = !!co.amount_locked;
+  form.elements['co_down_payment_percent'].value = co.down || 0;
+  form.elements['co_installment_count'].value = String(co.installments || 1);
+  // Disabled plan fields aren't sent, so the server keeps the current plan
+  form.elements['co_down_payment_percent'].disabled = !!co.plan_locked;
+  form.elements['co_installment_count'].disabled = !!co.plan_locked;
+  document.getElementById('editCoTitle').textContent = co.co_number || 'Change Order';
+  document.getElementById('editCoLockNote').style.display = co.plan_locked ? '' : 'none';
+  refreshEditCoPlan();
+  new bootstrap.Modal(document.getElementById('editCOModal')).show();
+}
+
+function refreshEditCoPlan() {
+  const form = document.getElementById('editCoForm');
+  const box = document.getElementById('editCoPlanPreview');
+  if (form.elements['co_installment_count'].disabled) { box.style.display = 'none'; return; }
+  renderCoPlan(box,
+    parseFloat(form.elements['amount'].value) || 0,
+    parseFloat(form.elements['co_down_payment_percent'].value) || 0,
+    parseInt(form.elements['co_installment_count'].value, 10) || 1,
+    'Payment stages');
 }
 </script>
+
+<!-- Edit Change Order Modal -->
+<div class="modal fade" id="editCOModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-teal"></i>Edit Change Order · <span id="editCoTitle"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="editCoForm">
+        <input type="hidden" name="co_firebase_id">
+        <div class="modal-body">
+          <div class="row g-3 mb-3">
+            <div class="col-md-5">
+              <label class="form-label fw-600">CO Number <span class="text-danger">*</span></label>
+              <input type="text" name="new_co_number" class="form-control" autocomplete="off" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-600">Amount ({{ currency_symbol }}) <span class="text-danger">*</span></label>
+              <input type="number" name="amount" class="form-control" step="0.01" min="0" required oninput="refreshEditCoPlan()">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-600">Date</label>
+              <input type="date" name="co_date" class="form-control">
+            </div>
+          </div>
+          <div class="co-plan-section mb-3">
+            <div class="co-plan-head"><i class="bi bi-calendar2-week me-1"></i>Payment Plan</div>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small fw-600 mb-1">Down Payment (%)</label>
+                <input type="number" name="co_down_payment_percent" class="form-control form-control-sm" min="0" max="100" step="1"
+                       oninput="refreshEditCoPlan()">
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-600 mb-1">Balance Installments</label>
+                <select name="co_installment_count" class="form-select form-select-sm" onchange="refreshEditCoPlan()">
+                  <option value="1">1 — Single payment</option>
+                  {% for n in range(2, 7) %}<option value="{{ n }}">{{ n }} installments</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+            <div id="editCoLockNote" class="small text-muted mt-2" style="display:none;">
+              <i class="bi bi-lock-fill me-1"></i>Part of this CO is already invoiced, so its plan is locked. Edit the remaining
+              payment amounts in the CO's payment list instead.
+            </div>
+            <div id="editCoPlanPreview" class="co-plan-preview" style="display:none;"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-600">Title</label>
+            <input type="text" name="title" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-600">PO / WO Number <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="text" name="po_wo_number" class="form-control" autocomplete="off" placeholder="Enter PO or WO number">
+            <div class="form-text">If entered, it must be unique — different from the project PO/WO and all other change orders.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-600">Shipping Address</label>
+            <textarea name="shipping_address" class="form-control" rows="2"></textarea>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-600">Description</label>
+            <textarea name="description" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-teal"><i class="bi bi-check-lg me-1"></i>Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <!-- ?? Delete Confirmation Modal ??????????????????????????????????????????? -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
@@ -2486,14 +2522,6 @@ function submitStatusOnly() {
   const modal = bootstrap.Modal.getInstance(document.getElementById('invoicePromptModal'));
   if (modal) modal.hide();
   document.getElementById('statusForm').submit();
-}
-
-function toggleCoAddr(idx) {
-  const display = document.getElementById('addrDisplay' + idx);
-  const edit    = document.getElementById('addrEdit'    + idx);
-  display.classList.toggle('d-none');
-  edit.classList.toggle('d-none');
-  if (!edit.classList.contains('d-none')) edit.focus();
 }
 
 function requestDeletePermission(entityType, entityId, entityLabel, redirectUrl) {
