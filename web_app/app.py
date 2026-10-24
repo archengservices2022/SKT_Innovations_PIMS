@@ -1544,6 +1544,15 @@ def inject_globals():
         **clock_widget,
     }
 
+@app.template_filter('js_json')
+def js_json_filter(value):
+    """A json.dumps string made safe to place inside <script>: a name containing "</script>" can't
+    end the block early. Escaping <, > and & keeps it valid JSON."""
+    from markupsafe import Markup
+    # Raw lists/dicts (some views pass them without json.dumps) become real JSON too
+    text = value if isinstance(value, str) else json.dumps(value)
+    return Markup(text.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
+
 _CO_PLAN_LABEL_RE = re.compile(r"Down Payment \(\d+%\)|Installment \d+ of \d+|Final Payment|Full Payment", re.I)
 
 @app.template_filter('co_plan_label')

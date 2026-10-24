@@ -25,7 +25,7 @@ select.ss-hidden-select { display: none; }
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   box-shadow: 0 6px 16px rgba(15,23,42,.15);
-  font-size: 12px;
+  font-size: 14px;
 }
 .ss-item {
   padding: 6px 10px;
@@ -948,12 +948,12 @@ function openStagePickerModal(rowSelectEl, data) {
   const body   = document.getElementById('stagePickerBody');
 
   let html = `<div style="margin-bottom:14px;">
-    <div style="font-size:13px;color:#64748b;">${data.project_number || ''} — ${data.project_name || ''}</div>
+    <div style="font-size:15px;color:#64748b;">${data.project_number || ''} — ${data.project_name || ''}</div>
     <p class="text-muted small mb-0 mt-1">Check the stage(s) / change order(s) to bill on this invoice.</p>
   </div>`;
 
   html += `<div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;background:white;">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;background:white;">
       <tr style="background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
         <th style="padding:10px;width:36px;"></th>
         <th style="padding:10px;text-align:left;font-weight:600;color:#334155;">Stage</th>
@@ -974,11 +974,11 @@ function openStagePickerModal(rowSelectEl, data) {
       </td>
       <td style="padding:8px 10px;color:#1e293b;">
         <label for="${checkId}" style="cursor:pointer;margin:0;">${stage.stage_name || '—'}
-          ${stage.is_next ? '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600;">Next</span>' : ''}
+          ${stage.is_next ? '<span style="font-size:12px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600;">Next</span>' : ''}
         </label>
       </td>
       <td style="padding:8px 10px;text-align:right;color:#1e293b;font-weight:600;">${CURRENCY_SYMBOL}${parseFloat(stage.amount||0).toFixed(2)}</td>
-      <td style="padding:8px 10px;color:${statusClr};font-size:11px;">${statusTxt}</td>
+      <td style="padding:8px 10px;color:${statusClr};font-size:13px;">${statusTxt}</td>
     </tr>`;
   });
 
@@ -993,11 +993,11 @@ function openStagePickerModal(rowSelectEl, data) {
                checked style="cursor:pointer;width:15px;height:15px;">
       </td>
       <td style="padding:8px 10px;color:#78350f;">
-        <span style="font-size:10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px;">CO</span>
+        <span style="font-size:12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px;">CO</span>
         CO ${co.co_number || '—'}${co.title ? ' — ' + co.title : ''}
       </td>
       <td style="padding:8px 10px;text-align:right;color:#92400e;font-weight:600;">${CURRENCY_SYMBOL}${parseFloat(co.amount||0).toFixed(2)}</td>
-      <td style="padding:8px 10px;color:#0f766e;font-size:11px;">Ready to invoice</td>
+      <td style="padding:8px 10px;color:#0f766e;font-size:13px;">Ready to invoice</td>
     </tr>`;
   });
 

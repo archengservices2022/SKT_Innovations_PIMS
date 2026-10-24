@@ -24,7 +24,7 @@
   cursor: pointer;
   pointer-events: none;
   color: #666;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .custom-dropdown input:focus + .dropdown-arrow {
@@ -81,7 +81,7 @@
         {% if receipt_name %}
         <div style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: #f0f9ff; border: 1px solid #bfdbfe; border-radius: 4px;">
           <i class="bi bi-paperclip" style="color: #0ea5e9; font-size: 18px;"></i>
-          <span style="font-size: 12px; color: #0369a1; font-weight: 500; cursor: pointer;" onclick="viewExpenseReceipt('{{ expense.id }}')">
+          <span style="font-size: 14px; color: #0369a1; font-weight: 500; cursor: pointer;" onclick="viewExpenseReceipt('{{ expense.id }}')">
             {{ receipt_name }}
           </span>
         </div>
@@ -335,18 +335,18 @@
           <tbody>
             {% for child in expense.child_expenses %}
             <tr>
-              <td style="font-size:12px; white-space:nowrap;">{{ child.date | format_date or '—' }}</td>
-              <td style="font-size:12px;">{{ child.category or '—' }}</td>
-              <td style="font-size:12px;">{{ child.expense_name or '—' }}</td>
-              <td style="font-size:12px; text-align:right;">₹{{ "{:,.2f}".format(child.amount or 0) }}</td>
-              <td style="font-size:12px; color:#666;">{{ child.description or '—' }}</td>
+              <td style="font-size:14px; white-space:nowrap;">{{ child.date | format_date or '—' }}</td>
+              <td style="font-size:14px;">{{ child.category or '—' }}</td>
+              <td style="font-size:14px;">{{ child.expense_name or '—' }}</td>
+              <td style="font-size:14px; text-align:right;">₹{{ "{:,.2f}".format(child.amount or 0) }}</td>
+              <td style="font-size:14px; color:#666;">{{ child.description or '—' }}</td>
               <td style="white-space:nowrap;">
                 <div style="display:flex; justify-content:flex-start; gap:4px; align-items:center;">
                   {% if child.receipt_filename %}
-                  <button type="button" class="btn btn-sm btn-link p-0" onclick="viewExpenseItemReceipt('{{ expense.id }}', '{{ loop.index0 }}')" title="View Receipt: {{ child.receipt_filename }}" style="color:#0ea5e9; font-size:14px;"><i class="bi bi-paperclip"></i></button>
+                  <button type="button" class="btn btn-sm btn-link p-0" onclick="viewExpenseItemReceipt('{{ expense.id }}', '{{ loop.index0 }}')" title="View Receipt: {{ child.receipt_filename }}" style="color:#0ea5e9; font-size:16px;"><i class="bi bi-paperclip"></i></button>
                   {% endif %}
-                  <button type="button" class="btn btn-sm btn-link p-0" onclick="editExpenseItemFromDetails('{{ expense.id }}', {{ loop.index0 }})" title="Edit" style="color:#0ea5e9; font-size:14px;"><i class="bi bi-pencil"></i></button>
-                  <button type="button" class="btn btn-sm btn-link p-0" onclick="deleteExpenseItem('{{ expense.id }}', {{ loop.index0 }})" title="Delete" style="color:#ef4444; font-size:14px;"><i class="bi bi-trash"></i></button>
+                  <button type="button" class="btn btn-sm btn-link p-0" onclick="editExpenseItemFromDetails('{{ expense.id }}', {{ loop.index0 }})" title="Edit" style="color:#0ea5e9; font-size:16px;"><i class="bi bi-pencil"></i></button>
+                  <button type="button" class="btn btn-sm btn-link p-0" onclick="deleteExpenseItem('{{ expense.id }}', {{ loop.index0 }})" title="Delete" style="color:#ef4444; font-size:16px;"><i class="bi bi-trash"></i></button>
                 </div>
               </td>
             </tr>
@@ -416,7 +416,7 @@
             <div class="col-md-6">
               <label class="form-label form-label-sm fw-600">Amount (₹) *</label>
               <input type="number" name="amount" id="modalAmount" class="form-control form-control-sm" step="0.01" min="0" required oninput="updateModalBdtDisplay()">
-              <small class="form-text text-muted" id="modalBdtDisplay" style="color:#10b981;font-size:11px;margin-top:4px;"></small>
+              <small class="form-text text-muted" id="modalBdtDisplay" style="color:#10b981;font-size:13px;margin-top:4px;"></small>
             </div>
           </div>
 
@@ -489,7 +489,7 @@
 
             <!-- LEFT COLUMN: GROUP EXPENSE DETAILS (NARROWER) -->
             <div style="flex:0 0 30%; min-width:280px;">
-              <h6 style="color:#1f2937; font-weight:700; margin-bottom:12px; font-size:13px; text-transform:uppercase; letter-spacing:0.5px;">
+              <h6 style="color:#1f2937; font-weight:700; margin-bottom:12px; font-size:15px; text-transform:uppercase; letter-spacing:0.5px;">
                 Group Expenses Details
               </h6>
 
@@ -502,14 +502,14 @@
               <!-- Expense Type (Fixed: Group Expenses) -->
               <div class="mb-2">
                 <label class="form-label form-label-sm fw-600" style="margin-bottom:4px;">Expense Type *</label>
-                <input type="text" class="form-control form-control-sm" value="Group Expenses" disabled style="background:#f5f5f5; font-size:12px;">
+                <input type="text" class="form-control form-control-sm" value="Group Expenses" disabled style="background:#f5f5f5; font-size:14px;">
                 <input type="hidden" id="groupType" value="Group Expenses">
               </div>
 
               <!-- Category -->
               <div class="mb-2">
                 <label class="form-label form-label-sm fw-600" style="margin-bottom:4px;">Expense Category *</label>
-                <input type="text" id="groupExpenseCategory0" class="form-control form-control-sm" placeholder="e.g., Business Travel" required style="font-size:12px;">
+                <input type="text" id="groupExpenseCategory0" class="form-control form-control-sm" placeholder="e.g., Business Travel" required style="font-size:14px;">
               </div>
 
               <!-- Expense Name -->
@@ -521,42 +521,42 @@
               <!-- Vendor/Merchant -->
               <div class="mb-2" style="position:relative;">
                 <label class="form-label form-label-sm fw-600" style="margin-bottom:4px;">Vendor/Merchant *</label>
-                <input type="text" id="groupExpenseVendor0" class="form-control form-control-sm" placeholder="Choose or type..." required style="font-size:12px;" onkeyup="filterGroupVendorDropdown(this.value)" onclick="showGroupVendorDropdown()">
+                <input type="text" id="groupExpenseVendor0" class="form-control form-control-sm" placeholder="Choose or type..." required style="font-size:14px;" onkeyup="filterGroupVendorDropdown(this.value)" onclick="showGroupVendorDropdown()">
                 <div class="dropdown-list" id="groupVendorDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #dee2e6; border-radius:4px; max-height:200px; overflow-y:auto; z-index:1000; margin-top:2px; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></div>
               </div>
 
               <!-- Link to Project -->
               <div class="mb-2" style="position:relative;">
                 <label class="form-label form-label-sm fw-600" style="margin-bottom:4px;">Project Number</label>
-                <input type="text" id="groupExpenseProject0" class="form-control form-control-sm" placeholder="— Optional —" style="font-size:12px;" onkeyup="filterGroupProjectDropdown(this.value)" onclick="showGroupProjectDropdown()">
+                <input type="text" id="groupExpenseProject0" class="form-control form-control-sm" placeholder="— Optional —" style="font-size:14px;" onkeyup="filterGroupProjectDropdown(this.value)" onclick="showGroupProjectDropdown()">
                 <div class="dropdown-list" id="groupProjectDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #dee2e6; border-radius:4px; max-height:200px; overflow-y:auto; z-index:1000; margin-top:2px; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></div>
               </div>
 
               <!-- Notes -->
               <div class="mb-2">
                 <label class="form-label form-label-sm fw-600" style="margin-bottom:4px;">Notes</label>
-                <textarea id="groupNotes" class="form-control form-control-sm" rows="2" placeholder="Optional notes" style="font-size:12px;"></textarea>
+                <textarea id="groupNotes" class="form-control form-control-sm" rows="2" placeholder="Optional notes" style="font-size:14px;"></textarea>
               </div>
 
               <!-- Receipt -->
               <div class="mb-2">
                 <label class="form-label form-label-sm fw-600" style="margin-bottom:4px;">Receipt (PDF/Image)</label>
                 <div id="currentGroupReceiptDisplay" style="display:none; background:#e0f2fe; border:1px solid #0ea5e9; border-radius:4px; padding:8px; margin-bottom:8px;">
-                  <div style="font-size:11px; color:#666; margin-bottom:4px;">Current Receipt:</div>
+                  <div style="font-size:13px; color:#666; margin-bottom:4px;">Current Receipt:</div>
                   <div style="display:flex; align-items:center; gap:6px;">
-                    <span id="currentGroupReceiptName" style="font-size:12px; font-weight:600; color:#0369a1; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="viewCurrentGroupReceipt(); return false;" style="padding:3px 8px; font-size:11px;">View</button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCurrentGroupReceipt(event); return false;" style="padding:3px 8px; font-size:11px;">Remove</button>
+                    <span id="currentGroupReceiptName" style="font-size:14px; font-weight:600; color:#0369a1; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="viewCurrentGroupReceipt(); return false;" style="padding:3px 8px; font-size:13px;">View</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCurrentGroupReceipt(event); return false;" style="padding:3px 8px; font-size:13px;">Remove</button>
                   </div>
                 </div>
                 <input type="file" id="groupReceipt" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.gif">
-                <small class="text-muted d-block" style="font-size:10px; margin-top:2px;">PDF, JPG, PNG, GIF</small>
+                <small class="text-muted d-block" style="font-size:12px; margin-top:2px;">PDF, JPG, PNG, GIF</small>
               </div>
             </div>
 
             <!-- RIGHT COLUMN: EXPENSE ITEMS -->
             <div style="flex:1; min-width:500px;">
-              <h6 style="color:#1f2937; font-weight:700; margin-bottom:12px; font-size:13px; text-transform:uppercase; letter-spacing:0.5px;">
+              <h6 style="color:#1f2937; font-weight:700; margin-bottom:12px; font-size:15px; text-transform:uppercase; letter-spacing:0.5px;">
                 Add Expense Item
               </h6>
 
@@ -565,12 +565,12 @@
                 <!-- Row 1: Date | Category -->
                 <div class="row g-2 mb-2">
                   <div class="col-6">
-                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:12px;">Date *</label>
-                    <input type="date" id="newItemDate" class="form-control form-control-sm" required style="font-size:12px; padding:6px 8px;">
+                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:14px;">Date *</label>
+                    <input type="date" id="newItemDate" class="form-control form-control-sm" required style="font-size:14px; padding:6px 8px;">
                   </div>
                   <div class="col-6" style="position:relative;">
-                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:12px;">Category *</label>
-                    <input type="text" id="newItemCategory" class="form-control form-control-sm" placeholder="Choose or type..." required style="font-size:11px;" onkeyup="filterNewItemCategoryDropdown(this.value)" onclick="showNewItemCategoryDropdown()">
+                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:14px;">Category *</label>
+                    <input type="text" id="newItemCategory" class="form-control form-control-sm" placeholder="Choose or type..." required style="font-size:13px;" onkeyup="filterNewItemCategoryDropdown(this.value)" onclick="showNewItemCategoryDropdown()">
                     <div class="dropdown-list" id="newItemCategoryDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #dee2e6; border-radius:4px; max-height:200px; overflow-y:auto; z-index:10000; margin-top:2px; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></div>
                   </div>
                 </div>
@@ -578,43 +578,43 @@
                 <!-- Row 2: Expense Name | Amount -->
                 <div class="row g-2 mb-2">
                   <div class="col-6">
-                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:12px;">Expense Name *</label>
-                    <input type="text" id="newItemName" class="form-control form-control-sm" placeholder="Item name" required style="font-size:12px; padding:6px 8px;">
+                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:14px;">Expense Name *</label>
+                    <input type="text" id="newItemName" class="form-control form-control-sm" placeholder="Item name" required style="font-size:14px; padding:6px 8px;">
                   </div>
                   <div class="col-6">
-                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:12px;">Amount *</label>
-                    <input type="number" id="newItemAmount" class="form-control form-control-sm" placeholder="0.00" step="0.01" required style="font-size:12px; padding:6px 8px;">
+                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:14px;">Amount *</label>
+                    <input type="number" id="newItemAmount" class="form-control form-control-sm" placeholder="0.00" step="0.01" required style="font-size:14px; padding:6px 8px;">
                   </div>
                 </div>
 
                 <!-- Row 3: Description | Receipt -->
                 <div class="row g-2 mb-2">
                   <div class="col-8">
-                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:12px;">Description</label>
-                    <textarea id="newItemDescription" class="form-control form-control-sm" rows="1" placeholder="Optional" style="font-size:12px; padding:6px 8px;"></textarea>
+                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:14px;">Description</label>
+                    <textarea id="newItemDescription" class="form-control form-control-sm" rows="1" placeholder="Optional" style="font-size:14px; padding:6px 8px;"></textarea>
                   </div>
                   <div class="col-4">
-                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:12px;">
-                      <i class="bi bi-paperclip me-1" style="font-size:12px;"></i>Receipt
+                    <label class="form-label form-label-sm fw-600" style="margin-bottom:4px; font-size:14px;">
+                      <i class="bi bi-paperclip me-1" style="font-size:14px;"></i>Receipt
                     </label>
                     <div id="currentItemReceiptDisplay" style="display:none; background:#e0f2fe; border:1px solid #0ea5e9; border-radius:4px; padding:6px; margin-bottom:4px;">
-                      <div style="font-size:10px; color:#666; margin-bottom:2px;">Current:</div>
+                      <div style="font-size:12px; color:#666; margin-bottom:2px;">Current:</div>
                       <div style="display:flex; align-items:center; gap:4px;">
-                        <span id="currentItemReceiptName" style="font-size:11px; font-weight:600; color:#0369a1; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
-                        <button type="button" class="btn btn-sm btn-link p-0" onclick="viewCurrentItemReceipt(); return false;" style="padding:0; font-size:10px; color:#0369a1;">View</button>
-                        <button type="button" class="btn btn-sm btn-link p-0" onclick="removeCurrentItemReceipt(event); return false;" style="padding:0; font-size:10px; color:#ef4444;">Remove</button>
+                        <span id="currentItemReceiptName" style="font-size:13px; font-weight:600; color:#0369a1; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
+                        <button type="button" class="btn btn-sm btn-link p-0" onclick="viewCurrentItemReceipt(); return false;" style="padding:0; font-size:12px; color:#0369a1;">View</button>
+                        <button type="button" class="btn btn-sm btn-link p-0" onclick="removeCurrentItemReceipt(event); return false;" style="padding:0; font-size:12px; color:#ef4444;">Remove</button>
                       </div>
                     </div>
-                    <input type="file" id="newItemReceipt" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.gif" style="font-size:10px;">
+                    <input type="file" id="newItemReceipt" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.gif" style="font-size:12px;">
                   </div>
                 </div>
 
                 <!-- Row 4: Buttons (Right-aligned, small) -->
                 <div style="display:flex; justify-content:flex-end; gap:8px;">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAddItemForm()" style="padding:6px 14px; font-size:11px; font-weight:600; white-space:nowrap; border-radius:20px;">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAddItemForm()" style="padding:6px 14px; font-size:13px; font-weight:600; white-space:nowrap; border-radius:20px;">
                     <i class="bi bi-x-lg me-1"></i>Cancel
                   </button>
-                  <button type="button" id="addItemButton" class="btn btn-sm btn-success" onclick="addExpenseToGroupTable()" style="padding:6px 16px; font-size:11px; font-weight:600; white-space:nowrap; border-radius:20px;">
+                  <button type="button" id="addItemButton" class="btn btn-sm btn-success" onclick="addExpenseToGroupTable()" style="padding:6px 16px; font-size:13px; font-weight:600; white-space:nowrap; border-radius:20px;">
                     <i class="bi bi-plus-lg me-1"></i>Add Expense Item
                   </button>
                 </div>
@@ -622,11 +622,11 @@
 
               <!-- Expense Items Table (Hidden until first item added) -->
               <div id="expenseItemsSection" style="display:none;">
-                <h6 style="color:#1f2937; font-weight:700; margin-bottom:10px; font-size:13px; text-transform:uppercase; letter-spacing:0.5px;">
+                <h6 style="color:#1f2937; font-weight:700; margin-bottom:10px; font-size:15px; text-transform:uppercase; letter-spacing:0.5px;">
                   Expense Items
                 </h6>
                 <div class="table-responsive mb-3" style="max-height:280px; overflow-y:auto; border:1px solid #e5e7eb; border-radius:4px;">
-                  <table class="table table-sm mb-0" style="font-size:12px; padding:6px 8px;">
+                  <table class="table table-sm mb-0" style="font-size:14px; padding:6px 8px;">
                     <thead style="background:#f5f5f5; position:sticky; top:0;">
                       <tr>
                         <th style="width:12%;">Date</th>
@@ -645,7 +645,7 @@
 
                 <!-- Total -->
                 <div style="text-align:right; padding:12px; background:#f0fdf4; border:1px solid #86efac; border-radius:4px;">
-                  <div style="font-size:12px; color:#666; margin-bottom:6px; text-transform:uppercase; font-weight:600;">Total Expense</div>
+                  <div style="font-size:14px; color:#666; margin-bottom:6px; text-transform:uppercase; font-weight:600;">Total Expense</div>
                   <div style="font-size:28px; font-weight:700; color:#0f766e;" id="groupTotalDisplay">₹0.00</div>
                 </div>
               </div>
@@ -681,7 +681,7 @@
 
           <div class="mb-3" style="position:relative;">
             <label class="form-label fw-600">Category *</label>
-            <input type="text" id="editItemCategory" class="form-control" placeholder="Choose or type..." required style="font-size:14px;" onkeyup="filterEditCategoryDropdown(this.value)" onclick="showEditCategoryDropdown()">
+            <input type="text" id="editItemCategory" class="form-control" placeholder="Choose or type..." required style="font-size:16px;" onkeyup="filterEditCategoryDropdown(this.value)" onclick="showEditCategoryDropdown()">
             <div id="editCategoryDropdown" class="custom-dropdown" style="display:none; position:fixed; background:white; border:1px solid #dee2e6; border-radius:4px; max-height:250px; overflow-y:auto; z-index:10050; width:400px; box-shadow:0 4px 12px rgba(0,0,0,0.3);">
             </div>
           </div>
@@ -704,11 +704,11 @@
           <div class="mb-3">
             <label class="form-label fw-600">Receipt</label>
             <div id="currentEditItemReceipt" style="display:none; background:#e0f2fe; border:1px solid #0ea5e9; border-radius:4px; padding:8px; margin-bottom:8px;">
-              <div style="font-size:12px; color:#666; margin-bottom:4px;">Current Receipt:</div>
+              <div style="font-size:14px; color:#666; margin-bottom:4px;">Current Receipt:</div>
               <div style="display:flex; align-items:center; gap:6px;">
-                <span id="editItemReceiptName" style="font-size:12px; font-weight:600; color:#0369a1; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="viewEditItemReceipt()" style="padding:3px 8px; font-size:11px;">View</button>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeEditItemReceipt()" style="padding:3px 8px; font-size:11px;">Remove</button>
+                <span id="editItemReceiptName" style="font-size:14px; font-weight:600; color:#0369a1; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="viewEditItemReceipt()" style="padding:3px 8px; font-size:13px;">View</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeEditItemReceipt()" style="padding:3px 8px; font-size:13px;">Remove</button>
               </div>
             </div>
             <input type="file" id="editItemReceipt" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.gif">
@@ -725,8 +725,8 @@
 </div>
 
 <script>
-let categoriesByType = {{ categories_by_type|safe }};
-let expenseNamesByCategory = {{ expense_names_by_category|safe }};
+let categoriesByType = {{ categories_by_type|js_json }};
+let expenseNamesByCategory = {{ expense_names_by_category|js_json }};
 const expenseTypesList = {{ expense_types|tojson }};
 const projectsList = {{ projects|tojson|safe }};
 let vendorList = {{ all_vendors|tojson }};
@@ -1560,7 +1560,7 @@ function showEditCategoryDropdown() {
   uniqueCats.forEach(cat => {
     const div = document.createElement('div');
     div.className = 'option';
-    div.style.cssText = 'padding:8px 12px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:13px; background:white;';
+    div.style.cssText = 'padding:8px 12px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:15px; background:white;';
     div.textContent = cat;
     div.onmouseover = () => div.style.backgroundColor = '#f0f0f0';
     div.onmouseout = () => div.style.backgroundColor = 'white';
@@ -1879,7 +1879,7 @@ function showNewItemCategoryDropdown() {
 
   uniqueCats.forEach(cat => {
     const div = document.createElement('div');
-    div.style.cssText = 'padding:8px 12px; cursor:pointer; background:white; border-bottom:1px solid #f0f0f0; font-size:12px;';
+    div.style.cssText = 'padding:8px 12px; cursor:pointer; background:white; border-bottom:1px solid #f0f0f0; font-size:14px;';
     div.textContent = cat;
     div.onmouseover = () => div.style.backgroundColor = '#f0fdf4';
     div.onmouseout = () => div.style.backgroundColor = 'white';
@@ -2079,28 +2079,28 @@ function openGroupEditModal(expense) {
 
         const row = `
           <tr class="expense-row-${index}" data-index="${index}" data-expense-name="${String(childExp.expense_name || '').replace(/"/g, '&quot;')}" data-category="${String(childExp.category || '').replace(/"/g, '&quot;')}" data-date="${String(childExp.date || '').replace(/"/g, '&quot;')}" data-amount="${childExp.amount || 0}" data-description="${String(childExp.description || '').replace(/"/g, '&quot;')}" data-receipt="${String(childExp.receipt_filename || '').replace(/"/g, '&quot;')}">
-            <td style="font-size:12px; white-space:nowrap; padding:8px;">
+            <td style="font-size:14px; white-space:nowrap; padding:8px;">
               ${fmtMDY(childExp.date)}
             </td>
-            <td style="font-size:12px; padding:8px;">
+            <td style="font-size:14px; padding:8px;">
               ${childExp.category || '—'}
             </td>
-            <td style="font-size:12px; padding:8px;">
+            <td style="font-size:14px; padding:8px;">
               ${childExp.expense_name || '—'}
             </td>
-            <td style="font-size:12px; text-align:right; padding:8px;">
+            <td style="font-size:14px; text-align:right; padding:8px;">
               ₹${parseFloat(childExp.amount || 0).toFixed(2)}
             </td>
-            <td style="font-size:12px; color:#666; padding:8px;">
+            <td style="font-size:14px; color:#666; padding:8px;">
               ${childExp.description || '—'}
             </td>
             <td style="width:18%; text-align:left; padding:8px; white-space:nowrap;">
               <div style="display:flex; justify-content:flex-start; gap:4px; align-items:center;">
-                ${childExp.receipt_filename ? `<button type="button" class="btn btn-sm btn-link p-0" onclick="viewExpenseItemReceipt('${window.editingGroupExpenseId}', ${idx})" title="View Receipt: ${String(childExp.receipt_filename || '').replace(/"/g, '&quot;')}" style="color:#0ea5e9; font-size:14px;"><i class="bi bi-paperclip"></i></button>` : ''}
-                <button type="button" class="btn btn-sm btn-link text-primary p-0" onclick="editRowItem(this)" title="Edit" style="color:#0ea5e9; font-size:14px;">
+                ${childExp.receipt_filename ? `<button type="button" class="btn btn-sm btn-link p-0" onclick="viewExpenseItemReceipt('${window.editingGroupExpenseId}', ${idx})" title="View Receipt: ${String(childExp.receipt_filename || '').replace(/"/g, '&quot;')}" style="color:#0ea5e9; font-size:16px;"><i class="bi bi-paperclip"></i></button>` : ''}
+                <button type="button" class="btn btn-sm btn-link text-primary p-0" onclick="editRowItem(this)" title="Edit" style="color:#0ea5e9; font-size:16px;">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeExpenseFromGroup(${index})" title="Delete" style="color:#ef4444; font-size:14px;">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeExpenseFromGroup(${index})" title="Delete" style="color:#ef4444; font-size:16px;">
                   <i class="bi bi-trash"></i>
                 </button>
               </div>
@@ -2174,18 +2174,18 @@ function addExpenseToGroupTable() {
 
   const row = `
     <tr class="expense-row-${index}" data-index="${index}" data-expense-name="${String(name || '').replace(/"/g, '&quot;')}" data-category="${String(category || '').replace(/"/g, '&quot;')}" data-date="${String(date || '').replace(/"/g, '&quot;')}" data-amount="${amount}" data-description="${String(description || '').replace(/"/g, '&quot;')}" data-receipt="${String(receiptFile ? receiptFile.name : '').replace(/"/g, '&quot;')}">
-      <td style="font-size:12px; white-space:nowrap; padding:8px;">${fmtMDY(date)}</td>
-      <td style="font-size:12px; padding:8px;">${category}</td>
-      <td style="font-size:12px; padding:8px;">${name}</td>
-      <td style="font-size:12px; text-align:right; padding:8px;">₹${parseFloat(amount).toFixed(2)}</td>
-      <td style="font-size:12px; color:#666; padding:8px;">${description || '—'}</td>
+      <td style="font-size:14px; white-space:nowrap; padding:8px;">${fmtMDY(date)}</td>
+      <td style="font-size:14px; padding:8px;">${category}</td>
+      <td style="font-size:14px; padding:8px;">${name}</td>
+      <td style="font-size:14px; text-align:right; padding:8px;">₹${parseFloat(amount).toFixed(2)}</td>
+      <td style="font-size:14px; color:#666; padding:8px;">${description || '—'}</td>
       <td style="width:18%; text-align:left; padding:8px; white-space:nowrap;">
         <div style="display:flex; justify-content:flex-start; gap:4px; align-items:center;">
-          ${receiptFile ? `<button type="button" class="btn btn-sm btn-link p-0" onclick="viewExpenseItemReceipt('${window.editingGroupExpenseId}', ${index})" title="View Receipt: ${safeReceiptName}" style="color:#0ea5e9; font-size:14px;"><i class="bi bi-paperclip"></i></button>` : ''}
-          <button type="button" class="btn btn-sm btn-link text-primary p-0" onclick="editRowItem(this)" title="Edit" style="color:#0ea5e9; font-size:14px;">
+          ${receiptFile ? `<button type="button" class="btn btn-sm btn-link p-0" onclick="viewExpenseItemReceipt('${window.editingGroupExpenseId}', ${index})" title="View Receipt: ${safeReceiptName}" style="color:#0ea5e9; font-size:16px;"><i class="bi bi-paperclip"></i></button>` : ''}
+          <button type="button" class="btn btn-sm btn-link text-primary p-0" onclick="editRowItem(this)" title="Edit" style="color:#0ea5e9; font-size:16px;">
             <i class="bi bi-pencil"></i>
           </button>
-          <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeExpenseFromGroup(${index})" title="Delete" style="color:#ef4444; font-size:14px;">
+          <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeExpenseFromGroup(${index})" title="Delete" style="color:#ef4444; font-size:16px;">
             <i class="bi bi-trash"></i>
           </button>
         </div>
@@ -2395,18 +2395,18 @@ function updateExistingItem(index) {
   const safeReceiptName = (receiptName || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
   row.innerHTML = `
-    <td style="font-size:12px; white-space:nowrap; padding:8px;">${fmtMDY(date)}</td>
-    <td style="font-size:12px; padding:8px;">${category}</td>
-    <td style="font-size:12px; padding:8px;">${name}</td>
-    <td style="font-size:12px; text-align:right; padding:8px;">₹${parseFloat(amount).toFixed(2)}</td>
-    <td style="font-size:12px; color:#666; padding:8px;">${description || '—'}</td>
+    <td style="font-size:14px; white-space:nowrap; padding:8px;">${fmtMDY(date)}</td>
+    <td style="font-size:14px; padding:8px;">${category}</td>
+    <td style="font-size:14px; padding:8px;">${name}</td>
+    <td style="font-size:14px; text-align:right; padding:8px;">₹${parseFloat(amount).toFixed(2)}</td>
+    <td style="font-size:14px; color:#666; padding:8px;">${description || '—'}</td>
     <td style="width:18%; text-align:left; padding:8px; white-space:nowrap;">
       <div style="display:flex; justify-content:flex-start; gap:4px; align-items:center;">
-        ${receiptName ? `<button type="button" class="btn btn-sm btn-link p-0" onclick="viewExpenseItemReceipt('${window.editingGroupExpenseId}', '${index}')" title="View Receipt: ${receiptName}" style="color:#0ea5e9; font-size:14px;"><i class="bi bi-paperclip"></i></button>` : ''}
-        <button type="button" class="btn btn-sm btn-link text-primary p-0" onclick="editExistingItem(${index}, '${safeName}', '${safeCategory}', '${date}', ${amount}, '${safeDescription}', '${safeReceiptName}')" title="Edit" style="color:#0ea5e9; font-size:14px;">
+        ${receiptName ? `<button type="button" class="btn btn-sm btn-link p-0" onclick="viewExpenseItemReceipt('${window.editingGroupExpenseId}', '${index}')" title="View Receipt: ${receiptName}" style="color:#0ea5e9; font-size:16px;"><i class="bi bi-paperclip"></i></button>` : ''}
+        <button type="button" class="btn btn-sm btn-link text-primary p-0" onclick="editExistingItem(${index}, '${safeName}', '${safeCategory}', '${date}', ${amount}, '${safeDescription}', '${safeReceiptName}')" title="Edit" style="color:#0ea5e9; font-size:16px;">
           <i class="bi bi-pencil"></i>
         </button>
-        <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeExpenseFromGroup(${index})" title="Delete" style="color:#ef4444; font-size:14px;">
+        <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeExpenseFromGroup(${index})" title="Delete" style="color:#ef4444; font-size:16px;">
           <i class="bi bi-trash"></i>
         </button>
       </div>

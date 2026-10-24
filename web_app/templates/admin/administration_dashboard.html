@@ -47,12 +47,12 @@
   <div class="col-12 col-lg-6">
     <div class="card-panel h-100" style="border-top:3px solid #0D9488;">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="mb-0 fw-bold" style="color:#0D9488;font-size:14px;">
+        <h6 class="mb-0 fw-bold" style="color:#0D9488;font-size:16px;">
           <i class="bi bi-kanban me-1"></i>Project Status
-          <span class="text-muted fw-normal" style="font-size:11px;margin-left:4px;">{{ proj_total }} total</span>
+          <span class="text-muted fw-normal" style="font-size:13px;margin-left:4px;">{{ proj_total }} total</span>
         </h6>
         {% if 'projects' in allowed_pages %}
-        <a href="{{ url_for('projects') }}" class="btn btn-xs" style="background:#F0FDFA;color:#0D9488;border:none;font-size:11px;padding:3px 10px;border-radius:4px;">View All →</a>
+        <a href="{{ url_for('projects') }}" class="btn btn-xs" style="background:#F0FDFA;color:#0D9488;border:none;font-size:13px;padding:3px 10px;border-radius:4px;">View All →</a>
         {% endif %}
       </div>
       {% if proj_status_counts %}
@@ -67,7 +67,7 @@
         <div class="col-6 col-md-4">
           <a href="{{ url_for('projects') }}" class="text-decoration-none">
             <div style="background:{{ _bg }};border-radius:8px;padding:10px 12px;">
-              <div style="font-size:10px;color:{{ _ac }};font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ st }}">{{ st }}</div>
+              <div style="font-size:12px;color:{{ _ac }};font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ st }}">{{ st }}</div>
               <div style="font-size:1.6rem;font-weight:800;color:{{ _ac }};line-height:1.1;">{{ cnt }}</div>
             </div>
           </a>
@@ -84,12 +84,12 @@
   <div class="col-12 col-lg-6">
     <div class="card-panel h-100" style="border-top:3px solid #0369A1;">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="mb-0 fw-bold" style="color:#0369A1;font-size:14px;">
+        <h6 class="mb-0 fw-bold" style="color:#0369A1;font-size:16px;">
           <i class="bi bi-receipt me-1"></i>Invoice Status
-          <span class="text-muted fw-normal" style="font-size:11px;margin-left:4px;">{{ inv_total }} total</span>
+          <span class="text-muted fw-normal" style="font-size:13px;margin-left:4px;">{{ inv_total }} total</span>
         </h6>
         {% if 'invoicing' in allowed_pages %}
-        <a href="{{ url_for('invoicing') }}" class="btn btn-xs" style="background:#EFF6FF;color:#0369A1;border:none;font-size:11px;padding:3px 10px;border-radius:4px;">View All →</a>
+        <a href="{{ url_for('invoicing') }}" class="btn btn-xs" style="background:#EFF6FF;color:#0369A1;border:none;font-size:13px;padding:3px 10px;border-radius:4px;">View All →</a>
         {% endif %}
       </div>
       {% if inv_status_counts %}
@@ -104,7 +104,7 @@
         <div class="col-6 col-md-4">
           <a href="{{ url_for('invoicing') }}" class="text-decoration-none">
             <div style="background:{{ _bg }};border-radius:8px;padding:10px 12px;">
-              <div style="font-size:10px;color:{{ _ac }};font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ st }}">{{ st }}</div>
+              <div style="font-size:12px;color:{{ _ac }};font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ st }}">{{ st }}</div>
               <div style="font-size:1.6rem;font-weight:800;color:{{ _ac }};line-height:1.1;">{{ cnt }}</div>
             </div>
           </a>
@@ -128,7 +128,7 @@
         <h6 class="panel-title mb-0"><i class="bi bi-exclamation-triangle me-1" style="color:#DC2626;"></i>Invoices Needing Attention</h6>
       </div>
 
-      <div class="text-muted small fw-600 mb-1" style="text-transform:uppercase;font-size:10px;letter-spacing:.04em;">Overdue ({{ overdue_invoices_count }})</div>
+      <div class="text-muted small fw-600 mb-1" style="text-transform:uppercase;font-size:12px;letter-spacing:.04em;">Overdue ({{ overdue_invoices_count }})</div>
       {% for inv in overdue_invoices %}
       {% set meta = inv.get('meta', {}) %}
       <a href="{{ url_for('invoice_detail', invoice_id=inv.firebase_id) }}" class="list-item text-decoration-none" style="display:flex;justify-content:space-between;align-items:center;">
@@ -142,7 +142,7 @@
       <div class="text-muted small py-1">None — nice.</div>
       {% endfor %}
 
-      <div class="text-muted small fw-600 mb-1 mt-3" style="text-transform:uppercase;font-size:10px;letter-spacing:.04em;">Awaiting Send ({{ draft_invoices_count }})</div>
+      <div class="text-muted small fw-600 mb-1 mt-3" style="text-transform:uppercase;font-size:12px;letter-spacing:.04em;">Awaiting Send ({{ draft_invoices_count }})</div>
       {% for inv in draft_invoices %}
       {% set meta = inv.get('meta', {}) %}
       <a href="{{ url_for('invoice_detail', invoice_id=inv.firebase_id) }}" class="list-item text-decoration-none" style="display:flex;justify-content:space-between;align-items:center;">
@@ -156,7 +156,7 @@
       <div class="text-muted small py-1">None pending.</div>
       {% endfor %}
 
-      <div class="text-muted small fw-600 mb-1 mt-3" style="text-transform:uppercase;font-size:10px;letter-spacing:.04em;">Recently Paid</div>
+      <div class="text-muted small fw-600 mb-1 mt-3" style="text-transform:uppercase;font-size:12px;letter-spacing:.04em;">Recently Paid</div>
       {% for inv in recently_paid_invoices[:5] %}
       {% set meta = inv.get('meta', {}) %}
       <a href="{{ url_for('invoice_detail', invoice_id=inv.firebase_id) }}" class="list-item text-decoration-none" style="display:flex;justify-content:space-between;align-items:center;">
@@ -177,13 +177,13 @@
     <div class="card-panel h-100">
       <div class="panel-header d-flex justify-content-between align-items-center mb-2">
         <h6 class="panel-title mb-0"><i class="bi bi-clock-history me-1" style="color:#7C3AED;"></i>Timesheets Awaiting Approval
-          <span class="text-muted fw-normal" style="font-size:11px;margin-left:4px;">{{ pending_timesheets_count }}</span>
+          <span class="text-muted fw-normal" style="font-size:13px;margin-left:4px;">{{ pending_timesheets_count }}</span>
         </h6>
         {% if 'timesheets' in allowed_pages %}
         <a href="{{ url_for('timesheets') }}" class="text-teal small">View all →</a>
         {% endif %}
       </div>
-      <div class="text-muted" style="font-size:11px;margin-bottom:8px;">
+      <div class="text-muted" style="font-size:13px;margin-bottom:8px;">
         <i class="bi bi-info-circle me-1"></i>Approving requires an Admin — this is a heads-up list.
       </div>
       {% for s in pending_timesheets %}
@@ -192,7 +192,7 @@
           <div class="list-item-title">{{ s.get('employee_name','—') }}</div>
           <div class="list-item-sub">Week of {{ s.get('week_of','—') }}</div>
         </div>
-        <span class="badge bg-warning text-dark" style="font-size:11px;">Submitted</span>
+        <span class="badge bg-warning text-dark" style="font-size:13px;">Submitted</span>
       </div>
       {% else %}
       <div class="empty-state py-4"><i class="bi bi-check2-circle fs-2 d-block mb-2"></i>Nothing pending.</div>
@@ -217,18 +217,18 @@
       <div class="row g-3">
         <div class="col-12 col-md-3">
           <div style="background:#F0FDFA;border-radius:8px;padding:12px;">
-            <div style="font-size:10px;color:#0D9488;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Active Employees</div>
+            <div style="font-size:12px;color:#0D9488;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Active Employees</div>
             <div style="font-size:1.6rem;font-weight:800;color:#0D9488;line-height:1.1;">{{ active_employees_count }}</div>
           </div>
         </div>
 
         <div class="col-12 col-md-4">
-          <div class="text-muted small fw-600 mb-1" style="text-transform:uppercase;font-size:10px;letter-spacing:.04em;">Clocked In Now ({{ clocked_in_now|length }})</div>
+          <div class="text-muted small fw-600 mb-1" style="text-transform:uppercase;font-size:12px;letter-spacing:.04em;">Clocked In Now ({{ clocked_in_now|length }})</div>
           {% for e in clocked_in_now[:5] %}
           <div class="d-flex align-items-center gap-2 mb-1">
             <i class="bi bi-circle-fill text-success" style="font-size:.5rem;"></i>
             <span style="font-size:12.5px;">{{ e.get('employee_name','—') }}</span>
-            <span class="text-muted" style="font-size:11px;">{{ e.get('project_name','') }}</span>
+            <span class="text-muted" style="font-size:13px;">{{ e.get('project_name','') }}</span>
           </div>
           {% else %}
           <div class="text-muted small">No one clocked in right now.</div>
@@ -236,11 +236,11 @@
         </div>
 
         <div class="col-12 col-md-5">
-          <div class="text-muted small fw-600 mb-1" style="text-transform:uppercase;font-size:10px;letter-spacing:.04em;">Pending Time Off ({{ pending_time_off_count }})</div>
+          <div class="text-muted small fw-600 mb-1" style="text-transform:uppercase;font-size:12px;letter-spacing:.04em;">Pending Time Off ({{ pending_time_off_count }})</div>
           {% for r in pending_time_off[:5] %}
           <div class="d-flex justify-content-between align-items-center mb-1">
             <span style="font-size:12.5px;">{{ r.get('employee_name','—') }} <span class="text-muted">· {{ r.get('type','') }}</span></span>
-            <span class="text-muted" style="font-size:11px;">{{ r.get('start_date','') }}{% if r.get('end_date') and r.get('end_date') != r.get('start_date') %} – {{ r.get('end_date') }}{% endif %}</span>
+            <span class="text-muted" style="font-size:13px;">{{ r.get('start_date','') }}{% if r.get('end_date') and r.get('end_date') != r.get('start_date') %} – {{ r.get('end_date') }}{% endif %}</span>
           </div>
           {% else %}
           <div class="text-muted small">No pending requests.</div>

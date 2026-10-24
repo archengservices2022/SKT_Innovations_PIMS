@@ -64,78 +64,78 @@
 <!-- ?? Commission Widget ???????????????????????????????????????????????????????? -->
 <div class="card-panel mb-4" style="border-top:3px solid #7C3AED;">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h6 class="mb-0 fw-bold" style="color:#7C3AED;font-size:14px;">
+    <h6 class="mb-0 fw-bold" style="color:#7C3AED;font-size:16px;">
       <i class="bi bi-cash-coin me-1"></i>My Commission
     </h6>
     <div class="d-flex align-items-center gap-2">
       {% if not commission.rate_set %}
-      <span class="badge" style="background:#FEF3C7;color:#92400E;font-size:11px;">Rate not set — contact admin</span>
+      <span class="badge" style="background:#FEF3C7;color:#92400E;font-size:13px;">Rate not set — contact admin</span>
       {% endif %}
-      <a href="{{ url_for('employees') }}#tab-my-commission" class="btn btn-xs btn-outline-secondary" style="font-size:11px;">View All →</a>
+      <a href="{{ url_for('employees') }}#tab-my-commission" class="btn btn-xs btn-outline-secondary" style="font-size:13px;">View All →</a>
     </div>
   </div>
   <div class="row g-2 row-cols-2 row-cols-md-5">
     <div class="col">
       <div style="background:#F5F3FF;border-radius:8px;padding:12px 14px;">
-        <div style="font-size:10px;color:#7C3AED;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Commission Earned</div>
+        <div style="font-size:12px;color:#7C3AED;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Commission Earned</div>
         <div style="font-size:1.5rem;font-weight:800;color:#7C3AED;line-height:1.2;">{{ currency_symbol }}{{ "{:,.2f}".format(commission.total_earned) }}</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px;">All Commissions</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:2px;">All Commissions</div>
       </div>
     </div>
     <div class="col">
       <div style="background:#FFFBEB;border-radius:8px;padding:12px 14px;">
-        <div style="font-size:10px;color:#D97706;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Adjusted</div>
+        <div style="font-size:12px;color:#D97706;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Adjusted</div>
         <div style="font-size:1.5rem;font-weight:800;color:#D97706;line-height:1.2;">{{ currency_symbol }}{{ "{:,.2f}".format(commission.total_adjusted) }}</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Settled via advance deduction</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Settled via advance deduction</div>
       </div>
     </div>
     <div class="col">
       <div style="background:#ECFDF5;border-radius:8px;padding:12px 14px;">
-        <div style="font-size:10px;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Commission Paid</div>
+        <div style="font-size:12px;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Commission Paid</div>
         <div style="font-size:1.5rem;font-weight:800;color:#059669;line-height:1.2;">{{ currency_symbol }}{{ "{:,.2f}".format(commission.total_paid) }}</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Paid directly</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Paid directly</div>
       </div>
     </div>
     <div class="col">
       <div style="background:#ECFEFF;border-radius:8px;padding:12px 14px;">
-        <div style="font-size:10px;color:#0891B2;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Total Paid</div>
+        <div style="font-size:12px;color:#0891B2;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Total Paid</div>
         <div style="font-size:1.5rem;font-weight:800;color:#0891B2;line-height:1.2;">{{ currency_symbol }}{{ "{:,.2f}".format(commission.total_paid_combined) }}</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Total Commission paid</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Total Commission paid</div>
       </div>
     </div>
     <div class="col">
       <div style="background:#FEF2F2;border-radius:8px;padding:12px 14px;">
-        <div style="font-size:10px;color:#DC2626;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Remaining Due</div>
+        <div style="font-size:12px;color:#DC2626;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Remaining Due</div>
         <div style="font-size:1.5rem;font-weight:800;color:#DC2626;line-height:1.2;">{{ currency_symbol }}{{ "{:,.2f}".format(commission.total_remaining) }}</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Pending commission payment</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Pending commission payment</div>
       </div>
     </div>
   </div>
 
   <div class="mt-3 pt-3" style="border-top:1px solid #e5e7eb;">
-    <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
+    <div style="font-size:12px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">
       <i class="bi bi-wallet2 me-1"></i>My Advances
     </div>
     <div class="row g-2 row-cols-2 row-cols-md-3">
       <div class="col">
         <div style="background:#F8FAFC;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:10px;color:#334155;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Total Advance</div>
+          <div style="font-size:12px;color:#334155;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Total Advance</div>
           <div style="font-size:1.5rem;font-weight:800;color:#334155;line-height:1.2;">{{ currency_symbol }}{{ "{:,.2f}".format(advance_summary.total_advance) }}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:2px;">All advances taken</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px;">All advances taken</div>
         </div>
       </div>
       <div class="col">
         <div style="background:#FFFBEB;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:10px;color:#D97706;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Adjusted</div>
+          <div style="font-size:12px;color:#D97706;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Adjusted</div>
           <div style="font-size:1.5rem;font-weight:800;color:#D97706;line-height:1.2;">{{ currency_symbol }}{{ "{:,.2f}".format(advance_summary.total_adjusted) }}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Adjusted across all advances</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Adjusted across all advances</div>
         </div>
       </div>
       <div class="col">
         <div style="background:#FEF2F2;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:10px;color:#DC2626;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Outstanding</div>
+          <div style="font-size:12px;color:#DC2626;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Outstanding</div>
           <div style="font-size:1.5rem;font-weight:800;color:#DC2626;line-height:1.2;">{{ currency_symbol }}{{ "{:,.2f}".format(advance_summary.outstanding) }}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Still owed on open advances</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Still owed on open advances</div>
         </div>
       </div>
     </div>
@@ -174,7 +174,7 @@
       </h6>
       {% if followups_due %}
       <div class="table-responsive">
-        <table class="table mb-0 align-middle" style="font-size:13px;">
+        <table class="table mb-0 align-middle" style="font-size:15px;">
           <thead>
             <tr>
               <th>Quote #</th>
@@ -223,7 +223,7 @@
       </h6>
       {% if expiring_soon %}
       <div class="table-responsive">
-        <table class="table mb-0 align-middle" style="font-size:13px;">
+        <table class="table mb-0 align-middle" style="font-size:15px;">
           <thead>
             <tr>
               <th>Quote #</th>

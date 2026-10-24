@@ -6,7 +6,7 @@
 <style>
   .score-pill {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px; font-size: 14px; font-weight: 600;
   }
   .score-outstanding    { background: #E8F5E9; color: #2E7D32; }
   .score-exceeds        { background: #F1F8E9; color: #558B2F; }
@@ -20,8 +20,8 @@
   .status-done  { background: #F0FDF4; color: #166534; border: 1px solid #86EFAC; }
 
   .cat-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
-  .cat-label { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 2px; }
-  .cat-desc  { font-size: 12px; color: #6B7280; margin-bottom: 6px; }
+  .cat-label { font-size: 15px; font-weight: 600; color: #374151; margin-bottom: 2px; }
+  .cat-desc  { font-size: 14px; color: #6B7280; margin-bottom: 6px; }
   .star-row  { display: flex; gap: 6px; }
   .star-btn  {
     width: 36px; height: 36px; border-radius: 6px; border: 1.5px solid #D1D5DB;
@@ -34,11 +34,11 @@
   .star-btn.active-3  { border-color: #C9920A; background: #FDF4DC; color: #9A6F00; }
   .star-btn.active-2  { border-color: #E65100; background: #FFF3E0; color: #E65100; }
   .star-btn.active-1  { border-color: #C0392B; background: #FDECEA; color: #C0392B; }
-  .score-display { font-size: 12px; color: #6B7280; margin-left: 8px; align-self: center; }
+  .score-display { font-size: 14px; color: #6B7280; margin-left: 8px; align-self: center; }
 
   .weight-badge {
     display: inline-block; background: #1A2B3C; color: #E8B84B;
-    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    font-size: 12px; font-weight: 700; letter-spacing: .06em;
     padding: 2px 7px; border-radius: 3px; margin-left: 6px;
   }
 
@@ -54,9 +54,9 @@
     background: #fff; border: 1px solid #E5E7EB; border-radius: 10px;
     padding: 14px 16px; box-shadow: 0 1px 4px rgba(15,23,42,.05);
   }
-  .review-kpi-label { font-size: 11px; color: #94A3B8; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+  .review-kpi-label { font-size: 13px; color: #94A3B8; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
   .review-kpi-value { font-size: 24px; line-height: 1.1; font-weight: 800; margin-top: 6px; color: #0F172A; }
-  .review-kpi-sub { font-size: 12px; color: #64748B; margin-top: 4px; }
+  .review-kpi-sub { font-size: 14px; color: #64748B; margin-top: 4px; }
   .review-actions { display: inline-flex; align-items: center; gap: 6px; }
   .review-action-btn {
     width: 30px; height: 30px; border-radius: 6px; border: 1px solid #D1D5DB;
@@ -70,7 +70,7 @@
   .gauge-fill { height: 100%; border-radius: 4px; }
 
   .ack-banner {
-    border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; font-size: 14px;
+    border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; font-size: 16px;
   }
   .ack-banner.pending { background: #FDF4DC; border: 1px solid #F5C842; color: #92400E; }
   .ack-banner.done    { background: #E8F5E9; border: 1px solid #81C784; color: #1B5E20; }
@@ -79,7 +79,7 @@
 
   .raise-suggest {
     background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 8px;
-    padding: 12px 16px; font-size: 13px; color: #166534; margin-bottom: 16px;
+    padding: 12px 16px; font-size: 15px; color: #166534; margin-bottom: 16px;
   }
 
   .compare-row {
@@ -87,14 +87,14 @@
     padding: 10px 0; border-bottom: 1px solid #F3F4F6;
   }
   .compare-row:last-child { border-bottom: none; }
-  .compare-label { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 3px; }
+  .compare-label { font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 3px; }
   .compare-score { font-family: Georgia, serif; font-size: 22px; font-weight: 700; line-height: 1; }
 
   .self-section-header {
     background: linear-gradient(90deg, #EFF6FF, #F8FAFF);
     border: 1px solid #BFDBFE; border-radius: 8px;
     padding: 12px 16px; margin-bottom: 20px;
-    font-size: 13px; color: #1E40AF;
+    font-size: 15px; color: #1E40AF;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -250,12 +250,12 @@
   {% if rstatus in ('pending_acknowledgement', 'completed', 'Submitted') and score > 0 %}
   <div class="d-flex gap-4 mt-3 flex-wrap">
     <div>
-      <div class="text-muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;">Score</div>
-      <div class="fw-bold" style="font-size:20px;font-family:Georgia,serif;color:#1A2B3C;">{{ "%.2f"|format(score) }}<span style="font-size:13px;color:#9CA3AF;">/5.00</span></div>
+      <div class="text-muted" style="font-size:13px;letter-spacing:.06em;text-transform:uppercase;">Score</div>
+      <div class="fw-bold" style="font-size:20px;font-family:Georgia,serif;color:#1A2B3C;">{{ "%.2f"|format(score) }}<span style="font-size:15px;color:#9CA3AF;">/5.00</span></div>
     </div>
     {% if acked and r.approved_raise_pct %}
     <div>
-      <div class="text-muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;">Raise</div>
+      <div class="text-muted" style="font-size:13px;letter-spacing:.06em;text-transform:uppercase;">Raise</div>
       <div class="fw-bold" style="font-size:20px;font-family:Georgia,serif;color:#2E7D32;">{{ r.approved_raise_pct }}%</div>
     </div>
     {% endif %}
@@ -331,7 +331,7 @@
               {% endfor %}
             </select>
           </div>
-          <div class="alert alert-info py-2" style="font-size:13px;">
+          <div class="alert alert-info py-2" style="font-size:15px;">
             <i class="bi bi-info-circle me-1"></i>
             After you click <strong>Initiate</strong>, the employee will log in and complete their self-assessment. You will then review their scores and add your manager evaluation.
           </div>
@@ -508,22 +508,22 @@
       {% set c = sa_comments[key] if key in sa_comments else '' %}
       <div class="mb-3 {% if not loop.last %}pb-3 border-bottom{% endif %}">
         <div class="d-flex justify-content-between align-items-center mb-1">
-          <div class="fw-semibold" style="font-size:13px;">{{ name }}<span class="weight-badge">{{ weight }}</span></div>
+          <div class="fw-semibold" style="font-size:15px;">{{ name }}<span class="weight-badge">{{ weight }}</span></div>
           <span style="font-family:Georgia,serif;font-size:20px;font-weight:700;
-            color:{% if s==5 %}#2E7D32{% elif s==4 %}#558B2F{% elif s==3 %}#9A6F00{% elif s==2 %}#E65100{% else %}#C0392B{% endif %};">{{ s }}<span class="text-muted" style="font-size:13px;">/5</span></span>
+            color:{% if s==5 %}#2E7D32{% elif s==4 %}#558B2F{% elif s==3 %}#9A6F00{% elif s==2 %}#E65100{% else %}#C0392B{% endif %};">{{ s }}<span class="text-muted" style="font-size:15px;">/5</span></span>
         </div>
         <div class="gauge-bar mb-1">
           <div class="gauge-fill" style="width:{{ (s/5*100)|round }}%;
             background:{% if s>=5 %}#2E7D32{% elif s>=4 %}#558B2F{% elif s>=3 %}#C9920A{% elif s>=2 %}#E65100{% else %}#C0392B{% endif %};"></div>
         </div>
         <div class="text-muted small">{{ ['','Unsatisfactory','Needs Improvement','Meets Expectations','Exceeds Expectations','Outstanding'][s] }}</div>
-        {% if c %}<div style="font-size:12px;color:#4B5563;margin-top:6px;padding:8px 10px;background:#F9FAFB;border-radius:6px;">{{ c }}</div>{% endif %}
+        {% if c %}<div style="font-size:14px;color:#4B5563;margin-top:6px;padding:8px 10px;background:#F9FAFB;border-radius:6px;">{{ c }}</div>{% endif %}
       </div>
       {% endfor %}
       {% if sa.overall_comments %}
       <div class="mt-3 pt-3 border-top">
         <div class="fw-semibold small mb-1">Overall Comments</div>
-        <p style="font-size:13px;white-space:pre-wrap;color:#4B5563;">{{ sa.overall_comments }}</p>
+        <p style="font-size:15px;white-space:pre-wrap;color:#4B5563;">{{ sa.overall_comments }}</p>
       </div>
       {% endif %}
     </div>
@@ -541,7 +541,7 @@
     <div class="col-lg-6">
       <div class="card shadow-sm mb-4 h-100">
         <div class="card-header py-2" style="background:#EFF6FF;border-bottom:1px solid #BFDBFE;">
-          <h6 class="mb-0 fw-semibold" style="color:#1E40AF;font-size:13px;">
+          <h6 class="mb-0 fw-semibold" style="color:#1E40AF;font-size:15px;">
             <i class="bi bi-person-check me-1"></i>{{ r.employee_name }}'s Self-Assessment
           </h6>
         </div>
@@ -551,22 +551,22 @@
           {% set c = sa_comments[key] if key in sa_comments else '' %}
           <div class="mb-3 {% if not loop.last %}pb-3 border-bottom{% endif %}">
             <div class="d-flex justify-content-between align-items-center mb-1">
-              <div class="fw-semibold" style="font-size:12px;">{{ name }}</div>
+              <div class="fw-semibold" style="font-size:14px;">{{ name }}</div>
               <span style="font-family:Georgia,serif;font-size:18px;font-weight:700;
-                color:{% if s==5 %}#2E7D32{% elif s==4 %}#558B2F{% elif s==3 %}#9A6F00{% elif s==2 %}#E65100{% else %}#C0392B{% endif %};">{{ s }}<span class="text-muted" style="font-size:12px;">/5</span></span>
+                color:{% if s==5 %}#2E7D32{% elif s==4 %}#558B2F{% elif s==3 %}#9A6F00{% elif s==2 %}#E65100{% else %}#C0392B{% endif %};">{{ s }}<span class="text-muted" style="font-size:14px;">/5</span></span>
             </div>
             <div class="gauge-bar mb-1">
               <div class="gauge-fill" style="width:{{ (s/5*100)|round }}%;
                 background:{% if s>=5 %}#2E7D32{% elif s>=4 %}#558B2F{% elif s>=3 %}#C9920A{% elif s>=2 %}#E65100{% else %}#C0392B{% endif %};"></div>
             </div>
-            <div class="text-muted" style="font-size:11px;">{{ ['','Unsatisfactory','Needs Improvement','Meets Expectations','Exceeds Expectations','Outstanding'][s] }}</div>
-            {% if c %}<div style="font-size:11px;color:#4B5563;margin-top:4px;padding:6px 8px;background:#F9FAFB;border-radius:5px;">{{ c }}</div>{% endif %}
+            <div class="text-muted" style="font-size:13px;">{{ ['','Unsatisfactory','Needs Improvement','Meets Expectations','Exceeds Expectations','Outstanding'][s] }}</div>
+            {% if c %}<div style="font-size:13px;color:#4B5563;margin-top:4px;padding:6px 8px;background:#F9FAFB;border-radius:5px;">{{ c }}</div>{% endif %}
           </div>
           {% endfor %}
           {% if sa.overall_comments %}
           <div class="mt-3 pt-3 border-top">
-            <div class="fw-semibold" style="font-size:12px;margin-bottom:4px;">Overall Self-Comments</div>
-            <p style="font-size:12px;white-space:pre-wrap;color:#4B5563;">{{ sa.overall_comments }}</p>
+            <div class="fw-semibold" style="font-size:14px;margin-bottom:4px;">Overall Self-Comments</div>
+            <p style="font-size:14px;white-space:pre-wrap;color:#4B5563;">{{ sa.overall_comments }}</p>
           </div>
           {% endif %}
         </div>
@@ -582,14 +582,14 @@
 
         <div class="card shadow-sm mb-4">
           <div class="card-header py-2" style="background:#F0FDF4;border-bottom:1px solid #86EFAC;">
-            <h6 class="mb-0 fw-semibold" style="color:#166534;font-size:13px;">
+            <h6 class="mb-0 fw-semibold" style="color:#166534;font-size:15px;">
               <i class="bi bi-person-badge me-1"></i>Manager Evaluation
             </h6>
           </div>
           <div class="card-body">
             {% for key, name, weight, desc in cats_full %}
             <div class="cat-row">
-              <div class="cat-label" style="font-size:12px;">{{ name }}<span class="weight-badge">{{ weight }}</span></div>
+              <div class="cat-label" style="font-size:14px;">{{ name }}<span class="weight-badge">{{ weight }}</span></div>
               <div class="d-flex align-items-center">
                 <div class="star-row" data-field="{{ key }}">
                   {% for n in [1,2,3,4,5] %}
@@ -627,10 +627,10 @@
 
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <h6 class="fw-semibold mb-2" style="font-size:13px;">Overall Comments</h6>
+            <h6 class="fw-semibold mb-2" style="font-size:15px;">Overall Comments</h6>
             <textarea name="overall_comments" class="form-control form-control-sm" rows="3"
                       placeholder="Overall performance summary and key accomplishments"></textarea>
-            <h6 class="fw-semibold mb-2 mt-3" style="font-size:13px;">Goals for Next Period</h6>
+            <h6 class="fw-semibold mb-2 mt-3" style="font-size:15px;">Goals for Next Period</h6>
             <textarea name="goals" class="form-control form-control-sm" rows="3"
                       placeholder="List 2-3 specific goals for the next 6 months"></textarea>
           </div>
@@ -638,9 +638,9 @@
 
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <h6 class="fw-semibold mb-3" style="font-size:13px;"><i class="bi bi-currency-dollar me-1 text-success"></i>Raise Settings</h6>
+            <h6 class="fw-semibold mb-3" style="font-size:15px;"><i class="bi bi-currency-dollar me-1 text-success"></i>Raise Settings</h6>
             <div class="mb-3">
-              <label class="form-label fw-semibold" style="font-size:12px;">Approved Raise %</label>
+              <label class="form-label fw-semibold" style="font-size:14px;">Approved Raise %</label>
               <div class="input-group input-group-sm">
                 <input type="number" name="approved_raise_pct" class="form-control"
                        min="0" max="25" step="0.5" placeholder="e.g. 6">
@@ -648,7 +648,7 @@
               </div>
             </div>
             <div class="mb-3">
-              <label class="form-label fw-semibold" style="font-size:12px;">Raise Effective Date</label>
+              <label class="form-label fw-semibold" style="font-size:14px;">Raise Effective Date</label>
               <input type="date" name="raise_effective_date" class="form-control form-control-sm">
             </div>
             <div class="d-grid">
@@ -694,7 +694,7 @@
           {% elif label == 'Meets Expectations' %}score-meets
           {% elif label == 'Needs Improvement' %}score-needs
           {% else %}score-unsatisfactory{% endif %}"
-          style="font-size:14px;padding:5px 14px;">{{ label }}</span>
+          style="font-size:16px;padding:5px 14px;">{{ label }}</span>
       </div>
     </div>
 
@@ -703,7 +703,7 @@
       <div class="card-body">
         {% if sa_scores %}
         <h6 class="fw-semibold mb-3">Category Breakdown
-          <span class="text-muted fw-normal" style="font-size:11px;margin-left:8px;">Employee vs Manager</span>
+          <span class="text-muted fw-normal" style="font-size:13px;margin-left:8px;">Employee vs Manager</span>
         </h6>
         {% for key, name, weight, _ in cats_full %}
         {% set ms = (r.scores[key] | int) if (r.scores and key in r.scores) else 0 %}
@@ -711,25 +711,25 @@
         {% set mc = r.comments[key] if (r.comments and key in r.comments) else '' %}
         {% set ec = sa_comments[key] if key in sa_comments else '' %}
         <div class="mb-4 {% if not loop.last %}pb-3 border-bottom{% endif %}">
-          <div class="fw-semibold mb-2" style="font-size:13px;">{{ name }}<span class="weight-badge">{{ weight }}</span></div>
+          <div class="fw-semibold mb-2" style="font-size:15px;">{{ name }}<span class="weight-badge">{{ weight }}</span></div>
           <div class="compare-row">
             <div>
               <div class="compare-label">Employee</div>
               <div class="compare-score"
-                   style="color:{% if es==5 %}#2E7D32{% elif es==4 %}#558B2F{% elif es==3 %}#9A6F00{% elif es==2 %}#E65100{% else %}#C0392B{% endif %};">{{ es }}<span class="text-muted" style="font-size:13px;">/5</span></div>
+                   style="color:{% if es==5 %}#2E7D32{% elif es==4 %}#558B2F{% elif es==3 %}#9A6F00{% elif es==2 %}#E65100{% else %}#C0392B{% endif %};">{{ es }}<span class="text-muted" style="font-size:15px;">/5</span></div>
               <div class="gauge-bar">
                 <div class="gauge-fill" style="width:{{ (es/5*100)|round }}%;background:{% if es>=5 %}#2E7D32{% elif es>=4 %}#558B2F{% elif es>=3 %}#C9920A{% elif es>=2 %}#E65100{% else %}#C0392B{% endif %};"></div>
               </div>
-              {% if ec %}<div style="font-size:11px;color:#4B5563;margin-top:4px;padding:5px 8px;background:#EFF6FF;border-radius:5px;">{{ ec }}</div>{% endif %}
+              {% if ec %}<div style="font-size:13px;color:#4B5563;margin-top:4px;padding:5px 8px;background:#EFF6FF;border-radius:5px;">{{ ec }}</div>{% endif %}
             </div>
             <div>
               <div class="compare-label">Manager</div>
               <div class="compare-score"
-                   style="color:{% if ms==5 %}#2E7D32{% elif ms==4 %}#558B2F{% elif ms==3 %}#9A6F00{% elif ms==2 %}#E65100{% else %}#C0392B{% endif %};">{{ ms }}<span class="text-muted" style="font-size:13px;">/5</span></div>
+                   style="color:{% if ms==5 %}#2E7D32{% elif ms==4 %}#558B2F{% elif ms==3 %}#9A6F00{% elif ms==2 %}#E65100{% else %}#C0392B{% endif %};">{{ ms }}<span class="text-muted" style="font-size:15px;">/5</span></div>
               <div class="gauge-bar">
                 <div class="gauge-fill" style="width:{{ (ms/5*100)|round }}%;background:{% if ms>=5 %}#2E7D32{% elif ms>=4 %}#558B2F{% elif ms>=3 %}#C9920A{% elif ms>=2 %}#E65100{% else %}#C0392B{% endif %};"></div>
               </div>
-              {% if mc %}<div style="font-size:11px;color:#4B5563;margin-top:4px;padding:5px 8px;background:#F0FDF4;border-radius:5px;">{{ mc }}</div>{% endif %}
+              {% if mc %}<div style="font-size:13px;color:#4B5563;margin-top:4px;padding:5px 8px;background:#F0FDF4;border-radius:5px;">{{ mc }}</div>{% endif %}
             </div>
           </div>
         </div>
@@ -741,7 +741,7 @@
         {% set c = r.comments[key] if (r.comments and key in r.comments) else '' %}
         <div class="mb-3 {% if not loop.last %}pb-3 border-bottom{% endif %}">
           <div class="d-flex justify-content-between align-items-center mb-1">
-            <div class="fw-semibold" style="font-size:13px;">{{ name }}<span class="weight-badge">{{ weight }}</span></div>
+            <div class="fw-semibold" style="font-size:15px;">{{ name }}<span class="weight-badge">{{ weight }}</span></div>
             <div class="d-flex align-items-center gap-2">
               <span style="font-family:Georgia,serif;font-size:20px;font-weight:700;
                 color:{% if s==5 %}#2E7D32{% elif s==4 %}#558B2F{% elif s==3 %}#9A6F00{% elif s==2 %}#E65100{% else %}#C0392B{% endif %};">{{ s }}</span>
@@ -753,7 +753,7 @@
               background:{% if s>=5 %}#2E7D32{% elif s>=4 %}#558B2F{% elif s>=3 %}#C9920A{% elif s>=2 %}#E65100{% else %}#C0392B{% endif %};"></div>
           </div>
           <div class="text-muted small">{{ ['','Unsatisfactory','Needs Improvement','Meets Expectations','Exceeds Expectations','Outstanding'][s] }}</div>
-          {% if c %}<div style="font-size:12px;color:#4B5563;margin-top:6px;padding:8px 10px;background:#F9FAFB;border-radius:6px;">{{ c }}</div>{% endif %}
+          {% if c %}<div style="font-size:14px;color:#4B5563;margin-top:6px;padding:8px 10px;background:#F9FAFB;border-radius:6px;">{{ c }}</div>{% endif %}
         </div>
         {% endfor %}
         {% endif %}
@@ -766,14 +766,14 @@
     <div class="card shadow-sm mb-4" style="border-color:#BFDBFE;">
       <div class="card-body">
         <h6 class="fw-semibold mb-2" style="color:#1E40AF;"><i class="bi bi-person-check me-2"></i>Your Self-Comments</h6>
-        <p style="font-size:14px;white-space:pre-wrap;color:#4B5563;">{{ sa.overall_comments }}</p>
+        <p style="font-size:16px;white-space:pre-wrap;color:#4B5563;">{{ sa.overall_comments }}</p>
       </div>
     </div>
     {% elif sa.overall_comments and role == 'admin' %}
     <div class="card shadow-sm mb-4" style="border-color:#BFDBFE;">
       <div class="card-body">
         <h6 class="fw-semibold mb-2" style="color:#1E40AF;"><i class="bi bi-person-check me-2"></i>Employee Self-Comments</h6>
-        <p style="font-size:14px;white-space:pre-wrap;color:#4B5563;">{{ sa.overall_comments }}</p>
+        <p style="font-size:16px;white-space:pre-wrap;color:#4B5563;">{{ sa.overall_comments }}</p>
       </div>
     </div>
     {% endif %}
@@ -782,7 +782,7 @@
     <div class="card shadow-sm mb-4">
       <div class="card-body">
         <h6 class="fw-semibold mb-2"><i class="bi bi-chat-text me-2 text-info"></i>Manager Comments</h6>
-        <p style="font-size:14px;white-space:pre-wrap;">{{ r.overall_comments }}</p>
+        <p style="font-size:16px;white-space:pre-wrap;">{{ r.overall_comments }}</p>
       </div>
     </div>
     {% endif %}
@@ -791,7 +791,7 @@
     <div class="card shadow-sm mb-4">
       <div class="card-body">
         <h6 class="fw-semibold mb-2"><i class="bi bi-flag me-2 text-success"></i>Goals for Next Period</h6>
-        <p style="font-size:14px;white-space:pre-wrap;">{{ r.goals }}</p>
+        <p style="font-size:16px;white-space:pre-wrap;">{{ r.goals }}</p>
       </div>
     </div>
     {% endif %}
@@ -836,13 +836,13 @@
         {% endif %}
         {% if r.salary_updated and r.salary_update_result %}
         {% set sr = r.salary_update_result %}
-        <div class="alert alert-success py-2" style="font-size:13px;">
+        <div class="alert alert-success py-2" style="font-size:15px;">
           <i class="bi bi-check-circle me-1"></i>
           Salary updated: {{ currency_symbol }}{{ "%.2f"|format(sr.old | float) }} → {{ currency_symbol }}{{ "%.2f"|format(sr.new | float) }}
           ({{ 'hourly' if sr.field == 'hourly_rate' else 'monthly' }})
         </div>
         {% elif r.raise_effective_date and r.approved_raise_pct and r.approved_raise_pct|float > 0 %}
-        <div class="alert alert-warning py-2" style="font-size:12px;">
+        <div class="alert alert-warning py-2" style="font-size:14px;">
           <i class="bi bi-clock me-1"></i>
           Salary update pending — effective {{ r.raise_effective_date | format_date }}
         </div>
@@ -853,7 +853,7 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h6 class="fw-semibold mb-2">Review Status</h6>
-        <div class="d-flex flex-column gap-2" style="font-size:13px;">
+        <div class="d-flex flex-column gap-2" style="font-size:15px;">
           <div class="d-flex justify-content-between">
             <span class="text-muted">Self-Assessment</span>
             <span class="badge {{ 'bg-success' if sa_scores else 'bg-warning text-dark' }}">
@@ -1003,7 +1003,7 @@ function recalc() {
   else if (total >= 1.5) { label='Needs Improvement';    cls='score-needs';       lo=0;  hi=0;  }
   else if (total >  0)   { label='Unsatisfactory';        cls='score-unsatisfactory'; lo=0; hi=0; }
   if (lblDisp && label) {
-    lblDisp.innerHTML = '<span class="score-pill ' + cls + '" style="font-size:13px;">' + label + '</span>';
+    lblDisp.innerHTML = '<span class="score-pill ' + cls + '" style="font-size:15px;">' + label + '</span>';
   }
   if (raiseHint && raiseRange && allSet) {
     raiseHint.classList.remove('d-none');

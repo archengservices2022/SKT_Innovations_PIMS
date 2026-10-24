@@ -141,7 +141,7 @@
             </div>
             <div style="min-width:0;flex:1;">
               <div class="stat-value" style="font-size:18px;">{{ count }}</div>
-              <div class="stat-label" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;{{ 'font-size:9px;' if label|length > 14 }}" title="{{ label }}">{{ label }}</div>
+              <div class="stat-label" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;{{ 'font-size:11px;' if label|length > 14 }}" title="{{ label }}">{{ label }}</div>
             </div>
           </div>
         </a>
@@ -275,7 +275,7 @@
               <td class="text-muted">{{ p.get('company_name') or p.get('client_name','—') }}</td>
               <td>
                 {% if p.get('_plant_display') %}
-                <span class="badge" style="background:#0D9488;color:#fff;font-size:11px;font-weight:700;letter-spacing:.04em;">{{ p._plant_display }}</span>
+                <span class="badge" style="background:#0D9488;color:#fff;font-size:13px;font-weight:700;letter-spacing:.04em;">{{ p._plant_display }}</span>
                 {% else %}<span class="text-muted">-</span>{% endif %}
               </td>
               <td>{{ p.get('date_received','—') | format_date }}</td>
@@ -706,12 +706,12 @@ function openLoadModal() {
         // Title
         let html = `<div style="margin-bottom:20px;">
           <h6 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 8px 0;">Auto-Detected Payment Stages</h6>
-          <p style="font-size:12px;color:#64748b;margin:0;">System auto-detected the next invoice stage for each project. Review then confirm.</p>
+          <p style="font-size:14px;color:#64748b;margin:0;">System auto-detected the next invoice stage for each project. Review then confirm.</p>
         </div>`;
 
         // Table
         html += `<div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;margin-bottom:16px;">
-          <table style="width:100%;border-collapse:collapse;font-size:12px;background:white;">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;background:white;">
             <tr style="background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
               <th style="padding:12px;width:36px;"></th>
               <th style="padding:12px;text-align:left;font-weight:600;color:#334155;">Stage</th>
@@ -734,7 +734,7 @@ function openLoadModal() {
             html += `<tr style="border-bottom:1px solid #f1f5f9;background:#f8fafc;opacity:.6;">
               <td style="padding:12px;color:#1e293b;"><strong>${proj.project_number || '—'}</strong></td>
               <td style="padding:12px;color:#64748b;" colspan="3">${proj.project_name || '—'} — All stages invoiced</td>
-              <td style="padding:12px;color:#64748b;font-size:11px;">Fully Invoiced</td>
+              <td style="padding:12px;color:#64748b;font-size:13px;">Fully Invoiced</td>
             </tr>`;
             return;
           }
@@ -756,7 +756,7 @@ function openLoadModal() {
             const rowBg     = stage.co_number ? '#fffbeb' : (isNext ? '#f0fdf4' : '#ffffff');
             // Payments of a CO with its own payment plan come through as stages too
             const coTag     = stage.co_number
-              ? '<span style="font-size:10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px;color:#78350f;">CO</span>'
+              ? '<span style="font-size:12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px;color:#78350f;">CO</span>'
               : '';
             const checkId   = `stageCheck_${proj.firebase_id}_${stage.stage_idx}`;
             const statusTxt = isBlocked ? '⚠ Prior stage not yet invoiced' : 'Ready to invoice';
@@ -771,16 +771,16 @@ function openLoadModal() {
                        ${isNext ? 'checked' : ''}
                        style="cursor:pointer;width:15px;height:15px;">
               </td>
-              <td style="padding:8px 12px;color:#1e293b;font-size:12px;">
+              <td style="padding:8px 12px;color:#1e293b;font-size:14px;">
                 <label for="${checkId}" style="cursor:pointer;margin:0;">
                   ${coTag}${stage.stage_name || '—'}
-                  ${isNext ? '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600;">Next</span>' : ''}
+                  ${isNext ? '<span style="font-size:12px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600;">Next</span>' : ''}
                 </label>
               </td>
               <td style="padding:8px 12px;text-align:right;color:#1e293b;font-weight:600;">
                 ${CURRENCY_SYMBOL}${parseFloat(stage.amount||0).toFixed(2)}
               </td>
-              <td style="padding:8px 12px;color:${statusClr};font-size:11px;" colspan="2">${statusTxt}</td>
+              <td style="padding:8px 12px;color:${statusClr};font-size:13px;" colspan="2">${statusTxt}</td>
             </tr>`;
           });
 
@@ -793,14 +793,14 @@ function openLoadModal() {
                          data-proj="${proj.firebase_id}" data-co="${co.co_idx}"
                          checked style="cursor:pointer;width:15px;height:15px;">
                 </td>
-                <td style="padding:8px 12px;color:#78350f;font-size:12px;">
-                  <span style="font-size:10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px;">CO</span>
+                <td style="padding:8px 12px;color:#78350f;font-size:14px;">
+                  <span style="font-size:12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px;">CO</span>
                   CO ${co.co_number || '—'}${co.title ? ' — ' + co.title : ''}
                 </td>
                 <td style="padding:8px 12px;text-align:right;color:#92400e;font-weight:600;">
                   ${CURRENCY_SYMBOL}${parseFloat(co.amount||0).toFixed(2)}
                 </td>
-                <td style="padding:8px 12px;color:#0f766e;font-size:11px;" colspan="2">Ready to invoice</td>
+                <td style="padding:8px 12px;color:#0f766e;font-size:13px;" colspan="2">Ready to invoice</td>
               </tr>`;
             });
           }
@@ -810,7 +810,7 @@ function openLoadModal() {
 
         // Info note
         html += `<div style="background:#eff6ff;border-radius:6px;padding:10px 12px;margin-bottom:16px;border-left:4px solid #3b82f6;">
-          <div style="color:#1d4ed8;font-size:12px;">
+          <div style="color:#1d4ed8;font-size:14px;">
             <strong>Tip:</strong> Check multiple stages to combine them into one invoice. Stages marked ⚠ have a prior uninvoiced stage — confirm with client before sending.
           </div>
         </div>`;
@@ -1016,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <form method="POST" action="{{ url_for('projects_import_excel') }}" enctype="multipart/form-data">
         <div class="modal-body">
-          <div class="alert alert-info" style="font-size:13px;">
+          <div class="alert alert-info" style="font-size:15px;">
             <i class="bi bi-info-circle-fill me-1"></i>
             <strong>How it works:</strong> Upload your Excel file (.xlsx). Each sheet (Dec 25, Jan 26, etc.) is read automatically.
             Projects with existing job numbers are skipped to avoid duplicates.
@@ -1061,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <input type="text" name="sheet_name" class="form-control" placeholder="e.g. Dec 25 — leave blank to import ALL sheets">
             <div class="form-text">Type the exact sheet tab name to import just one month. Leave blank to import all sheets at once.</div>
           </div>
-          <div class="alert alert-warning" style="font-size:12px;">
+          <div class="alert alert-warning" style="font-size:14px;">
             <i class="bi bi-exclamation-triangle-fill me-1"></i>
             Importing all sheets (~354 projects) takes 30–60 seconds. One sheet at a time is faster and easier to verify.
           </div>

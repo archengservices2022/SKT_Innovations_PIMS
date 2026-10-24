@@ -226,7 +226,7 @@
         <div class="card-panel mt-3">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <h6 class="section-heading mb-0"><i class="bi bi-cash-coin me-1"></i>Commission</h6>
-            <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#commissionEditModal" style="font-size:11px;">
+            <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#commissionEditModal" style="font-size:13px;">
               <i class="bi bi-pencil me-1"></i>Edit
             </button>
           </div>
@@ -239,9 +239,9 @@
               <div class="text-muted small">Rate / Type</div>
               <div class="fw-semibold">
                 {% if comm_type == 'percent' %}
-                  {{ comm_val }}% <span class="badge" style="background:#7C3AED;font-size:10px;">Custom</span>
+                  {{ comm_val }}% <span class="badge" style="background:#7C3AED;font-size:12px;">Custom</span>
                 {% elif comm_type == 'fixed' %}
-                  Fixed {{ currency_symbol }}{{ "{:,.2f}".format(comm_val) }} <span class="badge" style="background:#7C3AED;font-size:10px;">Custom</span>
+                  Fixed {{ currency_symbol }}{{ "{:,.2f}".format(comm_val) }} <span class="badge" style="background:#7C3AED;font-size:12px;">Custom</span>
                 {% else %}
                   Default rate
                 {% endif %}
@@ -261,11 +261,11 @@
         <div class="mt-2">
           <button class="btn btn-xs btn-link text-muted p-0" type="button"
                   data-bs-toggle="collapse" data-bs-target="#commHistoryCollapse"
-                  style="font-size:11px;">
+                  style="font-size:13px;">
             <i class="bi bi-clock-history me-1"></i>{{ comm_history|length }} change{{ 's' if comm_history|length != 1 }} — view history
           </button>
           <div class="collapse mt-2" id="commHistoryCollapse">
-            <table class="table table-sm mb-0" style="font-size:11px;background:#f8fafc;border-radius:6px;">
+            <table class="table table-sm mb-0" style="font-size:13px;background:#f8fafc;border-radius:6px;">
               <thead>
                 <tr style="background:#f1f5f9;">
                   <th class="ps-2">Date</th>
@@ -330,7 +330,7 @@
                            value="{{ comm_val if comm_type != 'default' else '' }}"
                            placeholder="{{ '5' if comm_type == 'percent' else '1500' }}">
                   </div>
-                  <div class="text-muted" style="font-size:11px;">
+                  <div class="text-muted" style="font-size:13px;">
                     Contract value: {{ currency_symbol }}{{ "{:,.2f}".format(cv) }}
                   </div>
                 </div>
@@ -986,9 +986,9 @@
                       {% endif %}
                     </div>
                     {% if co_lock.count > 1 %}
-                    <div class="text-muted mt-1" style="font-size:11px;">{{ co_lock.count }} stages in Payment Plan</div>
+                    <div class="text-muted mt-1" style="font-size:13px;">{{ co_lock.count }} stages in Payment Plan</div>
                     {% elif co.get('status') not in ('Approved', 'Invoiced', 'Paid') and (co_down > 0 or co_inst > 1) %}
-                    <div class="text-muted mt-1" style="font-size:11px;">Stages added on approval</div>
+                    <div class="text-muted mt-1" style="font-size:13px;">Stages added on approval</div>
                     {% endif %}
                   </td>
                   <td>
@@ -1101,7 +1101,7 @@
                             </form>
                             {% else %}
                             {{ currency_symbol }}{{ "{:,.2f}".format(st.amount) }}
-                            {% if not st.planned and not st.editable %}<i class="bi bi-lock-fill text-muted ms-1" style="font-size:10px;" title="Invoiced — locked"></i>{% endif %}
+                            {% if not st.planned and not st.editable %}<i class="bi bi-lock-fill text-muted ms-1" style="font-size:12px;" title="Invoiced — locked"></i>{% endif %}
                             {% endif %}
                           </td>
                           <td>
@@ -1332,21 +1332,21 @@
 
 <style>
   .co-plan-section { border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; background:#f8fafc; }
-  .co-plan-head { font-weight:600; font-size:13px; margin-bottom:8px; color:#0f172a; }
+  .co-plan-head { font-weight:600; font-size:15px; margin-bottom:8px; color:#0f172a; }
   .co-plan-preview { margin-top:10px; border:1px solid #99F6E4; background:#F0FDFA; border-radius:8px; overflow:hidden; font-size:12.5px; }
   .co-plan-preview .row-item { display:flex; justify-content:space-between; padding:5px 10px; border-top:1px solid #ccfbf1; }
   .co-plan-preview .row-item:first-of-type { border-top:0; }
-  .co-plan-preview .cap { padding:6px 10px 2px; font-size:11px; font-weight:600; color:#0f766e; text-transform:uppercase; letter-spacing:.03em; }
+  .co-plan-preview .cap { padding:6px 10px 2px; font-size:13px; font-weight:600; color:#0f766e; text-transform:uppercase; letter-spacing:.03em; }
   .co-plan-preview .total { font-weight:700; background:#ccfbf1; }
   .co-plan-pill { display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:999px; font-size:11.5px;
                   font-weight:600; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; white-space:nowrap; }
   .co-plan-pill.co-plan-split { background:#f0fdfa; color:#0f766e; border-color:#99f6e4; }
-  .co-plan-select { width:auto; min-width:0; font-size:12px; padding-top:2px; padding-bottom:2px; }
+  .co-plan-select { width:auto; min-width:0; font-size:14px; padding-top:2px; padding-bottom:2px; }
   tr.co-stages-row > td { border-top:0; padding-top:0; padding-bottom:12px; }
   tr.co-planned-stage td { color:#94a3b8; font-style:italic; background:#f8fafc; }
   .co-stages { margin-left:12px; border-left:3px solid #99f6e4; background:#f8fafc; border-radius:0 8px 8px 0; padding:6px 10px; }
-  .co-stages-head { font-size:12px; font-weight:600; color:#0f766e; margin-bottom:4px; }
-  .co-stages-table { width:100%; max-width:620px; font-size:12px; }
+  .co-stages-head { font-size:14px; font-weight:600; color:#0f766e; margin-bottom:4px; }
+  .co-stages-table { width:100%; max-width:620px; font-size:14px; }
   .co-stages-table td { padding:3px 8px; border-top:1px solid #e2e8f0; }
   .co-stages-table tr:first-child td { border-top:0; }
 </style>
@@ -2608,7 +2608,7 @@ function showDeleteConfirmModal(projectId, coIdx, coNumber) {
     </div>
     <div style="padding: 24px;">
       <p style="color: #475569; margin-bottom: 16px;">Type <strong style="color: #dc2626;">Delete</strong> to confirm deletion of ${coNumber || 'this change order'}:</p>
-      <input type="text" id="confirmText" placeholder="Type 'Delete'" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box; margin-bottom: 16px;">
+      <input type="text" id="confirmText" placeholder="Type 'Delete'" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 16px; box-sizing: border-box; margin-bottom: 16px;">
       <div style="display: flex; gap: 8px; justify-content: flex-end;">
         <button style="padding: 9px 18px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #334155; font-weight: 600; cursor: pointer;">Cancel</button>
         <button id="confirmDeleteBtn" style="padding: 9px 18px; border: none; border-radius: 6px; background: #dc2626; color: white; font-weight: 600; cursor: pointer; opacity: 0.5;">Delete</button>
@@ -2736,7 +2736,7 @@ function showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl) 
   const description = document.createElement('p');
   description.style.cssText = `
     margin: 0 0 8px 0;
-    font-size: 13px;
+    font-size: 15px;
     color: #64748b;
   `;
   description.textContent = 'An admin or accountant will review your request to delete:';
@@ -2749,7 +2749,7 @@ function showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl) 
     border-radius: 6px;
     font-weight: 600;
     color: #1e293b;
-    font-size: 13px;
+    font-size: 15px;
     border-left: 3px solid #f59e0b;
   `;
   entityName.textContent = entityLabel;
@@ -2759,7 +2759,7 @@ function showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl) 
     display: block;
     margin-bottom: 6px;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 14px;
     color: #1e293b;
   `;
   reasonLabel.textContent = 'Reason (optional)';
@@ -2772,7 +2772,7 @@ function showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl) 
     border: 1px solid #cbd5e1;
     border-radius: 6px;
     font-family: inherit;
-    font-size: 12px;
+    font-size: 14px;
     resize: vertical;
     min-height: 50px;
     box-sizing: border-box;
@@ -2803,7 +2803,7 @@ function showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl) 
     color: #475569;
     font-weight: 600;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 15px;
     transition: all 0.15s;
   `;
   cancelBtn.onmouseover = () => cancelBtn.style.background = '#f1f5f9';
@@ -2820,7 +2820,7 @@ function showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl) 
     color: white;
     font-weight: 600;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 15px;
     transition: all 0.15s;
     display: flex;
     align-items: center;
@@ -2864,7 +2864,7 @@ function showDeleteRequestModal(entityType, entityId, entityLabel, redirectUrl) 
           toast.className = 'alert alert-success';
           toast.style.cssText = `
             position: fixed; bottom: 20px; right: 20px; z-index: 9999;
-            padding: 12px 16px; border-radius: 4px; font-size: 14px;
+            padding: 12px 16px; border-radius: 4px; font-size: 16px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
             min-width: 300px; animation: slideIn 0.3s ease-out;
           `;
@@ -2916,7 +2916,7 @@ function showConfirmationModal(title, message, action, headerBg, onConfirm) {
   header.textContent = title;
 
   const body = document.createElement('div');
-  body.style.cssText = `padding: 24px; color: #334155; font-size: 14px; line-height: 1.6;`;
+  body.style.cssText = `padding: 24px; color: #334155; font-size: 16px; line-height: 1.6;`;
   body.innerHTML = `<p>${message}</p>`;
 
   const footer = document.createElement('div');
@@ -2924,12 +2924,12 @@ function showConfirmationModal(title, message, action, headerBg, onConfirm) {
 
   const cancelBtn = document.createElement('button');
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.style.cssText = `padding: 9px 18px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #334155; font-weight: 600; cursor: pointer; font-size: 13px;`;
+  cancelBtn.style.cssText = `padding: 9px 18px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #334155; font-weight: 600; cursor: pointer; font-size: 15px;`;
   cancelBtn.onclick = () => overlay.remove();
 
   const confirmBtn = document.createElement('button');
   confirmBtn.textContent = action;
-  confirmBtn.style.cssText = `padding: 9px 18px; border: none; border-radius: 6px; background: ${headerBg}; color: white; font-weight: 600; cursor: pointer; font-size: 13px;`;
+  confirmBtn.style.cssText = `padding: 9px 18px; border: none; border-radius: 6px; background: ${headerBg}; color: white; font-weight: 600; cursor: pointer; font-size: 15px;`;
   confirmBtn.onclick = () => {
     overlay.remove();
     onConfirm();
@@ -3097,8 +3097,8 @@ function toggleCommModal() {
       </div>
       <div class="modal-body pb-2">
         <div class="mb-3">
-          <label class="form-label fw-semibold" style="font-size:12px;">Reason for Rejection <span class="text-muted fw-normal">(optional)</span></label>
-          <textarea id="rejectReason" class="form-control form-control-sm" placeholder="e.g., Not approved by client" rows="3" style="font-size:12px;"></textarea>
+          <label class="form-label fw-semibold" style="font-size:14px;">Reason for Rejection <span class="text-muted fw-normal">(optional)</span></label>
+          <textarea id="rejectReason" class="form-control form-control-sm" placeholder="e.g., Not approved by client" rows="3" style="font-size:14px;"></textarea>
         </div>
       </div>
       <div class="modal-footer py-2">

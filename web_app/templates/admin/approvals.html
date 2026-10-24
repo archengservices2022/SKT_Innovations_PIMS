@@ -17,25 +17,25 @@
   <div class="col-6 col-md-3">
     <div class="card-panel text-center py-3" style="border-left:4px solid #0D9488;">
       <div style="font-size:28px;font-weight:700;color:#0D9488;">{{ pending_timeoff|length }}</div>
-      <div style="font-size:12px;color:#64748b;margin-top:2px;"><i class="bi bi-calendar-x me-1"></i>Time Off</div>
+      <div style="font-size:14px;color:#64748b;margin-top:2px;"><i class="bi bi-calendar-x me-1"></i>Time Off</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="card-panel text-center py-3" style="border-left:4px solid #b91c1c;">
       <div style="font-size:28px;font-weight:700;color:#b91c1c;">{{ pending_exp|length }}</div>
-      <div style="font-size:12px;color:#64748b;margin-top:2px;"><i class="bi bi-receipt me-1"></i>Expenses</div>
+      <div style="font-size:14px;color:#64748b;margin-top:2px;"><i class="bi bi-receipt me-1"></i>Expenses</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="card-panel text-center py-3" style="border-left:4px solid #7C3AED;">
       <div style="font-size:28px;font-weight:700;color:#7C3AED;">{{ pending_med|length }}</div>
-      <div style="font-size:12px;color:#64748b;margin-top:2px;"><i class="bi bi-heart-pulse me-1"></i>Medical</div>
+      <div style="font-size:14px;color:#64748b;margin-top:2px;"><i class="bi bi-heart-pulse me-1"></i>Medical</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="card-panel text-center py-3" style="border-left:4px solid #2563eb;">
       <div style="font-size:28px;font-weight:700;color:#2563eb;">{{ pending_ts|length }}</div>
-      <div style="font-size:12px;color:#64748b;margin-top:2px;"><i class="bi bi-clock me-1"></i>Timesheets</div>
+      <div style="font-size:14px;color:#64748b;margin-top:2px;"><i class="bi bi-clock me-1"></i>Timesheets</div>
     </div>
   </div>
 </div>
@@ -73,7 +73,7 @@
       <div class="text-muted text-center py-5">
         <i class="bi bi-check-circle" style="font-size:36px;display:block;margin-bottom:10px;opacity:.35;color:#0D9488;"></i>
         <div style="font-size:15px;font-weight:600;">All caught up!</div>
-        <div style="font-size:13px;margin-top:4px;">No pending approvals at this time.</div>
+        <div style="font-size:15px;margin-top:4px;">No pending approvals at this time.</div>
       </div>
     </div>
     {% endif %}
@@ -87,7 +87,7 @@
         <span class="badge ms-2" style="background:#0D9488;color:white;">{{ pending_timeoff|length }}</span>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+        <table class="table table-sm table-hover align-middle mb-0" style="font-size:15px;">
           <thead class="table-light">
             <tr>
               <th>Employee</th>
@@ -104,7 +104,7 @@
             <tr id="row-timeoff-{{ item.firebase_id }}">
               <td class="fw-semibold">{{ item.employee }}</td>
               <td>
-                <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;">{{ item.timeoff_type or 'PTO' }}</span>
+                <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:13px;">{{ item.timeoff_type or 'PTO' }}</span>
               </td>
               <td class="text-nowrap text-muted">{{ item.date | format_date }}{% if item.date_end %} → {{ item.date_end | format_date }}{% endif %}</td>
               <td>
@@ -147,7 +147,7 @@
         <span class="badge ms-2" style="background:#b91c1c;color:white;">{{ pending_exp|length }}</span>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+        <table class="table table-sm table-hover align-middle mb-0" style="font-size:15px;">
           <thead class="table-light">
             <tr>
               <th>Employee</th>
@@ -169,7 +169,7 @@
                   {% set rate = item.exchange_rate or 120 %}
                   {% if curr == 'BDT' %}
                     <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format((item.amount|float) / rate) }}</div>
-                    <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
+                    <div class="text-muted" style="font-size:13px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
                   {% else %}
                     <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format(item.amount|float) }}</div>
                   {% endif %}
@@ -210,7 +210,7 @@
         <span class="badge ms-2" style="background:#7C3AED;color:white;">{{ pending_med|length }}</span>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+        <table class="table table-sm table-hover align-middle mb-0" style="font-size:15px;">
           <thead class="table-light">
             <tr>
               <th>Employee</th>
@@ -232,7 +232,7 @@
                   {% set rate = item.exchange_rate or 120 %}
                   {% if curr == 'BDT' %}
                     <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format((item.amount|float) / rate) }}</div>
-                    <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
+                    <div class="text-muted" style="font-size:13px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
                   {% else %}
                     <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format(item.amount|float) }}</div>
                   {% endif %}
@@ -277,7 +277,7 @@
         <span class="badge ms-2" style="background:#2563eb;color:white;">{{ pending_ts|length }}</span>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+        <table class="table table-sm table-hover align-middle mb-0" style="font-size:15px;">
           <thead class="table-light">
             <tr>
               <th>Employee</th>
@@ -345,25 +345,25 @@
     {# History sub-tabs #}
     <ul class="nav nav-pills mb-3" id="historySubTab" style="gap:6px;">
       <li class="nav-item">
-        <a class="nav-link active py-1 px-3" data-bs-toggle="pill" href="#hist-timeoff" style="font-size:13px;">
+        <a class="nav-link active py-1 px-3" data-bs-toggle="pill" href="#hist-timeoff" style="font-size:15px;">
           <i class="bi bi-calendar-x me-1" style="color:#0D9488;"></i>Time Off
           {% if hist_timeoff %}<span class="badge ms-1" style="background:#0D9488;color:white;">{{ hist_timeoff|length }}</span>{% endif %}
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#hist-expense" style="font-size:13px;">
+        <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#hist-expense" style="font-size:15px;">
           <i class="bi bi-receipt me-1" style="color:#b91c1c;"></i>Expenses
           {% if hist_exp %}<span class="badge ms-1" style="background:#b91c1c;color:white;">{{ hist_exp|length }}</span>{% endif %}
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#hist-medical" style="font-size:13px;">
+        <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#hist-medical" style="font-size:15px;">
           <i class="bi bi-heart-pulse me-1" style="color:#7C3AED;"></i>Medical
           {% if hist_med %}<span class="badge ms-1" style="background:#7C3AED;color:white;">{{ hist_med|length }}</span>{% endif %}
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#hist-timesheet" style="font-size:13px;">
+        <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#hist-timesheet" style="font-size:15px;">
           <i class="bi bi-clock me-1" style="color:#2563eb;"></i>Timesheets
           {% if hist_ts %}<span class="badge ms-1" style="background:#2563eb;color:white;">{{ hist_ts|length }}</span>{% endif %}
         </a>
@@ -377,7 +377,7 @@
         {% if hist_timeoff %}
         <div class="card-panel">
           <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+            <table class="table table-sm table-hover align-middle mb-0" style="font-size:15px;">
               <thead class="table-light">
                 <tr>
                   <th>Employee</th>
@@ -394,7 +394,7 @@
                 {% for item in hist_timeoff %}
                 <tr>
                   <td class="fw-semibold">{{ item.employee }}</td>
-                  <td><span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;">{{ item.timeoff_type or 'PTO' }}</span></td>
+                  <td><span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:13px;">{{ item.timeoff_type or 'PTO' }}</span></td>
                   <td class="text-muted text-nowrap">{{ item.date | format_date }}{% if item.date_end %} → {{ item.date_end | format_date }}{% endif %}</td>
                   <td>{% if item.amount != '—' and item.amount != None %}<span class="fw-semibold">{{ "{:.0f}".format(item.amount|float) }}h</span>{% else %}—{% endif %}</td>
                   <td class="text-muted small">{{ item.notes or '—' }}</td>
@@ -422,7 +422,7 @@
         {% if hist_exp %}
         <div class="card-panel">
           <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+            <table class="table table-sm table-hover align-middle mb-0" style="font-size:15px;">
               <thead class="table-light">
                 <tr>
                   <th>Employee</th>
@@ -445,7 +445,7 @@
                       {% set rate = item.exchange_rate or 120 %}
                       {% if curr == 'BDT' %}
                         <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format((item.amount|float) / rate) }}</div>
-                        <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
+                        <div class="text-muted" style="font-size:13px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
                       {% else %}
                         <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format(item.amount|float) }}</div>
                       {% endif %}
@@ -476,7 +476,7 @@
         {% if hist_med %}
         <div class="card-panel">
           <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+            <table class="table table-sm table-hover align-middle mb-0" style="font-size:15px;">
               <thead class="table-light">
                 <tr>
                   <th>Employee</th>
@@ -499,7 +499,7 @@
                       {% set rate = item.exchange_rate or 120 %}
                       {% if curr == 'BDT' %}
                         <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format((item.amount|float) / rate) }}</div>
-                        <div class="text-muted" style="font-size:11px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
+                        <div class="text-muted" style="font-size:13px;">৳{{ "{:,.0f}".format(item.amount|float) }}</div>
                       {% else %}
                         <div class="fw-semibold">{{ currency_symbol }}{{ "{:.2f}".format(item.amount|float) }}</div>
                       {% endif %}
@@ -530,7 +530,7 @@
         {% if hist_ts %}
         <div class="card-panel">
           <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+            <table class="table table-sm table-hover align-middle mb-0" style="font-size:15px;">
               <thead class="table-light">
                 <tr>
                   <th>Employee</th>
@@ -578,7 +578,7 @@
     <div class="card-panel">
       <h6 class="section-heading mb-3"><i class="bi bi-shield-lock me-1" style="color:#0D9488;"></i>Permission Requests</h6>
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+        <table class="table table-sm table-hover align-middle mb-0" style="font-size:15px;">
           <thead class="table-light">
             <tr>
               <th>Requested By</th>
@@ -597,7 +597,7 @@
               <td>
                 {{ req.get('action','—') }}
                 {% if req.get('entity_label') %}
-                <div class="text-muted" style="font-size:11px;">{{ req.entity_label }}</div>
+                <div class="text-muted" style="font-size:13px;">{{ req.entity_label }}</div>
                 {% endif %}
               </td>
               <td class="text-muted">{{ req.get('notes','—') or '—' }}</td>
@@ -608,14 +608,14 @@
                   <span class="badge" style="background:#fef9c3;color:#92400e;">Pending</span>
                 {% elif req.get('status') == 'approved' %}
                   <span class="badge bg-success">Approved</span>
-                  <div class="text-muted" style="font-size:11px;">by {{ req.get('reviewed_by','—') }}</div>
-                  {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:11px;">{{ req.admin_notes }}</div>{% endif %}
+                  <div class="text-muted" style="font-size:13px;">by {{ req.get('reviewed_by','—') }}</div>
+                  {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:13px;">{{ req.admin_notes }}</div>{% endif %}
                 {% elif req.get('status') == 'completed' %}
                   <span class="badge bg-secondary">Completed</span>
-                  <div class="text-muted" style="font-size:11px;">Deleted by {{ req.get('reviewed_by','—') }}</div>
+                  <div class="text-muted" style="font-size:13px;">Deleted by {{ req.get('reviewed_by','—') }}</div>
                 {% else %}
                   <span class="badge bg-danger">Denied</span>
-                  {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:11px;">{{ req.admin_notes }}</div>{% endif %}
+                  {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:13px;">{{ req.admin_notes }}</div>{% endif %}
                 {% endif %}
               </td>
               <td class="text-center text-nowrap">
@@ -657,16 +657,16 @@
         <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body pb-2">
-        <p class="text-muted mb-3" style="font-size:12px;">
+        <p class="text-muted mb-3" style="font-size:14px;">
           Employee: <strong id="med-modal-employee"></strong> &mdash; Claimed: <strong id="med-modal-claimed"></strong>
         </p>
         <div class="mb-3">
-          <label class="form-label fw-semibold" style="font-size:12px;">Approved Amount (₹) <span class="text-danger">*</span></label>
+          <label class="form-label fw-semibold" style="font-size:14px;">Approved Amount (₹) <span class="text-danger">*</span></label>
           <input type="number" id="medAmountApproved" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00">
         </div>
         <div class="mb-2">
-          <label class="form-label fw-semibold" style="font-size:12px;">Admin Notes <span class="text-muted fw-normal">(optional)</span></label>
-          <textarea id="medAdminNotes" class="form-control form-control-sm" rows="2" style="font-size:12px;" placeholder="Notes about the approval…"></textarea>
+          <label class="form-label fw-semibold" style="font-size:14px;">Admin Notes <span class="text-muted fw-normal">(optional)</span></label>
+          <textarea id="medAdminNotes" class="form-control form-control-sm" rows="2" style="font-size:14px;" placeholder="Notes about the approval…"></textarea>
         </div>
       </div>
       <div class="modal-footer py-2">
@@ -688,7 +688,7 @@
         <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body pb-2">
-        <p class="text-muted mb-0" style="font-size:12px;">
+        <p class="text-muted mb-0" style="font-size:14px;">
           Approving this request will notify the requester and allow them to proceed with the delete action.
         </p>
       </div>
@@ -712,8 +712,8 @@
       </div>
       <div class="modal-body pb-2">
         <div class="mb-3">
-          <label class="form-label fw-semibold" style="font-size:12px;">Reason for Denying <span class="text-muted fw-normal">(optional)</span></label>
-          <textarea id="denyReason" class="form-control form-control-sm" placeholder="e.g., Already approved by another admin" rows="2" style="font-size:12px;"></textarea>
+          <label class="form-label fw-semibold" style="font-size:14px;">Reason for Denying <span class="text-muted fw-normal">(optional)</span></label>
+          <textarea id="denyReason" class="form-control form-control-sm" placeholder="e.g., Already approved by another admin" rows="2" style="font-size:14px;"></textarea>
         </div>
       </div>
       <div class="modal-footer py-2">

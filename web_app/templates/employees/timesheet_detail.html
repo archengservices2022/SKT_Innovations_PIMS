@@ -33,13 +33,13 @@
   border: 2px solid rgba(255,255,255,.4);
 }
 .tsd-emp-name { font-size: 18px; font-weight: 700; color: #fff; margin: 0; letter-spacing: -.2px; }
-.tsd-emp-week { font-size: 13px; color: rgba(255,255,255,.75); margin-top: 2px; font-weight: 400; }
+.tsd-emp-week { font-size: 15px; color: rgba(255,255,255,.75); margin-top: 2px; font-weight: 400; }
 
 /* ?? Status badge ?????????????????????????????????????????????? */
 .sbadge {
   display: inline-flex; align-items: center;
   padding: 4px 14px; border-radius: 20px;
-  font-size: 11px; font-weight: 700;
+  font-size: 13px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
 }
 .sb-approved  { background: #dcfce7; color: #15803d; }
@@ -74,7 +74,7 @@
 .tsd-kpi-val.ot-color { color: #dc2626; }
 .tsd-kpi-val.muted    { color: #94a3b8; }
 .tsd-kpi-lbl {
-  font-size: 10px; font-weight: 700;
+  font-size: 12px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .5px;
   color: #94a3b8; margin-top: 5px;
 }
@@ -92,7 +92,7 @@
 .tsd-table thead th {
   background: #f8fafc;
   color: #64748b;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .5px;
@@ -103,7 +103,7 @@
 .tsd-table tbody td {
   padding: 12px 14px;
   border-bottom: 1px solid #f1f5f9;
-  font-size: 13px;
+  font-size: 15px;
   color: #334155;
   vertical-align: middle;
 }
@@ -126,14 +126,14 @@
   background: #0D9488;
   color: #fff;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   padding: 3px 9px;
   text-transform: uppercase;
   letter-spacing: .4px;
 }
 .day-grp-label {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: #334155;
   letter-spacing: -.1px;
@@ -143,7 +143,7 @@
 .etype {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px; border-radius: 10px;
-  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
 }
 .etype-work    { background: #f0fdfa; color: #0D9488; }
 .etype-holiday { background: #ede9fe; color: #6d28d9; }
@@ -161,14 +161,14 @@
   background: #f8fafc;
   border-top: 2px solid #e2e8f0;
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 /* ?? Status banners ???????????????????????????????????????????? */
 .tsd-banner {
   display: flex; align-items: center; gap: 10px;
   padding: 14px 22px;
-  font-size: 13px; font-weight: 500;
+  font-size: 15px; font-weight: 500;
   border-top: 1px solid;
 }
 .tsd-banner-approved { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
@@ -182,11 +182,11 @@
   justify-content: flex-end; flex-wrap: wrap;
   background: #fafbfc;
 }
-.tsd-action-label { font-size: 13px; color: #64748b; margin-right: 4px; }
+.tsd-action-label { font-size: 15px; color: #64748b; margin-right: 4px; }
 .tsd-btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 20px; border-radius: 9px;
-  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-size: 15px; font-weight: 600; cursor: pointer;
   border: 1px solid transparent; transition: all .15s;
   text-decoration: none;
 }
@@ -204,7 +204,7 @@
 
 <!-- Back link -->
 <div class="mb-3">
-  <a href="{{ url_for('timesheets') }}" style="font-size:13px;font-weight:500;color:#64748b;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+  <a href="{{ url_for('timesheets') }}" style="font-size:15px;font-weight:500;color:#64748b;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
     <i class="bi bi-arrow-left"></i> Back to Timesheets
   </a>
 </div>
@@ -250,13 +250,13 @@
   </div>
   {% if sheet.submitted_at %}
   <div class="tsd-kpi c-slate">
-    <div class="tsd-kpi-val" style="font-size:14px;font-weight:700;letter-spacing:0;padding-top:4px;">{{ sheet.submitted_at[:10] | format_date }}</div>
+    <div class="tsd-kpi-val" style="font-size:16px;font-weight:700;letter-spacing:0;padding-top:4px;">{{ sheet.submitted_at[:10] | format_date }}</div>
     <div class="tsd-kpi-lbl">Submitted</div>
   </div>
   {% endif %}
   {% if sheet.approved_at %}
   <div class="tsd-kpi c-slate">
-    <div class="tsd-kpi-val" style="font-size:14px;font-weight:700;letter-spacing:0;padding-top:4px;">{{ sheet.approved_at[:10] | format_date }}</div>
+    <div class="tsd-kpi-val" style="font-size:16px;font-weight:700;letter-spacing:0;padding-top:4px;">{{ sheet.approved_at[:10] | format_date }}</div>
     <div class="tsd-kpi-lbl">Reviewed</div>
   </div>
   {% endif %}
@@ -303,7 +303,7 @@
           {# ?? Entry row ?? #}
           {% set etype = entry.entry_type | default('work') | lower %}
           <tr>
-            <td style="color:#94a3b8;font-size:12px;white-space:nowrap;">{{ entry.date | format_date if entry.date else '—' }}</td>
+            <td style="color:#94a3b8;font-size:14px;white-space:nowrap;">{{ entry.date | format_date if entry.date else '—' }}</td>
             <td>
               {% if etype == 'holiday' %}
                 <span class="etype etype-holiday"><i class="bi bi-umbrella-fill"></i> Holiday</span>
@@ -319,7 +319,7 @@
               {% if entry.project_name %}
                 <span style="font-weight:600;color:#1e293b;">{{ entry.project_name }}</span>
                 {% if entry.project_number %}
-                  <span style="color:#94a3b8;font-size:11px;margin-left:4px;">{{ entry.project_number }}</span>
+                  <span style="color:#94a3b8;font-size:13px;margin-left:4px;">{{ entry.project_number }}</span>
                 {% endif %}
               {% else %}
                 <span style="color:#94a3b8;">General / Admin</span>
@@ -327,12 +327,12 @@
             </td>
             <td style="font-variant-numeric:tabular-nums;white-space:nowrap;">
               {% if entry.start_time %}
-                <span style="background:#f0fdfa;color:#0D9488;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;">{{ entry.start_time }}</span>
+                <span style="background:#f0fdfa;color:#0D9488;padding:2px 8px;border-radius:6px;font-size:14px;font-weight:600;">{{ entry.start_time }}</span>
               {% else %}<span class="val-mute">—</span>{% endif %}
             </td>
             <td style="font-variant-numeric:tabular-nums;white-space:nowrap;">
               {% if entry.end_time %}
-                <span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;">{{ entry.end_time }}</span>
+                <span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:6px;font-size:14px;font-weight:600;">{{ entry.end_time }}</span>
               {% else %}<span class="val-mute">—</span>{% endif %}
             </td>
             <td style="text-align:right;">
@@ -348,20 +348,20 @@
             <td style="text-align:right;">
               <span class="val-tot">{{ "%.2f"|format(entry.total_hours | float) }}</span>
             </td>
-            <td style="color:#64748b;font-size:12px;max-width:180px;">{{ entry.notes or '—' }}</td>
+            <td style="color:#64748b;font-size:14px;max-width:180px;">{{ entry.notes or '—' }}</td>
           </tr>
           {% endfor %}
 
           {# ?? Totals row ?? #}
           <tr class="tsd-totals">
-            <td colspan="5" style="text-align:right;font-weight:700;color:#475569;font-size:12px;letter-spacing:.3px;text-transform:uppercase;">Totals</td>
+            <td colspan="5" style="text-align:right;font-weight:700;color:#475569;font-size:14px;letter-spacing:.3px;text-transform:uppercase;">Totals</td>
             <td style="text-align:right;"><span class="val-reg">{{ "%.2f"|format(sheet.total_regular_hours | float) }}</span></td>
             <td style="text-align:right;">
               {% if sheet.total_overtime_hours | float > 0 %}
                 <span class="val-ot">{{ "%.2f"|format(sheet.total_overtime_hours | float) }}</span>
               {% else %}<span class="val-mute">0.00</span>{% endif %}
             </td>
-            <td style="text-align:right;"><span class="val-tot" style="font-size:14px;">{{ "%.2f"|format(sheet.total_hours | float) }}</span></td>
+            <td style="text-align:right;"><span class="val-tot" style="font-size:16px;">{{ "%.2f"|format(sheet.total_hours | float) }}</span></td>
             <td></td>
           </tr>
         {% else %}
@@ -464,7 +464,7 @@ function showConfirmationDialog(action, sheetId, employeeName) {
   body.style.cssText = `
     padding: 24px;
     color: #334155;
-    font-size: 14px;
+    font-size: 16px;
     line-height: 1.6;
   `;
 
@@ -480,7 +480,7 @@ function showConfirmationDialog(action, sheetId, employeeName) {
         border: 1px solid #cbd5e1;
         border-radius: 6px;
         font-family: inherit;
-        font-size: 13px;
+        font-size: 15px;
         resize: vertical;
         min-height: 80px;
         box-sizing: border-box;
@@ -509,7 +509,7 @@ function showConfirmationDialog(action, sheetId, employeeName) {
     color: #334155;
     font-weight: 600;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 15px;
   `;
   cancelBtn.onclick = () => overlay.remove();
 
@@ -523,7 +523,7 @@ function showConfirmationDialog(action, sheetId, employeeName) {
     color: white;
     font-weight: 600;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 15px;
   `;
   confirmBtn.onclick = () => {
     overlay.remove();

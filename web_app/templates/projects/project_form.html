@@ -1566,7 +1566,7 @@ document.addEventListener('DOMContentLoaded', () => {
             badgeClass = 'status-not-started';
           }
         }
-        const statusBadge = stageStatus ? `<span class="badge ${badgeClass}" style="font-size: 11px;">${stageStatus}</span>` : '';
+        const statusBadge = stageStatus ? `<span class="badge ${badgeClass}" style="font-size: 13px;">${stageStatus}</span>` : '';
 
         html += `
           <div class="mb-2">
@@ -1702,7 +1702,7 @@ function updatePreviewStageTotals() {
           <div style="font-weight: 600; margin-bottom: 4px;">
             ${changeIcon} Contract value ${changeType} by <strong>${CURRENCY_SYMBOL}${diffAmt}</strong>
           </div>
-          <div style="font-size: 12px; opacity: 0.9;">
+          <div style="font-size: 14px; opacity: 0.9;">
             From ₹${originalValue.toFixed(2)} → ₹${newTotal.toFixed(2)}
           </div>
         </div>

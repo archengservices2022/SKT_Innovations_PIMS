@@ -3,7 +3,7 @@
 
 {% block content %}
 <style>
-.prof-breadcrumb { font-size:13px; color:#64748b; margin-bottom:12px; }
+.prof-breadcrumb { font-size:15px; color:#64748b; margin-bottom:12px; }
 .prof-breadcrumb a { color:#0D9488; text-decoration:none; }
 .prof-header { background:#fff; border-radius:12px; padding:24px 28px; margin-bottom:20px;
                box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0; }
@@ -11,8 +11,8 @@
                background:linear-gradient(135deg,#7C3AED,#0D9488); color:#fff;
                display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .prof-name   { font-size:22px; font-weight:800; color:#0f172a; line-height:1.2; }
-.prof-sub    { font-size:13px; color:#64748b; }
-.prof-meta   { font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px; }
+.prof-sub    { font-size:15px; color:#64748b; }
+.prof-meta   { font-size:14px; color:#64748b; display:flex; align-items:center; gap:6px; }
 .prof-meta i { color:#94a3b8; }
 
 /* KPI cards */
@@ -23,36 +23,36 @@
                box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0;
                text-decoration:none; display:block; transition:box-shadow .15s,border-color .15s; }
 .kpi-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.1); border-color:#0D9488; text-decoration:none; }
-.kpi-label   { font-size:10px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.kpi-label   { font-size:12px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
 .kpi-value   { font-size:17px; font-weight:800; color:#0f172a; line-height:1.1; }
-.kpi-sub     { font-size:10px; color:#94a3b8; margin-top:2px; }
+.kpi-sub     { font-size:12px; color:#94a3b8; margin-top:2px; }
 
 /* Financial bar */
 .fin-strip   { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:20px; }
 @media(max-width:768px){ .fin-strip { grid-template-columns:1fr; } }
 .fin-card    { background:#fff; border-radius:10px; padding:20px 24px;
                box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0; }
-.fin-title   { font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.fin-title   { font-size:13px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
 .fin-big     { font-size:26px; font-weight:900; color:#0f172a; }
-.fin-detail  { font-size:12px; color:#64748b; margin-top:6px; }
+.fin-detail  { font-size:14px; color:#64748b; margin-top:6px; }
 
 /* Summary panels */
 .summary-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:20px; }
 @media(max-width:900px){ .summary-grid { grid-template-columns:1fr 1fr; } }
 @media(max-width:600px){ .summary-grid { grid-template-columns:1fr; } }
 .sum-panel  { background:#fff; border-radius:10px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0; }
-.sum-head   { font-size:13px; font-weight:700; color:#0f172a; border-bottom:1px solid #f1f5f9; padding-bottom:10px; margin-bottom:12px; }
-.sum-row    { display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:5px 0; }
+.sum-head   { font-size:15px; font-weight:700; color:#0f172a; border-bottom:1px solid #f1f5f9; padding-bottom:10px; margin-bottom:12px; }
+.sum-row    { display:flex; justify-content:space-between; align-items:center; font-size:15px; padding:5px 0; }
 .sum-row-label { color:#64748b; }
 .sum-row-val   { font-weight:700; color:#0f172a; }
-.sum-total  { border-top:2px solid #e2e8f0; margin-top:6px; padding-top:8px; font-weight:800; font-size:14px; }
+.sum-total  { border-top:2px solid #e2e8f0; margin-top:6px; padding-top:8px; font-weight:800; font-size:16px; }
 
 /* Tables */
 .prof-table-card { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1px solid #e2e8f0; overflow:hidden; margin-bottom:20px; }
 .prof-table-head { padding:14px 20px; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between; }
-.prof-table-title { font-size:13px; font-weight:700; color:#0f172a; }
+.prof-table-title { font-size:15px; font-weight:700; color:#0f172a; }
 .prof-table-wrap  { overflow-x:auto; }
-.prof-table-wrap table { font-size:12px; width:100%; }
+.prof-table-wrap table { font-size:14px; width:100%; }
 .prof-table-wrap tbody tr { cursor:pointer; }
 .prof-table-wrap tbody tr:hover td { background:#f8fafc; }
 .proj-name-col { max-width:120px; overflow:hidden; text-overflow:ellipsis; }
@@ -66,13 +66,13 @@
 .text-blue  { color:#1d4ed8; }
 
 /* Status badges */
-.status-approved { background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-block; }
-.status-draft { background:#fed7aa; color:#92400e; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-block; }
-.status-pending { background:#fef3c7; color:#b45309; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-block; }
-.status-submitted { background:#dbeafe; color:#1e40af; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-block; }
-.status-rejected { background:#fee2e2; color:#991b1b; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-block; }
-.status-active { background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-block; }
-.status-completed { background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-block; }
+.status-approved { background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:4px; font-size:13px; font-weight:700; display:inline-block; }
+.status-draft { background:#fed7aa; color:#92400e; padding:4px 8px; border-radius:4px; font-size:13px; font-weight:700; display:inline-block; }
+.status-pending { background:#fef3c7; color:#b45309; padding:4px 8px; border-radius:4px; font-size:13px; font-weight:700; display:inline-block; }
+.status-submitted { background:#dbeafe; color:#1e40af; padding:4px 8px; border-radius:4px; font-size:13px; font-weight:700; display:inline-block; }
+.status-rejected { background:#fee2e2; color:#991b1b; padding:4px 8px; border-radius:4px; font-size:13px; font-weight:700; display:inline-block; }
+.status-active { background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:4px; font-size:13px; font-weight:700; display:inline-block; }
+.status-completed { background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:4px; font-size:13px; font-weight:700; display:inline-block; }
 </style>
 
 <!-- Breadcrumb -->
@@ -193,7 +193,7 @@
   </div>
   <div class="fin-card">
     <div class="fin-title"><i class="bi bi-person-workspace me-1"></i>Hours Contribution</div>
-    <div class="fin-big">{{ '{:,.1f}'.format(total_hours) }} <span style="font-size:14px;font-weight:400;color:#64748b;">hrs</span></div>
+    <div class="fin-big">{{ '{:,.1f}'.format(total_hours) }} <span style="font-size:16px;font-weight:400;color:#64748b;">hrs</span></div>
     <div class="fin-detail">{{ '{:,.1f}'.format(billable_hours) }} project hrs &nbsp;·&nbsp; {{ '{:,.1f}'.format(nonbillable_hrs) }} admin hrs</div>
   </div>
   <a class="fin-card" href="{{ url_for('commission_detail', salesperson_name=name) }}" style="text-decoration:none;color:inherit;display:block;">
@@ -213,7 +213,7 @@
   <div class="sum-panel">
     <div class="sum-head">
       <i class="bi bi-cash-coin me-2" style="color:#0D9488;"></i>Compensation Summary
-      <a href="{{ url_for('payroll') }}?employee={{ name | urlencode }}" class="float-end" style="font-size:11px;color:#0D9488;text-decoration:none;">View Payroll →</a>
+      <a href="{{ url_for('payroll') }}?employee={{ name | urlencode }}" class="float-end" style="font-size:13px;color:#0D9488;text-decoration:none;">View Payroll →</a>
     </div>
     <div class="sum-row">
       <span class="sum-row-label">Total Salary Paid</span>
@@ -245,7 +245,7 @@
   <div class="sum-panel">
     <div class="sum-head">
       <i class="bi bi-briefcase me-2" style="color:#7C3AED;"></i>Work Summary
-      <a href="{{ url_for('timesheets') }}" class="float-end" style="font-size:11px;color:#7C3AED;text-decoration:none;">View Timesheets →</a>
+      <a href="{{ url_for('timesheets') }}" class="float-end" style="font-size:13px;color:#7C3AED;text-decoration:none;">View Timesheets →</a>
     </div>
     <div class="sum-row">
       <span class="sum-row-label">Projects Worked</span>
@@ -277,7 +277,7 @@
   <div class="sum-panel">
     <div class="sum-head">
       <i class="bi bi-calendar-check me-2" style="color:#3b82f6;"></i>Leave Summary
-      <a href="{{ url_for('employees') }}#tab-time-off" class="float-end" style="font-size:11px;color:#3b82f6;text-decoration:none;">View Leave →</a>
+      <a href="{{ url_for('employees') }}#tab-time-off" class="float-end" style="font-size:13px;color:#3b82f6;text-decoration:none;">View Leave →</a>
     </div>
     <div class="sum-row">
       <span class="sum-row-label">Annual Leave Entitlement</span>
@@ -313,11 +313,11 @@
   <div class="prof-table-card" style="min-width:280px;flex:1;">
     <div class="prof-table-head">
       <span class="prof-table-title"><i class="bi bi-receipt me-1" style="color:#0D9488;"></i>Recent Payroll History</span>
-      <a href="{{ url_for('employee_all_payroll', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:11px;">View All</a>
+      <a href="{{ url_for('employee_all_payroll', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:13px;">View All</a>
     </div>
     <div class="prof-table-wrap">
       <table class="table table-sm table-hover mb-0 align-middle">
-        <thead style="background:#f8fafc; font-size:11px;">
+        <thead style="background:#f8fafc; font-size:13px;">
           <tr><th>Date</th><th>Type</th><th class="text-end">Amount</th><th>Status</th></tr>
         </thead>
         <tbody>
@@ -329,7 +329,7 @@
           <td><span class="badge status-{{ (s.get('salary_status','paid'))|lower }}">{{ s.get('salary_status','Paid') }}</span></td>
         </tr>
         {% else %}
-        <tr><td colspan="4" class="text-muted text-center py-3" style="font-size:12px;">No payroll records yet</td></tr>
+        <tr><td colspan="4" class="text-muted text-center py-3" style="font-size:14px;">No payroll records yet</td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -340,11 +340,11 @@
   <div class="prof-table-card" style="min-width:280px;flex:1;">
     <div class="prof-table-head">
       <span class="prof-table-title"><i class="bi bi-folder me-1" style="color:#7C3AED;"></i>Recent Projects</span>
-      <a href="{{ url_for('employee_all_projects', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:11px;">All Projects</a>
+      <a href="{{ url_for('employee_all_projects', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:13px;">All Projects</a>
     </div>
     <div class="prof-table-wrap">
       <table class="table table-sm table-hover mb-0 align-middle">
-        <thead style="background:#f8fafc; font-size:11px;">
+        <thead style="background:#f8fafc; font-size:13px;">
           <tr><th>Project #</th><th>Name</th><th>Status</th></tr>
         </thead>
         <tbody>
@@ -353,10 +353,10 @@
           <td>
             {% if p.get('firebase_id') %}
             <a href="{{ url_for('project_detail', project_id=p.get('firebase_id')) }}" class="text-decoration-none">
-              <span class="badge" style="background:#ede9fe;color:#5b21b6;font-size:11px;cursor:pointer;">{{ p.project_number }}</span>
+              <span class="badge" style="background:#ede9fe;color:#5b21b6;font-size:13px;cursor:pointer;">{{ p.project_number }}</span>
             </a>
             {% else %}
-            <span class="badge" style="background:#ede9fe;color:#5b21b6;font-size:11px;">{{ p.project_number }}</span>
+            <span class="badge" style="background:#ede9fe;color:#5b21b6;font-size:13px;">{{ p.project_number }}</span>
             {% endif %}
           </td>
           <td class="text-muted small proj-name-col" title="{{ p.project_name or '—' }}">
@@ -377,7 +377,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="3" class="text-muted text-center py-3" style="font-size:12px;">No project time logged</td></tr>
+        <tr><td colspan="3" class="text-muted text-center py-3" style="font-size:14px;">No project time logged</td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -388,11 +388,11 @@
   <div class="prof-table-card" style="min-width:280px;flex:1;">
     <div class="prof-table-head">
       <span class="prof-table-title"><i class="bi bi-wallet2 me-1" style="color:#b45309;"></i>Recent Advances</span>
-      <a href="{{ url_for('employee_all_advances', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:11px;">View All</a>
+      <a href="{{ url_for('employee_all_advances', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:13px;">View All</a>
     </div>
     <div class="prof-table-wrap">
       <table class="table table-sm table-hover mb-0 align-middle">
-        <thead style="background:#f8fafc; font-size:11px;">
+        <thead style="background:#f8fafc; font-size:13px;">
           <tr><th>Date</th><th class="text-end">Adv Amount</th><th class="text-end">Adjusted</th><th class="text-end">Balance</th></tr>
         </thead>
         <tbody>
@@ -407,7 +407,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="4" class="text-muted text-center py-3" style="font-size:12px;">No advances</td></tr>
+        <tr><td colspan="4" class="text-muted text-center py-3" style="font-size:14px;">No advances</td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -423,11 +423,11 @@
     <div class="prof-table-card">
       <div class="prof-table-head">
         <span class="prof-table-title"><i class="bi bi-calendar-event me-1" style="color:#7C3AED;"></i>Recent Timesheets</span>
-        <a href="{{ url_for('employee_all_timesheets', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:11px;">View All</a>
+        <a href="{{ url_for('employee_all_timesheets', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:13px;">View All</a>
       </div>
       <div class="prof-table-wrap">
         <table class="table table-sm table-hover mb-0 align-middle">
-          <thead style="background:#f8fafc; font-size:11px;">
+          <thead style="background:#f8fafc; font-size:13px;">
             <tr><th>Period</th><th class="text-end">Hours</th><th>Status</th></tr>
           </thead>
           <tbody>
@@ -455,7 +455,7 @@
             <td><span class="badge status-{{ (ts.get('status','pending'))|lower }}">{{ ts.get('status','Pending') }}</span></td>
           </tr>
           {% else %}
-          <tr><td colspan="3" class="text-muted text-center py-3" style="font-size:12px;">No timesheets yet</td></tr>
+          <tr><td colspan="3" class="text-muted text-center py-3" style="font-size:14px;">No timesheets yet</td></tr>
           {% endfor %}
           </tbody>
         </table>
@@ -468,11 +468,11 @@
     <div class="prof-table-card">
       <div class="prof-table-head">
         <span class="prof-table-title"><i class="bi bi-calendar-x me-1" style="color:#3b82f6;"></i>Recent Time Off Requests</span>
-        <a href="{{ url_for('employee_all_time_off', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:11px;">View All</a>
+        <a href="{{ url_for('employee_all_time_off', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:13px;">View All</a>
       </div>
       <div class="prof-table-wrap">
         <table class="table table-sm table-hover mb-0 align-middle">
-          <thead style="background:#f8fafc; font-size:11px;">
+          <thead style="background:#f8fafc; font-size:13px;">
             <tr><th>Type</th><th>From Date</th><th>To Date</th><th class="text-end">Days</th><th>Status</th></tr>
           </thead>
           <tbody>
@@ -485,7 +485,7 @@
             <td><span class="badge status-{{ (t.get('status','pending'))|lower }}">{{ t.get('status','Pending') }}</span></td>
           </tr>
           {% else %}
-          <tr><td colspan="3" class="text-muted text-center py-3" style="font-size:12px;">No time off requests</td></tr>
+          <tr><td colspan="3" class="text-muted text-center py-3" style="font-size:14px;">No time off requests</td></tr>
           {% endfor %}
           </tbody>
         </table>
@@ -498,11 +498,11 @@
     <div class="prof-table-card">
       <div class="prof-table-head">
         <span class="prof-table-title"><i class="bi bi-receipt me-1" style="color:#16a34a;"></i>Recent Employee Expenses</span>
-        <a href="{{ url_for('employee_all_expenses', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:11px;">View All</a>
+        <a href="{{ url_for('employee_all_expenses', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:13px;">View All</a>
       </div>
       <div class="prof-table-wrap">
         <table class="table table-sm table-hover mb-0 align-middle">
-          <thead style="background:#f8fafc; font-size:11px;">
+          <thead style="background:#f8fafc; font-size:13px;">
             <tr><th>Date</th><th>Category</th><th class="text-end">Amount</th><th>Status</th></tr>
           </thead>
           <tbody>
@@ -514,7 +514,7 @@
             <td><span class="badge status-{{ (exp.get('status','pending'))|lower }}">{{ exp.get('status','Pending') }}</span></td>
           </tr>
           {% else %}
-          <tr><td colspan="4" class="text-muted text-center py-3" style="font-size:12px;">No expenses submitted</td></tr>
+          <tr><td colspan="4" class="text-muted text-center py-3" style="font-size:14px;">No expenses submitted</td></tr>
           {% endfor %}
           </tbody>
         </table>
@@ -527,11 +527,11 @@
     <div class="prof-table-card">
       <div class="prof-table-head">
         <span class="prof-table-title"><i class="bi bi-heart-pulse me-1" style="color:#dc2626;"></i>Recent Medical Claims</span>
-        <a href="{{ url_for('employee_all_medical', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:11px;">View All</a>
+        <a href="{{ url_for('employee_all_medical', uid=uid) }}" class="btn btn-xs btn-outline-secondary" style="font-size:13px;">View All</a>
       </div>
       <div class="prof-table-wrap">
         <table class="table table-sm table-hover mb-0 align-middle">
-          <thead style="background:#f8fafc; font-size:11px;">
+          <thead style="background:#f8fafc; font-size:13px;">
             <tr><th>Date</th><th>Type</th><th class="text-end">Claimed</th><th class="text-end">Approved</th><th>Status</th></tr>
           </thead>
           <tbody>
@@ -544,7 +544,7 @@
             <td><span class="badge status-{{ (med.get('status','pending'))|lower }}">{{ med.get('status','Pending') }}</span></td>
           </tr>
           {% else %}
-          <tr><td colspan="5" class="text-muted text-center py-3" style="font-size:12px;">No medical claims submitted</td></tr>
+          <tr><td colspan="5" class="text-muted text-center py-3" style="font-size:14px;">No medical claims submitted</td></tr>
           {% endfor %}
           </tbody>
         </table>
@@ -567,17 +567,17 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body p-4">
-        <div class="alert alert-warning d-flex gap-2 align-items-start py-2 mb-3" style="font-size:13px;">
+        <div class="alert alert-warning d-flex gap-2 align-items-start py-2 mb-3" style="font-size:15px;">
           <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
           <div>This will <strong>immediately disable</strong> the employee's login access. Their data is preserved.</div>
         </div>
         <input type="hidden" id="terminateUid">
         <div class="mb-3">
-          <label class="form-label fw-600" style="font-size:13px;">Termination Date <span class="text-danger">*</span></label>
+          <label class="form-label fw-600" style="font-size:15px;">Termination Date <span class="text-danger">*</span></label>
           <input type="date" id="terminateDate" class="form-control form-control-sm">
         </div>
         <div class="mb-3">
-          <label class="form-label fw-600" style="font-size:13px;">Reason <span class="text-danger">*</span></label>
+          <label class="form-label fw-600" style="font-size:15px;">Reason <span class="text-danger">*</span></label>
           <select id="terminateReason" class="form-select form-select-sm">
             <option value="">— Select reason —</option>
             <option value="Resignation">Resignation</option>
@@ -588,7 +588,7 @@
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-600" style="font-size:13px;">Notes</label>
+          <label class="form-label fw-600" style="font-size:15px;">Notes</label>
           <textarea id="terminateNotes" class="form-control form-control-sm" rows="2" placeholder="Optional notes..."></textarea>
         </div>
       </div>

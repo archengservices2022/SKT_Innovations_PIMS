@@ -478,7 +478,7 @@
         {% endif %}
       </div>
 
-      <div class="alert py-2 mb-3" style="background:#F0FDF4;border:1px solid #86EFAC;font-size:13px;">
+      <div class="alert py-2 mb-3" style="background:#F0FDF4;border:1px solid #86EFAC;font-size:15px;">
         <i class="bi bi-info-circle me-1" style="color:#16A34A;"></i>
         Sales people are pulled from <strong>Settings — Users</strong> (Sales &amp; Admin roles).
         Add or remove people there to update this list.
@@ -490,7 +490,7 @@
 
       {% if sales_people %}
       <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle" style="font-size:13px;">
+        <table class="table table-hover mb-0 align-middle" style="font-size:15px;">
           <thead>
             <tr>
               <th>Name</th>
@@ -519,9 +519,9 @@
               <td>
                 {% set _etype = sp_stat.employee_type if sp_stat else sp.employee_type %}
                 {% if _etype == 'full_time' %}
-                <span class="badge" style="background:#0D9488;color:#fff;font-size:11px;">Full Time</span>
+                <span class="badge" style="background:#0D9488;color:#fff;font-size:13px;">Full Time</span>
                 {% elif _etype == 'contractor' %}
-                <span class="badge" style="background:#7C3AED;color:#fff;font-size:11px;">Contractor</span>
+                <span class="badge" style="background:#7C3AED;color:#fff;font-size:13px;">Contractor</span>
                 {% else %}
                 <span class="text-muted small">—</span>
                 {% endif %}
@@ -680,7 +680,7 @@
         if (filteredData.length > 0) {
           console.log('Building table for', filteredData.length, 'items (filtered from', data.length, ')');
           html += '<div class="table-responsive" style="width:100%;display:block;">';
-          html += '<table class="table table-hover align-middle mb-0" style="font-size:13px;width:100%;">';
+          html += '<table class="table table-hover align-middle mb-0" style="font-size:15px;width:100%;">';
           html += '<thead>';
           html += '<tr>';
           html += '<th>Project</th>';
@@ -708,9 +708,9 @@
             const remaining = pc.commission_amount - pc.adjusted_amount - pc.paid_amount;
             let statusBadge = '';
             if (remaining <= 0.01) {
-              statusBadge = '<span class="badge bg-success" style="font-size:10px;"><i class="bi bi-check-circle me-1"></i>Paid</span>';
+              statusBadge = '<span class="badge bg-success" style="font-size:12px;"><i class="bi bi-check-circle me-1"></i>Paid</span>';
             } else {
-              statusBadge = '<span class="badge bg-warning text-dark" style="font-size:10px;">Pending</span>';
+              statusBadge = '<span class="badge bg-warning text-dark" style="font-size:12px;">Pending</span>';
             }
 
             html += '<tr>';

@@ -22,7 +22,7 @@
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -75,7 +75,7 @@
   text-align: left;
   font-weight: 700;
   color: white;
-  font-size: 11px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: .5px;
 }
@@ -103,14 +103,14 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 12px;
 }
 
 .status-date {
-  font-size: 11px;
+  font-size: 13px;
   color: #64748b;
   margin-top: 3px;
 }
@@ -123,7 +123,7 @@
 
 .btn-sm {
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 14px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -170,7 +170,7 @@
   color: #0d9488;
   text-decoration: underline;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .advance-link:hover {
@@ -190,7 +190,7 @@
 .amount-info {
   font-weight: 500;
   color: #64748b;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .empty-state {
@@ -283,7 +283,7 @@ input:checked + .toggle-slider:before {
 .filter-toggle label {
   margin: 0;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   color: #64748b;
 }
@@ -314,7 +314,7 @@ input:checked + .toggle-slider:before {
   padding: 6px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 14px;
   color: #0f172a;
   flex: 0 1 240px;
   height: 32px;
@@ -328,7 +328,7 @@ input:checked + .toggle-slider:before {
   padding: 6px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 14px;
   color: #0f172a;
   background: white;
   cursor: pointer;
@@ -348,7 +348,7 @@ input:checked + .toggle-slider:before {
   padding: 6px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 14px;
   color: #0f172a;
   height: 32px;
 }
@@ -402,7 +402,7 @@ input:checked + .toggle-slider:before {
 
 .form-label {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #0f172a;
   margin-bottom: 6px;
@@ -413,7 +413,7 @@ input:checked + .toggle-slider:before {
   padding: 10px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 16px;
   color: #0f172a;
   box-sizing: border-box;
 }
@@ -465,7 +465,7 @@ input:checked + .toggle-slider:before {
   border-radius: 6px;
   padding: 12px;
   margin-bottom: 18px;
-  font-size: 13px;
+  font-size: 15px;
   color: #15803d;
 }
 
@@ -476,7 +476,7 @@ input:checked + .toggle-slider:before {
 {% block content %}
 <div class="container-fluid">
   <div class="commission-header">
-    <a href="{{ url_for('payroll') }}#commission" style="display: inline-flex; align-items: center; gap: 6px; color: #0d9488; text-decoration: none; font-weight: 600; font-size: 13px; margin-bottom: 20px;">
+    <a href="{{ url_for('payroll') }}#commission" style="display: inline-flex; align-items: center; gap: 6px; color: #0d9488; text-decoration: none; font-weight: 600; font-size: 15px; margin-bottom: 20px;">
       ← Back to Commissions
     </a>
     <button type="button" class="btn btn-sm btn-teal" onclick="openPaymentModal()">
@@ -573,7 +573,7 @@ input:checked + .toggle-slider:before {
           {% set row_class = 'row-zero-commission' if earned == 0 else '' %}
           <tr class="{{ row_class }}">
             <td><a href="/projects/{{ comm.get('firebase_id', '') }}" class="project-link">{{ comm.get('project_number', '—') }}</a></td>
-            <td style="font-size: 12px; color: #64748b;">
+            <td style="font-size: 14px; color: #64748b;">
               {% if comm.get('company_name') %}
                 {{ comm.get('company_name', '') }}
               {% else %}
@@ -581,7 +581,7 @@ input:checked + .toggle-slider:before {
               {% endif %}
             </td>
             <td>{{ currency_symbol }}{{ "{:,.2f}".format(comm.get('contract_value', 0) | float) }}</td>
-            <td><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#e0e7ff;color:#312e81;white-space:nowrap;">{{ comm.get('rate_display', '—') }}</span></td>
+            <td><span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:13px;font-weight:600;background:#e0e7ff;color:#312e81;white-space:nowrap;">{{ comm.get('rate_display', '—') }}</span></td>
             <td class="amount-primary">{{ currency_symbol }}{{ "{:,.2f}".format(earned) }}</td>
             <td>
               {% set deductions = comm.get('deductions_list', []) %}
@@ -597,9 +597,9 @@ input:checked + .toggle-slider:before {
               <div>
                 <span class="status-badge {{ status_class }}">
                   {% if display_status == 'Paid' %}
-                    <i class="bi bi-check-circle" style="font-size: 10px;"></i>
+                    <i class="bi bi-check-circle" style="font-size: 12px;"></i>
                   {% elif display_status == 'Pending' %}
-                    <i class="bi bi-clock" style="font-size: 10px;"></i>
+                    <i class="bi bi-clock" style="font-size: 12px;"></i>
                   {% endif %}
                   {{ display_status }}
                 </span>
@@ -644,18 +644,18 @@ input:checked + .toggle-slider:before {
         </tbody>
       </table>
       <!-- Pagination Info -->
-      <div style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">
+      <div style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 15px; color: #64748b;">
         Showing <span id="pageStart">1</span>–<span id="pageEnd">10</span> of <span id="totalRecords">0</span> commissions
       </div>
       <!-- Pagination -->
       <div style="display: flex; align-items: center; justify-content: center; gap: 10px; padding: 20px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
-        <button type="button" class="pagination-btn" onclick="previousPage()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer; font-size: 14px;">‹</button>
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+        <button type="button" class="pagination-btn" onclick="previousPage()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer; font-size: 16px;">‹</button>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 16px;">
           <input type="number" id="currentPage" value="1" min="1" style="width: 50px; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; text-align: center;" onchange="goToPage(this.value)">
           <span style="color: #94a3b8;">of</span>
           <span id="totalPages" style="font-weight: 600; color: #0f172a;">1</span>
         </div>
-        <button type="button" class="pagination-btn" onclick="nextPage()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer; font-size: 14px;">›</button>
+        <button type="button" class="pagination-btn" onclick="nextPage()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer; font-size: 16px;">›</button>
       </div>
     </div>
   {% else %}
@@ -734,7 +734,7 @@ input:checked + .toggle-slider:before {
 </div>
 
 <!-- Success Toast -->
-<div id="successToast" style="position: fixed; bottom: 20px; right: 20px; background: #0f766e; color: white; padding: 14px 20px; border-radius: 6px; display: flex; align-items: center; gap: 10px; font-size: 14px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 9999; opacity: 0; transition: opacity 0.3s ease;">
+<div id="successToast" style="position: fixed; bottom: 20px; right: 20px; background: #0f766e; color: white; padding: 14px 20px; border-radius: 6px; display: flex; align-items: center; gap: 10px; font-size: 16px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 9999; opacity: 0; transition: opacity 0.3s ease;">
   <i class="bi bi-check-circle-fill" style="font-size: 18px;"></i>
   <span id="toastMessage">Commission payment has been recorded successfully.</span>
 </div>

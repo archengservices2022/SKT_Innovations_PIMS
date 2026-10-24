@@ -55,7 +55,7 @@
     {% set _perm_pending = permission_requests | selectattr('status','equalto','pending') | list | length %}
     <a class="nav-link {{ 'active' if active_tab == 'permissions' }}" data-bs-toggle="tab" href="#tab-permissions">
       <i class="bi bi-shield-lock me-1"></i>Permissions
-      {% if _perm_pending > 0 %}<span class="badge bg-danger ms-1" style="font-size:10px;">{{ _perm_pending }}</span>{% endif %}
+      {% if _perm_pending > 0 %}<span class="badge bg-danger ms-1" style="font-size:12px;">{{ _perm_pending }}</span>{% endif %}
     </a>
   </li>
   {% endif %}
@@ -310,7 +310,7 @@
               </select>
             </div>
             <hr class="my-2">
-            <p class="text-muted mb-2" style="font-size:11px;"><i class="bi bi-person-badge me-1"></i>Employee details (optional)</p>
+            <p class="text-muted mb-2" style="font-size:13px;"><i class="bi bi-person-badge me-1"></i>Employee details (optional)</p>
             <div class="mb-2">
               <label class="form-label">Job Title</label>
               <input type="text" name="title" class="form-control form-control-sm" placeholder="e.g. Senior Engineer">
@@ -329,13 +329,13 @@
             </div>
             <div class="mb-2">
               <label class="form-label">Monthly Salary (₹)
-                <span class="text-muted" style="font-size:10px;">— auto-posts to Payroll</span>
+                <span class="text-muted" style="font-size:12px;">— auto-posts to Payroll</span>
               </label>
               <input type="number" name="monthly_salary" class="form-control form-control-sm" placeholder="0.00 (blank if hourly)" min="0" step="0.01">
             </div>
             <div id="createCommissionSection" style="display:none;">
               <hr class="my-2">
-              <p class="text-muted mb-2" style="font-size:11px;"><i class="bi bi-percent me-1"></i>Commission settings</p>
+              <p class="text-muted mb-2" style="font-size:13px;"><i class="bi bi-percent me-1"></i>Commission settings</p>
               <div class="mb-2" id="createEmployeeTypeField">
                 <label class="form-label">Employee Type</label>
                 <select name="employee_type" class="form-select form-select-sm">
@@ -375,64 +375,64 @@
 
           <ul class="nav nav-pills mb-3 gap-1" id="userRoleTabs" style="flex-wrap:wrap;">
             <li class="nav-item">
-              <a class="nav-link py-1 px-3 active" data-bs-toggle="pill" href="#urole-all" style="font-size:12px;">
+              <a class="nav-link py-1 px-3 active" data-bs-toggle="pill" href="#urole-all" style="font-size:14px;">
                 <i class="bi bi-people me-1"></i>All
-                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ users|length }}</span>
+                <span class="badge ms-1 bg-secondary" style="font-size:12px;">{{ users|length }}</span>
               </a>
             </li>
             {% if _g_admin %}
             <li class="nav-item">
-              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-admin" style="font-size:12px;">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-admin" style="font-size:14px;">
                 <i class="bi bi-shield-lock me-1"></i>Admin
-                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_admin|length }}</span>
+                <span class="badge ms-1 bg-secondary" style="font-size:12px;">{{ _g_admin|length }}</span>
               </a>
             </li>
             {% endif %}
             {% if _g_finance %}
             <li class="nav-item">
-              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-finance" style="font-size:12px;">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-finance" style="font-size:14px;">
                 <i class="bi bi-bar-chart-line me-1"></i>Finance
-                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_finance|length }}</span>
+                <span class="badge ms-1 bg-secondary" style="font-size:12px;">{{ _g_finance|length }}</span>
               </a>
             </li>
             {% endif %}
             {% if _g_sales %}
             <li class="nav-item">
-              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-sales" style="font-size:12px;">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-sales" style="font-size:14px;">
                 <i class="bi bi-megaphone me-1"></i>Sales
-                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_sales|length }}</span>
+                <span class="badge ms-1 bg-secondary" style="font-size:12px;">{{ _g_sales|length }}</span>
               </a>
             </li>
             {% endif %}
             {% if _g_engineer %}
             <li class="nav-item">
-              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-engineer" style="font-size:12px;">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-engineer" style="font-size:14px;">
                 <i class="bi bi-wrench me-1"></i>Engineers
-                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_engineer|length }}</span>
+                <span class="badge ms-1 bg-secondary" style="font-size:12px;">{{ _g_engineer|length }}</span>
               </a>
             </li>
             {% endif %}
             {% if _g_projects %}
             <li class="nav-item">
-              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-projects" style="font-size:12px;">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-projects" style="font-size:14px;">
                 <i class="bi bi-kanban me-1"></i>Projects
-                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_projects|length }}</span>
+                <span class="badge ms-1 bg-secondary" style="font-size:12px;">{{ _g_projects|length }}</span>
               </a>
             </li>
             {% endif %}
             {% if _g_administration %}
             <li class="nav-item">
-              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-administration" style="font-size:12px;">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-administration" style="font-size:14px;">
                 <i class="bi bi-building me-1"></i>Administration
-                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_administration|length }}</span>
+                <span class="badge ms-1 bg-secondary" style="font-size:12px;">{{ _g_administration|length }}</span>
               </a>
             </li>
             {% endif %}
             {% if _g_accountant %}
             <li class="nav-item">
-              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-accountant" style="font-size:12px;">
+              <a class="nav-link py-1 px-3" data-bs-toggle="pill" href="#urole-accountant" style="font-size:14px;">
                 <i class="bi bi-calculator me-1"></i>Accountant
-                <span class="badge ms-1 bg-secondary" style="font-size:10px;">{{ _g_accountant|length }}</span>
+                <span class="badge ms-1 bg-secondary" style="font-size:12px;">{{ _g_accountant|length }}</span>
               </a>
             </li>
             {% endif %}
@@ -440,7 +440,7 @@
 
           {% macro user_table(group, label) %}
           <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" style="font-size:13px;">
+            <table class="table table-hover align-middle mb-0" style="font-size:15px;">
               <thead>
                 <tr>
                   <th style="min-width:170px;">Name</th>
@@ -461,9 +461,9 @@
                   <td>
                     <div class="fw-semibold">
                       {{ u.get('username','—') }}
-                      {% if _is_me %}<span class="badge bg-secondary ms-1" style="font-size:9px;">You</span>{% endif %}
+                      {% if _is_me %}<span class="badge bg-secondary ms-1" style="font-size:11px;">You</span>{% endif %}
                     </div>
-                    <div class="text-muted" style="font-size:11px;">{{ u.get('email','—') }}</div>
+                    <div class="text-muted" style="font-size:13px;">{{ u.get('email','—') }}</div>
                   </td>
                   <!-- Role (click the badge to change it — disabled for your own row,
                        so you can't accidentally demote yourself out of Settings) -->
@@ -474,7 +474,7 @@
                     <form method="POST" action="{{ url_for('user_role_update', uid=u.firebase_uid) }}"
                           class="role-edit-form d-inline-flex align-items-center gap-1">
                       <select name="role" class="form-select form-select-sm role-edit-select"
-                              style="display:none;width:auto;font-size:11px;padding:2px 22px 2px 6px;"
+                              style="display:none;width:auto;font-size:13px;padding:2px 22px 2px 6px;"
                               onchange="this.form.submit()"
                               onblur="this.style.display='none';this.nextElementSibling.style.display='';">
                         <option value="sales"          {{ 'selected' if _role=='sales' }}>Sales</option>
@@ -495,7 +495,7 @@
                     {% if _role == 'sales' %}
                       {% set _cr = u.get('commission_rate', 0)|float %}
                       {% set _et = u.get('employee_type', '') %}
-                      <div style="font-size:10px;color:#94a3b8;margin-top:3px;">
+                      <div style="font-size:12px;color:#94a3b8;margin-top:3px;">
                         {% if _cr > 0 %}{{ _cr }}% commission{% else %}<span style="color:#f59e0b;">rate not set</span>{% endif %}
                         {% if _et %} — {{ 'FT' if _et == 'full_time' else 'Contractor' }}{% endif %}
                       </div>
@@ -505,7 +505,7 @@
                   <td>
                     <div>{{ u.get('title') or '—' }}</div>
                     {% if u.get('region') %}
-                    <span class="badge" style="font-size:10px;background:{{ '#0D9488' if u.get('region')=='Inside America' else '#7C3AED' }};color:#fff;">{{ u.get('region') }}</span>
+                    <span class="badge" style="font-size:12px;background:{{ '#0D9488' if u.get('region')=='Inside America' else '#7C3AED' }};color:#fff;">{{ u.get('region') }}</span>
                     {% endif %}
                   </td>
                   <!-- Compensation -->
@@ -521,9 +521,9 @@
                               title="{{ 'Deactivate' if _active else 'Activate' }}"
                               style="background:none;">
                         {% if _active %}
-                        <span class="badge bg-success" style="font-size:11px;cursor:pointer;">Active</span>
+                        <span class="badge bg-success" style="font-size:13px;cursor:pointer;">Active</span>
                         {% else %}
-                        <span class="badge bg-secondary" style="font-size:11px;cursor:pointer;">Inactive</span>
+                        <span class="badge bg-secondary" style="font-size:13px;cursor:pointer;">Inactive</span>
                         {% endif %}
                       </button>
                     </form>
@@ -679,18 +679,18 @@
 
       {% if activity_summary %}
       <div class="table-responsive">
-        <table class="table align-middle mb-0" style="font-size:13px;">
+        <table class="table align-middle mb-0" style="font-size:15px;">
           <thead>
-            <tr style="background:#f1f5f9;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">
+            <tr style="background:#f1f5f9;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">
               <th style="padding:10px 14px;">Employee</th>
               <th style="padding:10px 14px;">Status</th>
               <th style="padding:10px 14px;min-width:200px;">
                 <span style="color:#0D9488;">&#9679;</span> Open Time
-                <span class="text-muted fw-normal" style="font-size:10px;"> (session)</span>
+                <span class="text-muted fw-normal" style="font-size:12px;"> (session)</span>
               </th>
               <th style="padding:10px 14px;min-width:200px;">
                 <span style="color:#6366f1;">&#9679;</span> Operated Time
-                <span class="text-muted fw-normal" style="font-size:10px;"> (active clicks)</span>
+                <span class="text-muted fw-normal" style="font-size:12px;"> (active clicks)</span>
               </th>
               <th style="padding:10px 14px;">This Week Open</th>
               <th style="padding:10px 14px;">Last Seen</th>
@@ -709,7 +709,7 @@
             <tr style="border-bottom:1px solid #f1f5f9;">
               <td style="padding:12px 14px;">
                 <div class="d-flex align-items-center gap-2">
-                  <div style="width:34px;height:34px;border-radius:50%;background:#0D9488;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">
+                  <div style="width:34px;height:34px;border-radius:50%;background:#0D9488;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;">
                     {{ a.employee_name[0].upper() if a.employee_name else '?' }}
                   </div>
                   <span class="fw-semibold">{{ a.employee_name }}</span>
@@ -717,11 +717,11 @@
               </td>
               <td style="padding:12px 14px;">
                 {% if open_m > 0 %}
-                <span style="display:inline-flex;align-items:center;gap:4px;background:#dcfce7;color:#15803d;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;">
+                <span style="display:inline-flex;align-items:center;gap:4px;background:#dcfce7;color:#15803d;border-radius:20px;padding:2px 10px;font-size:13px;font-weight:600;">
                   <span style="width:6px;height:6px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Active Today
                 </span>
                 {% else %}
-                <span style="display:inline-flex;align-items:center;gap:4px;background:#f1f5f9;color:#64748b;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;">
+                <span style="display:inline-flex;align-items:center;gap:4px;background:#f1f5f9;color:#64748b;border-radius:20px;padding:2px 10px;font-size:13px;font-weight:600;">
                   <span style="width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>Not Active
                 </span>
                 {% endif %}
@@ -743,7 +743,7 @@
                 </div>
               </td>
               <td style="padding:12px 14px;color:#475569;">{% if wopen_h > 0 %}{{ wopen_h }}h {{ wopen_mn }}m{% elif wopen_mn > 0 %}{{ wopen_mn }}m{% else %}—{% endif %}</td>
-              <td style="padding:12px 14px;color:#64748b;font-size:12px;">
+              <td style="padding:12px 14px;color:#64748b;font-size:14px;">
                 {{ a.last_seen_at[11:16] if a.last_seen_at and a.last_seen_at[:10] == now.strftime('%Y-%m-%d') else (a.last_seen_at[:10] if a.last_seen_at else '—') }}
               </td>
             </tr>
@@ -769,7 +769,7 @@
       <!-- Fix project numbers -->
       <div class="d-flex align-items-start justify-content-between py-3 border-bottom">
         <div>
-          <div class="fw-600" style="font-size:14px;">Fix Project Numbers</div>
+          <div class="fw-600" style="font-size:16px;">Fix Project Numbers</div>
           <div class="text-muted small mt-1">
             Removes the extra dash from project numbers that were created with the old format.<br>
             Example: <code>SKT-202607-136</code> &rarr; <code>SKT-202607136</code>
@@ -791,7 +791,7 @@
       <h6 class="section-heading mb-3"><i class="bi bi-shield-lock me-1" style="color:#0D9488;"></i>Permission Requests</h6>
       {% if permission_requests %}
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle" style="font-size:13px;">
+        <table class="table table-sm table-hover align-middle" style="font-size:15px;">
           <thead class="table-light">
             <tr>
               <th>Requested By</th>
@@ -810,7 +810,7 @@
             <td>
               {{ req.get('action','—') }}
               {% if req.get('entity_label') %}
-              <div class="text-muted" style="font-size:11px;">{{ req.entity_label }}</div>
+              <div class="text-muted" style="font-size:13px;">{{ req.entity_label }}</div>
               {% endif %}
             </td>
             <td class="text-muted">{{ req.get('notes','—') or '—' }}</td>
@@ -821,13 +821,13 @@
                 <span class="badge" style="background:#fef9c3;color:#92400e;">Pending</span>
               {% elif req.get('status') == 'approved' %}
                 <span class="badge bg-success">Approved</span>
-                {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:11px;">{{ req.admin_notes }}</div>{% endif %}
+                {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:13px;">{{ req.admin_notes }}</div>{% endif %}
               {% elif req.get('status') == 'completed' %}
                 <span class="badge bg-secondary">Completed</span>
-                <div class="text-muted" style="font-size:11px;">Deleted by {{ req.get('requested_by_name','—') }}</div>
+                <div class="text-muted" style="font-size:13px;">Deleted by {{ req.get('requested_by_name','—') }}</div>
               {% else %}
                 <span class="badge bg-danger">Denied</span>
-                {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:11px;">{{ req.admin_notes }}</div>{% endif %}
+                {% if req.get('admin_notes') %}<div class="text-muted" style="font-size:13px;">{{ req.admin_notes }}</div>{% endif %}
               {% endif %}
             </td>
             <td class="text-center text-nowrap">
@@ -867,8 +867,8 @@
       </div>
       <div class="modal-body pb-2">
         <div class="mb-3">
-          <label class="form-label fw-semibold" style="font-size:12px;">Reason for Denying <span class="text-muted fw-normal">(optional)</span></label>
-          <textarea id="denyReason" class="form-control form-control-sm" placeholder="e.g., Already approved by another admin" rows="3" style="font-size:12px;"></textarea>
+          <label class="form-label fw-semibold" style="font-size:14px;">Reason for Denying <span class="text-muted fw-normal">(optional)</span></label>
+          <textarea id="denyReason" class="form-control form-control-sm" placeholder="e.g., Already approved by another admin" rows="3" style="font-size:14px;"></textarea>
         </div>
       </div>
       <div class="modal-footer py-2">
@@ -890,7 +890,7 @@
         <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body pb-2">
-        <p class="text-muted mb-0" style="font-size:12px;">
+        <p class="text-muted mb-0" style="font-size:14px;">
           Approving this request will notify the requester and allow them to proceed with the delete action.
         </p>
       </div>
@@ -909,16 +909,16 @@
   <div class="modal-dialog modal-sm">
     <div class="modal-content">
       <div class="modal-header py-2">
-        <h6 class="modal-title">Customize Pages — <span id="pagesUserName"></span> <span id="pagesRoleBadge" class="badge ms-1" style="font-size:10px;"></span></h6>
+        <h6 class="modal-title">Customize Pages — <span id="pagesUserName"></span> <span id="pagesRoleBadge" class="badge ms-1" style="font-size:12px;"></span></h6>
         <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body py-2">
-        <p class="text-muted mb-2" style="font-size:11px;">
+        <p class="text-muted mb-2" style="font-size:13px;">
           Check the pages this user can access. Leave all checked = use role default.
         </p>
         <input type="hidden" id="pagesUid">
         <input type="hidden" id="pagesRole">
-        <div id="pagesCheckboxes" class="d-flex flex-column gap-1" style="font-size:13px;">
+        <div id="pagesCheckboxes" class="d-flex flex-column gap-1" style="font-size:15px;">
           {# rendered by JS #}
         </div>
         <div class="mt-2">
@@ -926,7 +926,7 @@
             <i class="bi bi-arrow-counterclockwise"></i> Reset to Role Default
           </button>
         </div>
-        <div id="pagesMsg" class="mt-2" style="font-size:12px;"></div>
+        <div id="pagesMsg" class="mt-2" style="font-size:14px;"></div>
       </div>
       <div class="modal-footer py-2">
         <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -948,21 +948,21 @@
         <input type="hidden" id="editUid">
         <div class="row g-2 mb-2">
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Username</label>
+            <label class="form-label fw-semibold" style="font-size:14px;">Username</label>
             <input type="text" id="editUsername" class="form-control form-control-sm" placeholder="Full name">
           </div>
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Email</label>
+            <label class="form-label fw-semibold" style="font-size:14px;">Email</label>
             <input type="email" id="editEmail" class="form-control form-control-sm bg-light" readonly>
           </div>
         </div>
         <div class="row g-2 mb-2">
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Job Title</label>
+            <label class="form-label fw-semibold" style="font-size:14px;">Job Title</label>
             <input type="text" id="editTitle" class="form-control form-control-sm" placeholder="e.g. Senior Engineer">
           </div>
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Status</label>
+            <label class="form-label fw-semibold" style="font-size:14px;">Status</label>
             <select id="editStatus" class="form-select form-select-sm">
               <option value="true">Active</option>
               <option value="false">Inactive</option>
@@ -971,7 +971,7 @@
         </div>
         <div class="row g-2 mb-2">
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Role</label>
+            <label class="form-label fw-semibold" style="font-size:14px;">Role</label>
             <select id="editRole" class="form-select form-select-sm" onchange="onEditRoleChange()">
               <option value="sales">Sales</option>
               <option value="projects">Projects</option>
@@ -983,7 +983,7 @@
             </select>
           </div>
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Region</label>
+            <label class="form-label fw-semibold" style="font-size:14px;">Region</label>
             <select id="editRegion" class="form-select form-select-sm">
               <option value="">— None —</option>
               <option value="Inside America">Inside America</option>
@@ -993,21 +993,21 @@
         </div>
         <div class="row g-2 mb-2">
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Hourly Rate (₹)</label>
+            <label class="form-label fw-semibold" style="font-size:14px;">Hourly Rate (₹)</label>
             <input type="number" id="editHourlyRate" class="form-control form-control-sm" placeholder="0.00" min="0" step="0.01">
           </div>
           <div class="col-6">
-            <label class="form-label fw-semibold" style="font-size:12px;">Monthly Salary (₹)</label>
+            <label class="form-label fw-semibold" style="font-size:14px;">Monthly Salary (₹)</label>
             <input type="number" id="editMonthlySalary" class="form-control form-control-sm" placeholder="0.00 (blank if hourly)" min="0" step="0.01">
           </div>
         </div>
         <div id="editCommissionSection" style="display:none;border-top:1px solid #f1f5f9;padding-top:10px;margin-top:4px;">
           <div class="row g-2 mb-3">
             <div class="col-12 mb-1">
-              <span class="text-muted" style="font-size:11px;"><i class="bi bi-percent me-1"></i>Commission settings</span>
+              <span class="text-muted" style="font-size:13px;"><i class="bi bi-percent me-1"></i>Commission settings</span>
             </div>
             <div class="col-6" id="editEmployeeTypeField">
-              <label class="form-label fw-semibold" style="font-size:12px;">Employee Type</label>
+              <label class="form-label fw-semibold" style="font-size:14px;">Employee Type</label>
               <select id="editEmployeeType" class="form-select form-select-sm">
                 <option value="">— None —</option>
                 <option value="full_time">Full Time</option>
@@ -1015,12 +1015,12 @@
               </select>
             </div>
             <div class="col-6">
-              <label class="form-label fw-semibold" style="font-size:12px;">Commission Rate (%)</label>
+              <label class="form-label fw-semibold" style="font-size:14px;">Commission Rate (%)</label>
               <input type="number" id="editCommissionRate" class="form-control form-control-sm" placeholder="e.g. 5.0" min="0" max="100" step="0.01">
             </div>
           </div>
         </div>
-        <div id="editUserMsg" style="font-size:12px;"></div>
+        <div id="editUserMsg" style="font-size:14px;"></div>
       </div>
       <div class="modal-footer py-2">
         <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1243,7 +1243,7 @@ function buildPagesCheckboxes(role, selectedPages) {
   ALL_PAGES.forEach(function(p) {
     var checked  = active.indexOf(p) !== -1 ? 'checked' : '';
     var isDefault = defaults.indexOf(p) !== -1;
-    var badge    = isDefault ? ' <span class="badge bg-secondary" style="font-size:9px;">role default</span>' : '';
+    var badge    = isDefault ? ' <span class="badge bg-secondary" style="font-size:11px;">role default</span>' : '';
     html += '<div class="form-check">'
           + '<input class="form-check-input pages-checkbox" type="checkbox" value="' + p + '" id="pc_' + p + '" ' + checked + '>'
           + '<label class="form-check-label" for="pc_' + p + '">' + PAGE_LABELS[p] + badge + '</label>'
