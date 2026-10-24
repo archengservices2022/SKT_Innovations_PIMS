@@ -302,6 +302,14 @@
       <i class="bi bi-list"></i>
     </button>
     <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+    <!-- Global search: projects, invoices, quotes, clients (Ctrl+K) -->
+    <div class="topbar-search" id="globalSearch">
+      <input type="search" id="globalSearchInput" autocomplete="off" spellcheck="false"
+             placeholder="Search projects, invoices, quotes, clients…" aria-label="Search the app"
+             aria-controls="globalSearchResults" aria-expanded="false">
+      <kbd class="topbar-search-kbd">Ctrl K</kbd>
+      <div class="global-search-results d-none" id="globalSearchResults" role="listbox"></div>
+    </div>
     <div class="topbar-right d-flex align-items-center gap-3">
       <span class="topbar-date">{{ now.strftime('%b %d, %Y') }}</span>
       <!-- Notification Bell -->
@@ -373,6 +381,74 @@
 
 <!-- Bootstrap 5 JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ── Global search (top bar) ───────────────────────────────────────────── -->
+<script>
+(function () {
+  const input = document.getElementById('globalSearchInput');
+  const box = document.getElementById('globalSearchResults');
+  if (!input || !box) return;
+  const ICONS = { Projects: 'bi-kanban', Invoices: 'bi-receipt', Quotes: 'bi-file-earmark-text', Clients: 'bi-people' };
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let timer = null, seq = 0, active = -1;
+
+  function links() { return Array.from(box.querySelectorAll('a.gs-item')); }
+  function show(on) { box.classList.toggle('d-none', !on); input.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+  function highlight(i) {
+    const items = links();
+    active = items.length ? (i + items.length) % items.length : -1;
+    items.forEach((a, k) => a.classList.toggle('active', k === active));
+    if (active >= 0) items[active].scrollIntoView({ block: 'nearest' });
+  }
+
+  function render(results, q) {
+    if (!results.length) {
+      box.innerHTML = '<div class="gs-empty"><i class="bi bi-search me-1"></i>No matches for “' + esc(q) + '”</div>';
+    } else {
+      let html = '', group = '';
+      results.forEach(r => {
+        if (r.group !== group) { group = r.group; html += '<div class="gs-group">' + esc(group) + '</div>'; }
+        html += '<a class="gs-item" role="option" href="' + esc(r.url) + '">' +
+          '<i class="bi ' + (ICONS[r.group] || 'bi-dot') + '"></i>' +
+          '<span class="gs-text"><span class="gs-title">' + esc(r.title) + '</span>' +
+          (r.sub ? '<span class="gs-sub">' + esc(r.sub) + '</span>' : '') + '</span></a>';
+      });
+      box.innerHTML = html;
+    }
+    active = -1;
+    show(true);
+  }
+
+  function search() {
+    const q = input.value.trim();
+    if (q.length < 2) { show(false); return; }
+    const mine = ++seq;
+    box.innerHTML = '<div class="gs-empty"><span class="spinner-border spinner-border-sm me-2"></span>Searching…</div>';
+    show(true);
+    fetch('/api/global-search?q=' + encodeURIComponent(q))
+      .then(r => r.ok ? r.json() : { results: [] })
+      .then(res => { if (mine === seq) render(res.results || [], q); })
+      .catch(() => { if (mine === seq) render([], q); });
+  }
+
+  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 220); });
+  input.addEventListener('focus', () => { if (input.value.trim().length >= 2 && box.innerHTML) show(true); });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlight(active + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(active - 1); }
+    else if (e.key === 'Enter') {
+      const items = links();
+      const target = items[active >= 0 ? active : 0];
+      if (target) { e.preventDefault(); window.location.href = target.href; }
+    } else if (e.key === 'Escape') { show(false); input.blur(); }
+  });
+  document.addEventListener('click', e => { if (!document.getElementById('globalSearch').contains(e.target)) show(false); });
+  // Ctrl+K / Cmd+K jumps to the search from anywhere
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); input.focus(); input.select(); }
+  });
+})();
+</script>
 
 <!-- ── Generic Table Paginator (available on every page) ─────────────────── -->
 <script>

@@ -7095,6 +7095,67 @@ def _project_still_invoiceable(proj: dict, all_invoices: dict) -> bool:
     return bool(tmp.get("approved_pending_cos"))
 
 
+@app.route("/api/global-search", methods=["GET"])
+@login_required
+def api_global_search():
+    """Top-bar search: projects, invoices, quotes and clients matching ?q=, limited to the sections
+    this user can open. Uses the same cached tables the list pages load."""
+    q = request.args.get("q", "").strip().lower()
+    if len(q) < 2:
+        return jsonify({"results": []})
+    allowed = session.get("custom_pages") or ROLE_PAGES.get(normalize_role(session.get("user_role", "")), [])
+    results, per_group = [], 6
+
+    def hit(*fields):
+        return any(q in str(f or "").lower() for f in fields)
+
+    if "projects" in allowed:
+        n = 0
+        for pid, p in (fb_get("/projects") or {}).items():
+            if isinstance(p, dict) and hit(p.get("project_number"), p.get("project_name"),
+                                           p.get("company_name"), p.get("client_name"), p.get("po_wo_number")):
+                results.append({"group": "Projects", "title": p.get("project_number") or "Project",
+                                "sub": " · ".join(x for x in (p.get("project_name"), p.get("company_name") or p.get("client_name")) if x),
+                                "url": url_for("project_detail", project_id=pid)})
+                n += 1
+                if n >= per_group:
+                    break
+    if "invoicing" in allowed:
+        n = 0
+        for iid, inv in (fb_get("/invoices") or {}).items():
+            meta = (inv.get("meta") or {}) if isinstance(inv, dict) else {}
+            if meta and hit(meta.get("invoice_number"), meta.get("company_name"), meta.get("client_name"),
+                            meta.get("project_number")):
+                results.append({"group": "Invoices", "title": meta.get("invoice_number") or "Invoice",
+                                "sub": " · ".join(x for x in (meta.get("company_name") or meta.get("client_name"),
+                                                              meta.get("project_number"), meta.get("status")) if x),
+                                "url": url_for("invoice_detail", invoice_id=iid)})
+                n += 1
+                if n >= per_group:
+                    break
+    if "quotes" in allowed:
+        n = 0
+        for fid, f in (fb_get("/job_forms") or {}).items():
+            if isinstance(f, dict) and hit(f.get("job_number"), f.get("project_name"), f.get("client_name"),
+                                           f.get("company_name")):
+                results.append({"group": "Quotes", "title": f.get("job_number") or "Quote",
+                                "sub": " · ".join(x for x in (f.get("project_name"), f.get("company_name") or f.get("client_name")) if x),
+                                "url": url_for("quote_detail", quote_id=fid)})
+                n += 1
+                if n >= per_group:
+                    break
+    if "clients" in allowed:
+        n = 0
+        for name, c in (fb_get("/clients") or {}).items():
+            if isinstance(c, dict) and hit(name, c.get("client_name"), c.get("email")):
+                results.append({"group": "Clients", "title": name, "sub": c.get("client_name") or c.get("email") or "",
+                                "url": url_for("clients", q=name)})
+                n += 1
+                if n >= per_group:
+                    break
+    return jsonify({"results": results})
+
+
 @app.route("/api/projects/<project_ids>", methods=["GET"])
 @role_required("projects")
 def api_get_projects(project_ids):
