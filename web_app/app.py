@@ -356,8 +356,9 @@ def _co_stage_matches(stage: dict, co: dict, co_idx: int) -> bool:
 
 
 def _stage_is_billed(stage: dict) -> bool:
-    return isinstance(stage, dict) and (bool(stage.get("invoice_id")) or
-                                        stage.get("status", "Pending Invoice") != "Pending Invoice")
+    # Deleting an invoice resets its stages to "Pending Invoice" but keeps invoice_id (so a restore can relink),
+    # so the status, not invoice_id, says whether a stage is really billed.
+    return isinstance(stage, dict) and stage.get("status", "Pending Invoice") != "Pending Invoice"
 
 
 def _sync_co_amounts_from_stages(stages: list, cos: list) -> None:
@@ -4901,8 +4902,8 @@ def project_detail(project_id):
             "label":          s.get("co_stage_label") or "Full Payment",
             "amount":         _safe_float(s.get("amount", 0)),
             "status":         "Planned" if planned else (s.get("status") or "Pending Invoice"),
-            "invoice_id":     s.get("invoice_id", ""),
-            "invoice_number": s.get("invoice_number", ""),
+            "invoice_id":     s.get("invoice_id", "") if _stage_is_billed(s) else "",
+            "invoice_number": s.get("invoice_number", "") if _stage_is_billed(s) else "",
             "planned":        planned,
             "stage_index":    i,
             "editable":       not planned and not _stage_is_billed(s),
@@ -5569,20 +5570,12 @@ def co_pdf(project_id, co_idx):
     story.append(ship_table)
     story.append(Spacer(1, 4*mm))
 
-    # ── Scope / description ────────────────────────────────────────────────────
-    story.append(Paragraph("<b>Scope of Work</b>", b10))
-    story.append(Spacer(1, 1*mm))
-    story.append(Paragraph(co.get("title", ""), n10))
-    if co.get("description"):
-        story.append(Spacer(1, 1*mm))
-        story.append(Paragraph(co.get("description", "").replace("\n", "<br/>"), n10))
-    story.append(Spacer(1, 4*mm))
-
     # ── Amount table ──────────────────────────────────────────────────────────
     currency_sym = PDF_CURRENCY_SYMBOL
     amount = _safe_float(co.get("amount", 0))
     amt_table = Table([
-        [Paragraph("<b>Description</b>", b9), Paragraph("<b>Amount</b>", ps("ra", fontName="Helvetica-Bold", fontSize=9, alignment=2))],
+        [Paragraph("<font color='white'><b>Description</b></font>", b9),
+         Paragraph("<font color='white'><b>Amount</b></font>", ps("ra", fontName="Helvetica-Bold", fontSize=9, alignment=2))],
         [Paragraph(co_po_wo if co_po_wo != "—" else co.get("title","Change Order"), n9),
          Paragraph(f"{currency_sym}{amount:,.2f}", ps("rn", fontName="Helvetica", fontSize=9, alignment=2))],
         ["", ""],
@@ -5604,6 +5597,51 @@ def co_pdf(project_id, co_idx):
     ]))
     story.append(amt_table)
     story.append(Spacer(1, 4*mm))
+
+    # ── Payment plan: the CO's real stages once approved, otherwise the plan it will add on approval ──
+    project_stages = _normalise_list(project.get("payment_stages"))
+    linked = [s for i, s in enumerate(project_stages) if _co_stage_matches(s, co, co_idx)]
+    plan_rows = [(s.get("co_stage_label") or "Full Payment", _safe_float(s.get("amount", 0)),
+                  (s.get("status") or "Pending Invoice") if _stage_is_billed(s) else "Pending Invoice",
+                  s.get("invoice_number", "") if _stage_is_billed(s) else "") for s in linked]
+    if not plan_rows:
+        plan_rows = [(s.get("co_stage_label") or "Full Payment", _safe_float(s.get("amount", 0)), "Planned", "")
+                     for s in _co_payment_stages(co, co_idx)]
+    if plan_rows:
+        down = _safe_float(co.get("down_payment_percent", 0))
+        inst = int(_safe_float(co.get("installment_count", 1)) or 1)
+        plan_txt = (f"{down:g}% down payment, then {inst} installment{'s' if inst != 1 else ''}"
+                    if down > 0 else (f"{inst} installments" if inst > 1 else "Single payment"))
+        story.append(Paragraph(f"<b>Payment Plan</b> <font color='#64748B' size=9>&nbsp;·&nbsp; {plan_txt}</font>", b10))
+        story.append(Spacer(1, 1.5*mm))
+        rn = ps("prn", fontName="Helvetica", fontSize=9, leading=11, alignment=2)
+        rb = ps("prb", fontName="Helvetica-Bold", fontSize=9, leading=11, alignment=2)
+        ctr = ps("pc", fontName="Helvetica", fontSize=9, leading=11, alignment=1)
+        data = [[Paragraph("<font color='white'><b>#</b></font>", b9), Paragraph("<font color='white'><b>Payment</b></font>", b9),
+                 Paragraph("<font color='white'><b>Status</b></font>", b9), Paragraph("<font color='white'><b>Invoice</b></font>", b9),
+                 Paragraph("<font color='white'><b>Amount</b></font>", rb)]]
+        for n_, (label, amt_, status_, inv_no) in enumerate(plan_rows, 1):
+            data.append([Paragraph(str(n_), n9), Paragraph(label, n9), Paragraph(status_, n9),
+                         Paragraph(inv_no or "—", n9), Paragraph(f"{currency_sym}{amt_:,.2f}", rn)])
+        data.append([Paragraph("", n9), Paragraph("<b>Total</b>", b9), Paragraph("", n9), Paragraph("", n9),
+                     Paragraph(f"<b>{currency_sym}{sum(r[1] for r in plan_rows):,.2f}</b>", rb)])
+        plan_tbl = Table(data, colWidths=[W * 0.07, W * 0.38, W * 0.2, W * 0.17, W * 0.18], repeatRows=1)
+        plan_tbl.setStyle(TableStyle([
+            ("BACKGROUND",   (0,0), (-1,0), colors.HexColor("#0F172A")),
+            ("TEXTCOLOR",    (0,0), (-1,0), colors.white),
+            ("ROWBACKGROUNDS", (0,1), (-1,-2), [colors.white, colors.HexColor("#F8FAFC")]),
+            ("LINEBELOW",    (0,1), (-1,-2), 0.5, colors.HexColor("#E2E8F0")),
+            ("LINEABOVE",    (0,-1), (-1,-1), 0.75, colors.black),
+            ("BACKGROUND",   (0,-1), (-1,-1), colors.HexColor("#F0FDF4")),
+            ("BOX",          (0,0), (-1,-1), 0.75, colors.black),
+            ("LEFTPADDING",  (0,0), (-1,-1), 5),
+            ("RIGHTPADDING", (0,0), (-1,-1), 5),
+            ("TOPPADDING",   (0,0), (-1,-1), 4),
+            ("BOTTOMPADDING",(0,0), (-1,-1), 4),
+            ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
+        ]))
+        story.append(plan_tbl)
+        story.append(Spacer(1, 4*mm))
 
     # ── Notes ─────────────────────────────────────────────────────────────────
     if co.get("notes"):
@@ -8609,9 +8647,8 @@ def invoice_detail(invoice_id):
                                     cos = list(cos.values())
                                 for co in (cos if isinstance(cos, list) else []):
                                     if isinstance(co, dict) and co.get("firebase_id") == co_firebase_id:
-                                        powo = co.get("po_wo_number", "").strip()
-                                        if powo:
-                                            item["powo_number"] = powo
+                                        # The CO's current PO/WO wins even when blank (it may have been removed)
+                                        item["powo_number"] = co.get("po_wo_number", "").strip()
                                         # Also fetch fresh CO number (in case it was updated)
                                         co_num_fresh = co.get("co_number", "").strip()
                                         if co_num_fresh:
@@ -29662,6 +29699,7 @@ def _generate_invoice_pdf_bytes(invoice_id: str, job_style_header: bool = False,
             # For CO stage, prioritize firebase_id for fresh CO data (both CO number and PO/WO)
             co_firebase_id = item.get("co_firebase_id", "").strip()
             po_to_use = ""
+            co_found_fresh = False
             log.debug(f"[PDF_CO_POWO_DEBUG] Starting CO PO/WO fetch - firebase_id={co_firebase_id}")
 
             # If firebase_id available, fetch BOTH fresh CO number and PO/WO from CO
@@ -29675,31 +29713,48 @@ def _generate_invoice_pdf_bytes(invoice_id: str, job_style_header: bool = False,
                                     # Fetch fresh CO number and PO/WO
                                     co_num_fresh = _co.get("co_number", "").strip()
                                     po_to_use = _co.get("po_wo_number", "").strip()
+                                    co_found_fresh = True  # its PO/WO is the truth, even if blank
                                     if co_num_fresh:
                                         display_co_number = co_num_fresh
                                     log.debug(f"[PDF_CO_FRESH] FOUND CO! firebase_id={co_firebase_id}: co_number='{co_num_fresh}', powo='{po_to_use}'")
                                     break
-                            if po_to_use or display_co_number:
+                            if co_found_fresh:
                                 log.debug(f"[PDF_CO_FRESH] Breaking from project loop with po_to_use={po_to_use}")
                                 break
                 except Exception as e:
                     log.error(f"[PDF_CO_FRESH] Error fetching fresh CO data for firebase_id {co_firebase_id}: {e}")
             else:
                 log.debug(f"[PDF_CO_POWO_DEBUG] No firebase_id found in item")
+                # Older lines carry no CO id: find the CO by project + CO number so its current PO/WO
+                # (possibly removed since) is used instead of the copy saved on the invoice
+                import re as _re_co
+                _want_co = _re_co.sub(r"[^A-Z0-9]", "", ((item.get("co_number") or "").strip() or _meta_co_number or "").upper())
+                if _want_co and project_number:
+                    try:
+                        for _pid, _pd in (data_get("/projects") or {}).items():
+                            if isinstance(_pd, dict) and _pd.get("project_number") == project_number:
+                                for _co in _normalise_list(_pd.get("change_orders")):
+                                    if isinstance(_co, dict) and _re_co.sub(r"[^A-Z0-9]", "", str(_co.get("co_number", "")).upper()) == _want_co:
+                                        po_to_use = (_co.get("po_wo_number") or "").strip()
+                                        co_found_fresh = True
+                                        break
+                                break
+                    except Exception as e:
+                        log.error(f"[PDF_CO_FRESH] CO lookup by number failed: {e}")
 
             log.debug(f"[PDF_CO_POWO_DEBUG] After firebase_id lookup: po_to_use='{po_to_use}'")
             # Fallback: use stored PO/WO if firebase_id didn't provide one
-            if not po_to_use:
+            if not po_to_use and not co_found_fresh:
                 stored_powo = item.get("powo_number", "").strip()
                 log.debug(f"[PDF_CO_POWO_DEBUG] Fallback to stored powo_number: '{stored_powo}'")
                 po_to_use = stored_powo
 
             # If still empty, try CO's PO/WO from stage lookup or meta lookup
-            if not po_to_use:
+            if not po_to_use and not co_found_fresh:
                 po_to_use = co_po_wo_from_stage or ""
 
             # If still empty, try from invoice meta co_number in all projects
-            if not po_to_use:
+            if not po_to_use and not co_found_fresh:
                 invoice_co_num = meta.get("co_number", "").strip()
                 if invoice_co_num:
                     # Search all projects
@@ -29717,7 +29772,7 @@ def _generate_invoice_pdf_bytes(invoice_id: str, job_style_header: bool = False,
                         pass
 
             # If still empty, check payment_stage_index has meta with PO/WO
-            if not po_to_use and payment_stage_index is not None:
+            if not po_to_use and not co_found_fresh and payment_stage_index is not None:
                 try:
                     stage_data = payment_stages[int(payment_stage_index)] if isinstance(payment_stages, list) and int(payment_stage_index) < len(payment_stages) else None
                     if isinstance(stage_data, dict):
