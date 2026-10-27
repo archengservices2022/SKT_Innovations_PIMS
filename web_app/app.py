@@ -25409,6 +25409,7 @@ _CATEGORY_RULES = [(cat, re.compile(rf"\b(?:{pat})\b", re.I)) for cat, pat in _C
 
 # Bank prefixes in front of the payee name, e.g. "UPI-", "POS 4512XXXX4421 ", "NEFT DR-", "CHQ PAID-000145-"
 _TXN_PREFIX = re.compile(r"^(?:UPI|IMPS(?:-P2A)?|NEFT(?: ?(?:DR|CR))?|RTGS(?: ?(?:DR|CR))?|ACH ?D|ECS|NACH|"
+                         r"POS Sig \d{2}/\d{2} Visa #\d+|Purchase\s+Visa #\d+\s+\d{2}-\d{2} ATM \d+\s+Seq # \d+|"
                          r"POS(?: \d+X+\d+)?|CHQ PAID(?:-\d+)?|BIL(?:PAY)?|ATW|ATM)[-/ ]+", re.I)
 
 
@@ -25418,6 +25419,10 @@ def _rule_based_suggestions(rows, categories_by_type):
     for r in rows:
         desc = r.get("description", "")
         rest = _TXN_PREFIX.sub("", desc, count=1)
+        if rest != desc:
+            # US card lines: drop merchant phone numbers, "#G1870" refs and the trailing state ("... Ca")
+            rest = re.sub(r"\b\d{3}-\d{3}-?\d{4}\b|#\w*\d\w*", " ", rest)
+            rest = re.sub(r"\s+[A-Z][a-z]\s*$", "", " ".join(rest.split()))
         parts = [p.strip() for p in re.split(r"\s*[-/]\s*", rest) if p.strip()]
         # Drop reference numbers and bank codes such as 428812345 or ICIC0000123
         parts = [p for p in parts if not re.fullmatch(r"[A-Z]{4}0\w{6}|\w*\d{6,}\w*", p, re.I)]
@@ -25465,6 +25470,22 @@ _BALANCE_LINE = re.compile(r"^\s*(opening|closing|beginning|ending|previous|star
 _USD_HEADING = re.compile(r"\b(amount|balance|debit|credit|withdrawals?|deposits?)\b[^\n\d]{0,4}\(?(USD|US\$)\)?", re.I)
 _CARD_STATEMENT = re.compile(r"credit card|card ending|card number|card no\b|minimum (payment|amount) due|"
                              r"payment due date|total amount due", re.I)
+# Dates written in words, e.g. "September 30, 2026" or "30 September 2026" (US statements give the year only so)
+_PDF_TEXT_DATE = re.compile(r"\b(?:(?P<m1>jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?P<d1>\d{1,2})"
+                            r"\s*,?\s*(?P<y1>\d{4})|(?P<d2>\d{1,2})\s+(?P<m2>jan|feb|mar|apr|may|jun|jul|aug|sep|oct|"
+                            r"nov|dec)[a-z]*\.?,?\s+(?P<y2>\d{4}))\b", re.I)
+# Section headings that say which way the lines below them go, e.g. "Other Debits From Your Account"
+_PDF_SECTIONS = [
+    ("balance", re.compile(r"daily (ledger )?balance", re.I)),
+    ("checks", re.compile(r"\bchecks? (paid|cleared)\b", re.I)),
+    ("debit", re.compile(r"\b(debits?|withdrawals?|payments?|fees)( and other \w+)? (from|out of) your account\b|"
+                         r"\bwithdrawals and (other )?(debits|subtractions)\b|\belectronic withdrawals\b", re.I)),
+    ("credit", re.compile(r"\b(credits?|deposits?)( and other \w+)? (to|into) your account\b|"
+                          r"\bdeposits and (other )?(credits|additions)\b", re.I)),
+]
+# A paid check: "1080  09-15  11,800.00" (some PDFs glue the date onto the amount: "11,800.0009-15")
+_PDF_CHECK = re.compile(r"(?<!\S)(?P<no>\d{3,7})\*?\s+(?:(?P<d1>\d{1,2}[-/]\d{1,2}(?:[-/]\d{2,4})?)\s+)?"
+                        r"\$?(?P<amt>\d[\d,]*\.\d{2})(?P<d2>\d{1,2}[-/]\d{1,2}(?:[-/]\d{2,4})?)?")
 
 
 def _open_statement_pdf(raw: bytes, password: str = ""):
@@ -25504,7 +25525,7 @@ def _statement_rows_from_pdf_text(reader):
     with a running balance are read by how the balance moves; card statements and others by the sign or
     Cr/Dr mark on the amount. Returns (rows, credits, currency) - rows and credits are empty when the PDF
     has no readable transaction lines (e.g. a scan); currency is "USD", "INR" or ""."""
-    entries, opening, full_text = [], None, []
+    entries, opening, full_text, section = [], None, [], None
     for page in reader.pages:
         try:
             text = page.extract_text(extraction_mode="layout") or ""
@@ -25516,6 +25537,19 @@ def _statement_rows_from_pdf_text(reader):
                 continue
             m = _PDF_TXN_LINE.match(line)
             money = list(_PDF_MONEY.finditer(line))
+            if not m and not money and len(line.strip()) < 60:
+                for name, pattern in _PDF_SECTIONS:
+                    if pattern.search(line):
+                        section = name
+                        break
+            if section == "checks" and not m:
+                checks = [c for c in _PDF_CHECK.finditer(line) if c["d1"] or c["d2"]]
+                for c in checks:
+                    entries.append({"date_raw": c["d1"] or c["d2"], "description": f"Check #{c['no']}",
+                                    "money": [_pdf_money(_PDF_MONEY.search(c["amt"]))],
+                                    "closed": True, "section": "debit"})
+                if checks:
+                    continue
             if not m or not money:
                 if not m and opening is None and money and \
                         re.search(r"opening\s+balance|balance\s+b/?f|brought forward", line, re.I):
@@ -25539,8 +25573,10 @@ def _statement_rows_from_pdf_text(reader):
                 if opening is None and not entries and re.match(r"\s*(opening|beginning|previous|starting)|.*b/?f|.*brought", desc, re.I):
                     opening = _pdf_money(money[-1])["value"]
                 continue
+            if section == "balance" or not desc.strip():
+                continue  # daily balance tables: a date and a balance, no transaction
             entries.append({"date_raw": m.group(1), "description": " ".join(desc.split()),
-                            "money": [_pdf_money(x) for x in money], "closed": False})
+                            "money": [_pdf_money(x) for x in money], "closed": False, "section": section})
     if not entries:
         return [], 0, ""
     doc_text = "\n".join(full_text)
@@ -25561,6 +25597,11 @@ def _statement_rows_from_pdf_text(reader):
         d, mo = (int(a), int(b)) if day_first else (int(b), int(a))
         if 1 <= mo <= 12 and 1 <= d <= 31 and 1990 < int(y) < 2100:
             latest = max(latest or (0, 0), (int(y), mo))
+    if latest is None:
+        for t in _PDF_TEXT_DATE.finditer(doc_text):
+            y, mo = int(t["y1"] or t["y2"]), _MONTHS[(t["m1"] or t["m2"]).lower()[:3]]
+            if 1990 < y < 2100:
+                latest = max(latest or (0, 0), (y, mo))
     for e in entries:
         raw_date = e["date_raw"]
         if (yl := re.fullmatch(r"(\d{1,2})[-/](\d{1,2})", raw_date)) and latest:
@@ -25600,6 +25641,10 @@ def _statement_rows_from_pdf_text(reader):
             direction = "debit" if tok["mark"] == "DR" else "credit"
         elif balance_mode and prev is not None and bal is not None and abs(bal - prev) > 0.005:
             direction = "debit" if bal < prev else "credit"
+        elif e.get("section") in ("debit", "credit"):
+            # Under a heading like "Other Credits To Your Account" (more reliable than the card guess,
+            # which bank statements can trip in their small print)
+            direction = e["section"]
         elif tok["sign"] == "-":
             # On a card statement a minus is a payment or refund; on a bank statement it's money out
             direction = "credit" if is_card else "debit"
@@ -25621,7 +25666,7 @@ def _statement_rows_from_pdf_text(reader):
 
     curs = {x["cur"] for e in entries for x in e["money"] if x["cur"]}
     currency = "USD" if curs & {"$", "USD"} else ("INR" if curs else "")
-    if not currency and _USD_HEADING.search(doc_text):
+    if not currency and (_USD_HEADING.search(doc_text) or re.search(r"(?<![A-Za-z])\$\s?\d", doc_text)):
         currency = "USD"
     return rows, credits, currency
 
