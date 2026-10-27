@@ -5101,7 +5101,7 @@ function viewReceipt(expId) {
       </button>
       <div class="dropdown-menu dropdown-menu-end shadow p-3" style="width:330px;">
         <div class="fw-bold mb-1">Report period</div>
-        <div class="text-muted mb-2" style="font-size:13px;">Leave both dates empty for the whole of {{ selected_year }}.</div>
+        <div class="text-muted mb-2" style="font-size:13px;">Any period, e.g. several years. Leave both dates empty for the whole of {{ selected_year }}.</div>
         <div class="row g-2 mb-2">
           <div class="col-6">
             <label class="form-label mb-1" for="bsExportFrom">From</label>
@@ -5154,7 +5154,7 @@ function viewReceipt(expId) {
       if (from && to) {
         if (to < from) return fail('The To date is before the From date.');
         const [fy, fm] = from.split('-').map(Number), [ty, tm] = to.split('-').map(Number);
-        if ((ty - fy) * 12 + tm - fm + 1 > 12) return fail('A report can cover at most 12 months.');
+        if ((ty - fy) * 12 + tm - fm + 1 > 144) return fail('A report can cover at most 12 years.');
       }
       err.style.display = 'none';
       const params = new URLSearchParams({ year: '{{ selected_year }}' });

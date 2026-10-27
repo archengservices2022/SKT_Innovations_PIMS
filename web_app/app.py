@@ -19722,9 +19722,9 @@ def update_or_delete_expense_item(exp_id, item_index):
         app.logger.error(f"Error updating/deleting expense item: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-def _balance_sheet_period(args, max_months: int = 12):
+def _balance_sheet_period(args, max_months: int = 144):
     """(start date, end date, error) for a Balance Sheet export: the From/To dates the user picked,
-    or the whole selected year. A custom range may span at most max_months calendar months."""
+    or the whole selected year. A custom range may span at most max_months calendar months (12 years)."""
     from datetime import date as _date
     today = datetime.now(COMPANY_TZ).date()
     try:
@@ -19742,7 +19742,7 @@ def _balance_sheet_period(args, max_months: int = 12):
     if end < start:
         return None, None, "The To date is before the From date."
     if (end.year - start.year) * 12 + end.month - start.month + 1 > max_months:
-        return None, None, f"A report can cover at most {max_months} months. Pick a shorter period."
+        return None, None, f"A report can cover at most {max_months // 12} years. Pick a shorter period."
     return start, end, None
 
 
@@ -19814,7 +19814,21 @@ def _compute_balance_sheet_data(start, end) -> dict:
     net_profit = total_revenue - total_expenses
 
     period_text = f"{start.strftime('%m-%d-%Y')} to {end.strftime('%m-%d-%Y')}"
+    # The summary grid has room for 12 columns: months, or one column per year for longer periods
+    long_period = len(month_keys) > 12
+    if long_period:
+        years = sorted({yy for yy, _ in month_keys})
+        grid_labels = [str(yy) for yy in years]
+        grid_revenue = [sum(v for (yy, _), v in zip(month_keys, monthly_revenue) if yy == yr) for yr in years]
+        grid_expenses = [sum(v for (yy, _), v in zip(month_keys, monthly_expenses) if yy == yr) for yr in years]
+    else:
+        grid_labels, grid_revenue, grid_expenses = month_labels, monthly_revenue, monthly_expenses
     return {
+        "long_period": long_period,
+        "grid_title": "Years" if long_period else "Months",
+        "grid_labels": grid_labels,
+        "grid_revenue": grid_revenue,
+        "grid_expenses": grid_expenses,
         "year": start.year,
         "month_labels": month_labels,
         "period_title": (f"Annual Financial Summary — {start.year}" if full_year
@@ -19887,13 +19901,14 @@ def _build_balance_sheet_pdf(data: dict):
         Paragraph(data["period_title"], sub_s),
     ]
 
-    # Monthly revenue/expense table
+    # Revenue/expense grid: by month, or by year for periods longer than 12 months
+    cols = data["grid_labels"]
     tdata = [
-        ["", *months],
-        ["Revenue"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["monthly_revenue"]],
-        ["Expense"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["monthly_expenses"]],
+        ["", *cols],
+        ["Revenue"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["grid_revenue"]],
+        ["Expense"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["grid_expenses"]],
     ]
-    tbl = Table(tdata, colWidths=[0.7*inch] + [6.42*inch / max(1, len(months))]*len(months))
+    tbl = Table(tdata, colWidths=[0.7*inch] + [6.42*inch / max(1, len(cols))]*len(cols))
     tbl.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,0), colors.HexColor("#0F172A")),
         ("TEXTCOLOR",     (0,0), (-1,0), colors.white),
@@ -19940,6 +19955,31 @@ def _build_balance_sheet_pdf(data: dict):
     elems.append(Paragraph("Expense Breakdown", section_s))
     elems.append(_balance_sheet_summary_table("Expense Item", data["expense_breakdown"],
                  data["total_expenses"], {}))
+
+    if data["long_period"]:
+        # Every month of a long period, one row each (the grid above shows yearly totals)
+        elems.append(Paragraph("Monthly Breakdown", section_s))
+        cur = PDF_CURRENCY_SYMBOL
+        mrows = [["Month", "Revenue", "Expense", "Net"]] + [
+            [m, f"{cur}{r:,.2f}", f"{cur}{e:,.2f}", f"{cur}{r - e:,.2f}"]
+            for m, r, e in zip(months, data["monthly_revenue"], data["monthly_expenses"])]
+        mrows.append(["Total", f"{cur}{data['total_revenue']:,.2f}",
+                      f"{cur}{data['total_expenses']:,.2f}", f"{cur}{data['net_profit']:,.2f}"])
+        mtbl = Table(mrows, colWidths=[1.6*inch, 1.7*inch, 1.7*inch, 1.7*inch], repeatRows=1)
+        mtbl.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (-1,0), colors.HexColor("#1F4E79")),
+            ("TEXTCOLOR",     (0,0), (-1,0), colors.white),
+            ("FONTNAME",      (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTNAME",      (0,-1), (-1,-1), "Helvetica-Bold"),
+            ("BACKGROUND",    (0,-1), (-1,-1), colors.HexColor("#DCFCE7")),
+            ("FONTSIZE",      (0,0), (-1,-1), 8.5),
+            ("ALIGN",         (1,0), (-1,-1), "RIGHT"),
+            ("GRID",          (0,0), (-1,-1), 0.3, colors.HexColor("#E2E8F0")),
+            ("ROWBACKGROUNDS",(0,1), (-1,-2), [colors.white, colors.HexColor("#F8FAFC")]),
+            ("TOPPADDING",    (0,0), (-1,-1), 3),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ]))
+        elems.append(mtbl)
 
     doc.build(elems)
     buf.seek(0)
@@ -20063,14 +20103,15 @@ def export_balance_sheet(fmt):
         subtitle.alignment = center_align
         subtitle.fill = white_fill
 
-        # Month headers
-        ws['B12'] = "Months"
+        # Month headers (one column per year for periods longer than 12 months)
+        ws['B12'] = data["grid_title"]
         ws['B12'].font = header_font
         ws['B12'].fill = dark_blue_fill
         ws['B12'].alignment = center_align
         ws['B12'].border = thin_border
 
-        months = data["month_labels"]
+        months = data["grid_labels"]
+        monthly_revenue, monthly_expenses = data["grid_revenue"], data["grid_expenses"]
         for i, month in enumerate(months, 3):
             cell = ws.cell(row=12, column=i, value=month)
             cell.font = header_font
@@ -20333,6 +20374,33 @@ def export_balance_sheet(fmt):
 
         for col in range(7, 12):
             ws.cell(row, col).border = thin_border
+
+        if data["long_period"]:
+            # Every month of a long period, one row each (the summary sheet shows yearly totals)
+            money_fmt = '"₹"#,##0.00'
+            ms = wb.create_sheet("Monthly Breakdown")
+            ms.sheet_view.showGridLines = False
+            for col, width in zip("ABCD", (16, 18, 18, 18)):
+                ms.column_dimensions[col].width = width
+            for c, head in enumerate(("Month", "Revenue", "Expense", "Net"), 1):
+                cell = ms.cell(row=1, column=c, value=head)
+                cell.font, cell.fill, cell.alignment, cell.border = header_font, dark_blue_fill, center_align, thin_border
+            rows = list(zip(data["month_labels"], data["monthly_revenue"], data["monthly_expenses"]))
+            for r, (label, rev, exp) in enumerate(rows, 2):
+                for c, val in enumerate((label, rev, exp, rev - exp), 1):
+                    cell = ms.cell(row=r, column=c, value=val)
+                    cell.font, cell.border = normal_font, thin_border
+                    cell.alignment = left_align if c == 1 else right_align
+                    if c > 1:
+                        cell.number_format = money_fmt
+            total_row = len(rows) + 2
+            for c, val in enumerate(("Total", total_revenue, total_expenses, net_profit), 1):
+                cell = ms.cell(row=total_row, column=c, value=val)
+                cell.font, cell.fill, cell.border = bold_font, green_fill, thin_border
+                cell.alignment = left_align if c == 1 else right_align
+                if c > 1:
+                    cell.number_format = money_fmt
+            ms.freeze_panes = "A2"
 
         # Save to BytesIO
         output = BytesIO()
