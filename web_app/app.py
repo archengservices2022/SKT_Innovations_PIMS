@@ -19893,7 +19893,7 @@ def _build_balance_sheet_pdf(data: dict):
                             topMargin=0.4*inch, bottomMargin=0.4*inch)
     styles = getSampleStyleSheet()
     co = company_info()
-    title_s = ParagraphStyle("T", parent=styles["Normal"], fontSize=15, fontName="Helvetica-Bold",
+    title_s = ParagraphStyle("T", parent=styles["Normal"], fontSize=15, leading=19, fontName="Helvetica-Bold",
                               textColor=colors.HexColor("#0F766E"), spaceAfter=2, alignment=1)
     sub_s = ParagraphStyle("Sub2", parent=styles["Normal"], fontSize=11, alignment=1,
                             textColor=colors.HexColor("#334155"), spaceAfter=10)
@@ -19908,25 +19908,40 @@ def _build_balance_sheet_pdf(data: dict):
     def add_section(data):
         """Revenue/expense grid with totals, salary and expense breakdowns for one period."""
         # Revenue/expense grid: by month, or by year for periods longer than 12 months
-        cols = data["grid_labels"] + ["Total"]
-        money = lambda v: "—" if v is None else f"{PDF_CURRENCY_SYMBOL}{v:,.0f}"
-        tdata = [["", *cols]] + [[label] + [money(v) for v in vals] + [money(total)]
-                                 for label, vals, total in data["grid_rows"]]
-        tbl = Table(tdata, colWidths=[0.95*inch] + [6.17*inch / len(cols)]*len(cols))
-        tbl.setStyle(TableStyle([
+        # The currency is shown once (top-left) so the numbers fit their columns; widths fill the
+        # 7.27in between the margins exactly
+        money = lambda v: "—" if v is None else f"{v:,.0f}"
+        tdata = [[f"Amounts ({PDF_CURRENCY_SYMBOL.strip()})", *data["grid_labels"], "Total"]] + [
+            [label] + [money(v) for v in vals] + [money(total)] for label, vals, total in data["grid_rows"]]
+        n = len(data["grid_labels"])
+        label_w, total_w = 0.9*inch, 0.8*inch
+        tbl = Table(tdata, colWidths=[label_w] + [(7.27*inch - label_w - total_w) / max(1, n)]*n + [total_w],
+                    repeatRows=1)
+        style = [
             ("BACKGROUND",    (0,0), (-1,0), colors.HexColor("#0F172A")),
             ("TEXTCOLOR",     (0,0), (-1,0), colors.white),
             ("FONTNAME",      (0,0), (-1,0), "Helvetica-Bold"),
             ("FONTNAME",      (0,1), (0,-1), "Helvetica-Bold"),
-            ("FONTSIZE",      (0,0), (-1,-1), 7.3),
-            ("ALIGN",         (0,0), (-1,-1), "CENTER"),
+            ("FONTSIZE",      (0,0), (-1,-1), 7),
+            ("FONTSIZE",      (0,0), (0,0), 6.5),
+            ("ALIGN",         (1,0), (-1,0), "CENTER"),
+            ("ALIGN",         (1,1), (-1,-1), "RIGHT"),
+            ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
             ("GRID",          (0,0), (-1,-1), 0.3, colors.HexColor("#E2E8F0")),
-            ("ROWBACKGROUNDS",(0,1), (-1,-1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ("TOPPADDING",    (0,0), (-1,-1), 4),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+            ("TOPPADDING",    (0,0), (-1,-1), 5),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+            ("LEFTPADDING",   (0,0), (-1,-1), 3),
+            ("RIGHTPADDING",  (0,0), (-1,-1), 3),
             ("FONTNAME",      (-1,0), (-1,-1), "Helvetica-Bold"),
             ("BACKGROUND",    (-1,1), (-1,-1), colors.HexColor("#DCFCE7")),
-        ]))
+        ]
+        for r, (label, _vals, _total) in enumerate(data["grid_rows"], 1):
+            # Revenue rows green text, expense rows red; a heavier line starts each new year
+            style.append(("TEXTCOLOR", (0, r), (-1, r),
+                          colors.HexColor("#B91C1C" if label.startswith("Expense") else "#047857")))
+            if r > 1 and label.startswith("Revenue"):
+                style.append(("LINEABOVE", (0, r), (-1, r), 1.2, colors.HexColor("#64748B")))
+        tbl.setStyle(TableStyle(style))
         elems.append(tbl)
         elems.append(Spacer(1, 0.2*inch))
 
@@ -19973,6 +19988,7 @@ def _build_balance_sheet_pdf(data: dict):
             year_data = _compute_balance_sheet_data(max(data["start"], _date(yr, 1, 1)),
                                                     min(data["end"], _date(yr, 12, 31)))
             elems.append(PageBreak())
+            elems.append(Paragraph(f"Year {yr}", title_s))
             elems.append(Paragraph(year_data["period_title"], sub_s))
             add_section(year_data)
 
