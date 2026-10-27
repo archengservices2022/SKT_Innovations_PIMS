@@ -1007,7 +1007,8 @@ a[href*="filter_expense"]:hover {
             data-created-at="{{ exp.get('created_at','') }}"
             data-expense-id="{{ exp.get('firebase_id','') }}">
             {% if can_bulk_delete %}
-            <td class="text-center exp-tick-cell">
+            <td class="text-center exp-tick-cell" style="cursor:default;"
+                onclick="if (event.target === this) { const cb = this.querySelector('.exp-tick'); if (cb) { cb.checked = !cb.checked; updateExpenseTicks(); } }">
               {% if exp.get('firebase_id') %}
               <input type="checkbox" class="form-check-input exp-tick" data-id="{{ exp.firebase_id }}"
                      data-label="{{ exp.get('expense_name') or exp.get('description') or exp.get('vendor') or 'Expense' }}"
@@ -7652,8 +7653,9 @@ function makeExpenseRowsClickable() {
   document.querySelectorAll('#expenseTableBody tr.expense-row').forEach(row => {
     row.style.cursor = 'pointer';
     row.addEventListener('click', function(e) {
-      // Buttons and links in the row (Edit, receipt, bank statement) do their own thing
-      if (e.target.closest('button, a') !== null) {
+      // Buttons and links in the row (Edit, receipt, bank statement) do their own thing, and the
+      // tick-box cell only selects the row for bulk delete
+      if (e.target.closest('button, a, input, label, .exp-tick-cell') !== null) {
         return;
       }
       const expenseId = this.getAttribute('data-expense-id');
