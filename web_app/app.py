@@ -19814,23 +19814,26 @@ def _compute_balance_sheet_data(start, end) -> dict:
     net_profit = total_revenue - total_expenses
 
     period_text = f"{start.strftime('%m-%d-%Y')} to {end.strftime('%m-%d-%Y')}"
-    # The summary grid has room for 12 columns: months, or one column per year for longer periods
+    # Summary table rows: [label, values per column, total]. A period longer than 12 months keeps
+    # Jan-Dec columns with a Revenue and an Expense row per year (None = month outside the period).
     long_period = len(month_keys) > 12
     if long_period:
-        years = sorted({yy for yy, _ in month_keys})
-        grid_labels = [str(yy) for yy in years]
-        grid_revenue = [sum(v for (yy, _), v in zip(month_keys, monthly_revenue) if yy == yr) for yr in years]
-        grid_expenses = [sum(v for (yy, _), v in zip(month_keys, monthly_expenses) if yy == yr) for yr in years]
+        grid_labels = names
+        grid_rows = []
+        for yr in sorted({yy for yy, _ in month_keys}):
+            for label, series in (("Revenue", monthly_revenue), ("Expense", monthly_expenses)):
+                vals = [series[month_index[(yr, mm)]] if (yr, mm) in month_index else None for mm in range(1, 13)]
+                grid_rows.append([f"{label} {yr}", vals, sum(v for v in vals if v is not None)])
     else:
-        grid_labels, grid_revenue, grid_expenses = month_labels, monthly_revenue, monthly_expenses
+        grid_labels = month_labels
+        grid_rows = [["Revenue", monthly_revenue, sum(monthly_revenue)],
+                     ["Expense", monthly_expenses, sum(monthly_expenses)]]
     return {
         "start": start,
         "end": end,
         "long_period": long_period,
-        "grid_title": "Years" if long_period else "Months",
         "grid_labels": grid_labels,
-        "grid_revenue": grid_revenue,
-        "grid_expenses": grid_expenses,
+        "grid_rows": grid_rows,
         "year": start.year,
         "month_labels": month_labels,
         "period_title": (f"Annual Financial Summary — {start.year}" if full_year
@@ -19906,17 +19909,15 @@ def _build_balance_sheet_pdf(data: dict):
         """Revenue/expense grid with totals, salary and expense breakdowns for one period."""
         # Revenue/expense grid: by month, or by year for periods longer than 12 months
         cols = data["grid_labels"] + ["Total"]
-        tdata = [
-            ["", *cols],
-            ["Revenue"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["grid_revenue"] + [data["total_revenue"]]],
-            ["Expense"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["grid_expenses"] + [data["total_expenses"]]],
-        ]
-        tbl = Table(tdata, colWidths=[0.7*inch] + [6.42*inch / len(cols)]*len(cols))
+        money = lambda v: "—" if v is None else f"{PDF_CURRENCY_SYMBOL}{v:,.0f}"
+        tdata = [["", *cols]] + [[label] + [money(v) for v in vals] + [money(total)]
+                                 for label, vals, total in data["grid_rows"]]
+        tbl = Table(tdata, colWidths=[0.95*inch] + [6.17*inch / len(cols)]*len(cols))
         tbl.setStyle(TableStyle([
             ("BACKGROUND",    (0,0), (-1,0), colors.HexColor("#0F172A")),
             ("TEXTCOLOR",     (0,0), (-1,0), colors.white),
             ("FONTNAME",      (0,0), (-1,0), "Helvetica-Bold"),
-            ("FONTNAME",      (0,1), (0,2), "Helvetica-Bold"),
+            ("FONTNAME",      (0,1), (0,-1), "Helvetica-Bold"),
             ("FONTSIZE",      (0,0), (-1,-1), 7.3),
             ("ALIGN",         (0,0), (-1,-1), "CENTER"),
             ("GRID",          (0,0), (-1,-1), 0.3, colors.HexColor("#E2E8F0")),
@@ -20023,6 +20024,8 @@ def export_balance_sheet(fmt):
 
         def build_sheet(ws, data):
             """Fill one sheet: revenue/expense table, totals, salary and expense breakdowns."""
+            # Rows below the table move down when it has more than the usual rows (long periods)
+            sh = max(0, 12 + len(data["grid_rows"]) + 3 - 20)
             monthly_revenue   = data["monthly_revenue"]
             monthly_expenses  = data["monthly_expenses"]
             salary_inside     = data["salary_inside"]
@@ -20036,8 +20039,8 @@ def export_balance_sheet(fmt):
             ws.sheet_view.showGridLines = False
 
             # Set page break and print area
-            ws.row_breaks.append(Break(id=35))
-            ws.print_area = 'A1:O68'
+            ws.row_breaks.append(Break(id=35 + sh))
+            ws.print_area = f'A1:O{68 + sh}'
             ws.print_title_rows = '1:5'
 
             # Professional colors matching PIMS
@@ -20096,106 +20099,80 @@ def export_balance_sheet(fmt):
             subtitle.alignment = center_align
             subtitle.fill = white_fill
 
-            # Month headers (one column per year for periods longer than 12 months)
-            ws['B12'] = data["grid_title"]
+            # Month headers, then one row per grid row (Revenue/Expense, per year for long periods)
+            ws['B12'] = "Months"
             ws['B12'].font = header_font
             ws['B12'].fill = dark_blue_fill
             ws['B12'].alignment = center_align
             ws['B12'].border = thin_border
 
             months = data["grid_labels"]
-            monthly_revenue, monthly_expenses = data["grid_revenue"], data["grid_expenses"]
-            for i, month in enumerate(months, 3):
+            for i, month in enumerate(months + ["Total"], 3):
                 cell = ws.cell(row=12, column=i, value=month)
                 cell.font = header_font
                 cell.fill = dark_blue_fill
                 cell.alignment = center_align
                 cell.border = thin_border
 
-            # Revenue row
-            ws['B13'] = "Revenue"
-            ws['B13'].font = bold_font
-            ws['B13'].fill = light_gray_fill
-            ws['B13'].alignment = center_align
-            ws['B13'].border = thin_border
-
-            for i, val in enumerate(monthly_revenue, 3):
-                cell = ws.cell(row=13, column=i, value=val)
-                cell.number_format = '"₹"#,##0.00'
-                cell.alignment = center_align
-                cell.border = thin_border
-                cell.font = normal_font
-
-            # Expense row
-            ws['B14'] = "Expense"
-            ws['B14'].font = bold_font
-            ws['B14'].fill = light_gray_fill
-            ws['B14'].alignment = center_align
-            ws['B14'].border = thin_border
-
-            for i, val in enumerate(monthly_expenses, 3):
-                cell = ws.cell(row=14, column=i, value=val)
-                cell.number_format = '"₹"#,##0.00'
-                cell.alignment = center_align
-                cell.border = thin_border
-                cell.font = normal_font
-
-            # Total column after the last month
-            total_col = 3 + len(months)
-            for r, val, fnt, fill in ((12, "Total", header_font, dark_blue_fill),
-                                      (13, sum(monthly_revenue), bold_font, green_fill),
-                                      (14, sum(monthly_expenses), bold_font, green_fill)):
-                cell = ws.cell(row=r, column=total_col, value=val)
-                cell.font, cell.fill, cell.alignment, cell.border = fnt, fill, center_align, thin_border
-                if r > 12:
+            for r, (label, vals, total) in enumerate(data["grid_rows"], 13):
+                head = ws.cell(row=r, column=2, value=label)
+                head.font, head.fill, head.alignment, head.border = bold_font, light_gray_fill, center_align, thin_border
+                for i, val in enumerate(vals + [total], 3):
+                    cell = ws.cell(row=r, column=i, value="—" if val is None else val)
                     cell.number_format = '"₹"#,##0.00'
+                    cell.alignment = center_align
+                    cell.border = thin_border
+                    is_total = i == 3 + len(vals)
+                    cell.font = bold_font if is_total else normal_font
+                    if is_total:
+                        cell.fill = green_fill
 
             # Summary section
-            ws['G20'] = "Revenue"
-            ws['G20'].font = bold_font
-            ws['H20'] = "="
-            ws['H20'].font = bold_font
-            ws['H20'].alignment = center_align
-            ws.merge_cells('I20:J20')
-            ws['I20'].value = total_revenue
-            ws['I20'].number_format = '"₹"#,##0.00'
-            ws['I20'].font = bold_font
-            ws['I20'].alignment = left_align
+            ws[f'G{20 + sh}'] = "Revenue"
+            ws[f'G{20 + sh}'].font = bold_font
+            ws[f'H{20 + sh}'] = "="
+            ws[f'H{20 + sh}'].font = bold_font
+            ws[f'H{20 + sh}'].alignment = center_align
+            ws.merge_cells(f'I{20 + sh}:J{20 + sh}')
+            ws[f'I{20 + sh}'].value = total_revenue
+            ws[f'I{20 + sh}'].number_format = '"₹"#,##0.00'
+            ws[f'I{20 + sh}'].font = bold_font
+            ws[f'I{20 + sh}'].alignment = left_align
 
-            ws['G21'] = "Total Expense"
-            ws['G21'].font = bold_font
-            ws['H21'] = "="
-            ws['H21'].font = bold_font
-            ws['H21'].alignment = center_align
-            ws.merge_cells('I21:J21')
-            ws['I21'].value = total_expenses
-            ws['I21'].number_format = '"₹"#,##0.00'
-            ws['I21'].font = bold_font
-            ws['I21'].alignment = left_align
+            ws[f'G{21 + sh}'] = "Total Expense"
+            ws[f'G{21 + sh}'].font = bold_font
+            ws[f'H{21 + sh}'] = "="
+            ws[f'H{21 + sh}'].font = bold_font
+            ws[f'H{21 + sh}'].alignment = center_align
+            ws.merge_cells(f'I{21 + sh}:J{21 + sh}')
+            ws[f'I{21 + sh}'].value = total_expenses
+            ws[f'I{21 + sh}'].number_format = '"₹"#,##0.00'
+            ws[f'I{21 + sh}'].font = bold_font
+            ws[f'I{21 + sh}'].alignment = left_align
 
-            ws['G22'] = "Net Profit"
-            ws['G22'].font = bold_font
-            ws['H22'] = "="
-            ws['H22'].font = bold_font
-            ws['H22'].alignment = center_align
-            ws.merge_cells('I22:J22')
-            ws['I22'].value = net_profit
-            ws['I22'].number_format = '"₹"#,##0.00'
-            ws['I22'].font = bold_font
-            ws['I22'].fill = green_fill if net_profit > 0 else light_gray_fill
-            ws['I22'].alignment = left_align
+            ws[f'G{22 + sh}'] = "Net Profit"
+            ws[f'G{22 + sh}'].font = bold_font
+            ws[f'H{22 + sh}'] = "="
+            ws[f'H{22 + sh}'].font = bold_font
+            ws[f'H{22 + sh}'].alignment = center_align
+            ws.merge_cells(f'I{22 + sh}:J{22 + sh}')
+            ws[f'I{22 + sh}'].value = net_profit
+            ws[f'I{22 + sh}'].number_format = '"₹"#,##0.00'
+            ws[f'I{22 + sh}'].font = bold_font
+            ws[f'I{22 + sh}'].fill = green_fill if net_profit > 0 else light_gray_fill
+            ws[f'I{22 + sh}'].alignment = left_align
 
-            ws['H34'] = "Page : 01"
-            ws['H34'].font = Font(size=10, italic=True)
-            ws['H34'].alignment = right_align
+            ws[f'H{34 + sh}'] = "Page : 01"
+            ws[f'H{34 + sh}'].font = Font(size=10, italic=True)
+            ws[f'H{34 + sh}'].alignment = right_align
 
-            for row in range(1, 35):
+            for row in range(1, 35 + sh):
                 for col in range(1, 16):
                     if ws.cell(row=row, column=col).value is None:
                         ws.cell(row=row, column=col).fill = white_fill
 
             # PAGE 2 - SALARY & EXPENSE BREAKDOWN
-            start_row = 35
+            start_row = 35 + sh
 
             # Salary title
             ws.merge_cells(f"B{start_row}:E{start_row}")
@@ -20345,7 +20322,7 @@ def export_balance_sheet(fmt):
             for col in range(7, 12):
                 ws.cell(37, col).border = thin_border
 
-            row = 38
+            row = 38 + sh
             for exp_name in sorted(expense_breakdown.keys(), key=lambda x: expense_breakdown[x], reverse=True):
                 amt = expense_breakdown[exp_name]
 
