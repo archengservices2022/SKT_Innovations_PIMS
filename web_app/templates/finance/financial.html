@@ -5485,13 +5485,13 @@ function viewReceipt(expId) {
 
   <script>
   (function() {
-    var monthlyPaymentDetails    = {{ monthly_payment_details | safe }};
-    var monthlyExpenseDetails    = {{ monthly_expense_details | safe }};
-    var monthlyDirectCommissionDetails = {{ monthly_direct_commission_details | safe }};
-    var monthlySalaryDetails      = {{ monthly_salary_details | safe }};
-    var monthlyCommissionDetails  = {{ monthly_commission_details | safe }};
-    var monthlyOutstandingDetails = {{ monthly_outstanding_details | safe }};
-    var monthlyDueDetails         = {{ monthly_due_details | safe }};
+    var monthlyPaymentDetails    = {{ monthly_payment_details|js_json }};
+    var monthlyExpenseDetails    = {{ monthly_expense_details|js_json }};
+    var monthlyDirectCommissionDetails = {{ monthly_direct_commission_details|js_json }};
+    var monthlySalaryDetails      = {{ monthly_salary_details|js_json }};
+    var monthlyCommissionDetails  = {{ monthly_commission_details|js_json }};
+    var monthlyOutstandingDetails = {{ monthly_outstanding_details|js_json }};
+    var monthlyDueDetails         = {{ monthly_due_details|js_json }};
     var monthNames = {1:'January',2:'February',3:'March',4:'April',5:'May',6:'June',7:'July',8:'August',9:'September',10:'October',11:'November',12:'December'};
     var activeMonth = null;
     var fmt = function(n){ return CURRENCY_SYMBOL + parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
@@ -5751,7 +5751,7 @@ function viewReceipt(expId) {
   var bsActiveMonths = [1,2,3,4,5,6,7,8,9,10,11,12];
   var bsRevData   = {{ annual_revenue | tojson }};
   var bsExpData   = {{ annual_expenses | tojson }};
-  var bsSalData   = {{ monthly_salary_details | safe }};
+  var bsSalData   = {{ monthly_salary_details|js_json }};
   var bsFmt = function(n){ return CURRENCY_SYMBOL + parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
   var bsMonthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
