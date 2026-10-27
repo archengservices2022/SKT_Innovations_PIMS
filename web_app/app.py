@@ -19722,78 +19722,104 @@ def update_or_delete_expense_item(exp_id, item_index):
         app.logger.error(f"Error updating/deleting expense item: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-def _compute_balance_sheet_data(year: int) -> dict:
-    """Shared data computation for Balance Sheet exports (Excel/PDF/CSV)."""
+def _balance_sheet_period(args, max_months: int = 12):
+    """(start date, end date, error) for a Balance Sheet export: the From/To dates the user picked,
+    or the whole selected year. A custom range may span at most max_months calendar months."""
+    from datetime import date as _date
+    today = datetime.now(COMPANY_TZ).date()
+    try:
+        year = int(args.get("year") or today.year)
+    except (ValueError, TypeError):
+        year = today.year
+    raw_from, raw_to = (args.get("date_from") or "").strip(), (args.get("date_to") or "").strip()
+    if not raw_from and not raw_to:
+        return _date(year, 1, 1), _date(year, 12, 31), None
+    try:
+        start = _date.fromisoformat(raw_from) if raw_from else _date(year, 1, 1)
+        end = _date.fromisoformat(raw_to) if raw_to else today
+    except ValueError:
+        return None, None, "Enter the From and To dates as valid dates."
+    if end < start:
+        return None, None, "The To date is before the From date."
+    if (end.year - start.year) * 12 + end.month - start.month + 1 > max_months:
+        return None, None, f"A report can cover at most {max_months} months. Pick a shorter period."
+    return start, end, None
+
+
+def _compute_balance_sheet_data(start, end) -> dict:
+    """Shared data computation for Balance Sheet exports (Excel/PDF/CSV) over [start, end], grouped
+    by the calendar months the period covers (the first and last month may be partial)."""
     invoices_data = fb_get("/invoices") or {}
     expenses_data = fb_get("/balance_sheet_expenses") or {}
     salaries_data = fb_get("/balance_sheet_salary") or {}
 
-    monthly_revenue = [0] * 12
-    monthly_expenses = [0] * 12
+    month_keys = []
+    y, m = start.year, start.month
+    while (y, m) <= (end.year, end.month):
+        month_keys.append((y, m))
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    month_index = {k: i for i, k in enumerate(month_keys)}
+    names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    spans_years = start.year != end.year
+    month_labels = [f"{names[mm - 1]} {yy}" if spans_years else names[mm - 1] for yy, mm in month_keys]
+    full_year = start.month == 1 and start.day == 1 and end.month == 12 and end.day == 31 and not spans_years
+
+    monthly_revenue = [0] * len(month_keys)
+    monthly_expenses = [0] * len(month_keys)
     salary_inside = {}
     salary_outside = {}
     expense_breakdown = {}
+
+    def bucket(date_str):
+        """Month index for a YYYY-MM-DD date inside the period, else None."""
+        try:
+            d = datetime.fromisoformat(str(date_str or "")[:10]).date()
+        except ValueError:
+            return None
+        return month_index.get((d.year, d.month)) if start <= d <= end else None
 
     # Build revenue data from invoices based on PAYMENT DATES (not invoice dates)
     if isinstance(invoices_data, dict):
         for iid, inv_data in invoices_data.items():
             if isinstance(inv_data, dict):
-                for pay in (inv_data.get("payment_log", []) or []):
-                    pay_ds = pay.get("date", "") or ""
-                    try:
-                        pay_date = datetime.fromisoformat(pay_ds[:10])
-                        if pay_date.year == year:
-                            monthly_revenue[pay_date.month - 1] += _safe_float(pay.get("amount", 0))
-                    except Exception:
-                        pass
-                for tax_pay in (inv_data.get("tax_payments", []) or []):
-                    tax_ds = tax_pay.get("date", "") or ""
-                    try:
-                        tax_date = datetime.fromisoformat(tax_ds[:10])
-                        if tax_date.year == year:
-                            monthly_revenue[tax_date.month - 1] += _safe_float(tax_pay.get("amount", 0))
-                    except Exception:
-                        pass
+                for pay in (inv_data.get("payment_log", []) or []) + (inv_data.get("tax_payments", []) or []):
+                    i = bucket(pay.get("date")) if isinstance(pay, dict) else None
+                    if i is not None:
+                        monthly_revenue[i] += _safe_float(pay.get("amount", 0))
 
     # Build expense data
     if isinstance(expenses_data, dict):
         for eid, edata in expenses_data.items():
             if isinstance(edata, dict):
-                date_str = edata.get("date") or ""
-                try:
-                    e_year = int(date_str[:4])
-                    e_month = int(date_str[5:7])
-                    if e_year == year and 1 <= e_month <= 12:
-                        amt = _safe_float(edata.get("amount", 0))
-                        monthly_expenses[e_month-1] += amt
-                        vendor_name = (edata.get("vendor") or "").strip() or (edata.get("expense_name") or "") or (edata.get("description") or "—")
-                        expense_breakdown[vendor_name] = expense_breakdown.get(vendor_name, 0) + amt
-                except (ValueError, IndexError, TypeError):
-                    pass
+                i = bucket(edata.get("date"))
+                if i is not None:
+                    amt = _safe_float(edata.get("amount", 0))
+                    monthly_expenses[i] += amt
+                    vendor_name = (edata.get("vendor") or "").strip() or (edata.get("expense_name") or "") or (edata.get("description") or "—")
+                    expense_breakdown[vendor_name] = expense_breakdown.get(vendor_name, 0) + amt
 
     # Build salary data
     if isinstance(salaries_data, dict):
         for salary_id, sal_data in salaries_data.items():
-            if isinstance(sal_data, dict):
-                date_str = sal_data.get("date", "")
-                try:
-                    s_year = int(date_str[:4])
-                    if s_year == year:
-                        name = sal_data.get("name") or sal_data.get("employee_name", "—")
-                        amt = _safe_float(sal_data.get("amount", 0))
-                        region = sal_data.get("region", "").lower()
-                        target_dict = salary_inside if "inside" in region or "usa" in region else salary_outside
-                        target_dict[name] = target_dict.get(name, 0) + amt
-                except (ValueError, IndexError, TypeError):
-                    pass
+            if isinstance(sal_data, dict) and bucket(sal_data.get("date")) is not None:
+                name = sal_data.get("name") or sal_data.get("employee_name", "—")
+                amt = _safe_float(sal_data.get("amount", 0))
+                region = sal_data.get("region", "").lower()
+                target_dict = salary_inside if "inside" in region or "usa" in region else salary_outside
+                target_dict[name] = target_dict.get(name, 0) + amt
 
     total_revenue = sum(monthly_revenue)
     total_expenses = sum(monthly_expenses)
     total_salaries = sum(salary_inside.values()) + sum(salary_outside.values())
     net_profit = total_revenue - total_expenses
 
+    period_text = f"{start.strftime('%m-%d-%Y')} to {end.strftime('%m-%d-%Y')}"
     return {
-        "year": year,
+        "year": start.year,
+        "month_labels": month_labels,
+        "period_title": (f"Annual Financial Summary — {start.year}" if full_year
+                         else f"Financial Summary — {period_text}"),
+        "file_tag": str(start.year) if full_year else f"{start.isoformat()}_to_{end.isoformat()}",
         "monthly_revenue": monthly_revenue,
         "monthly_expenses": monthly_expenses,
         "salary_inside": salary_inside,
@@ -19842,8 +19868,7 @@ def _build_balance_sheet_pdf(data: dict):
     except ImportError:
         return None
 
-    year = data["year"]
-    months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    months = data["month_labels"]
     buf = _io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
                             leftMargin=0.5*inch, rightMargin=0.5*inch,
@@ -19859,7 +19884,7 @@ def _build_balance_sheet_pdf(data: dict):
 
     elems = [
         Paragraph(f"{co.get('name','')}", title_s),
-        Paragraph(f"Annual Financial Summary — {year}", sub_s),
+        Paragraph(data["period_title"], sub_s),
     ]
 
     # Monthly revenue/expense table
@@ -19868,7 +19893,7 @@ def _build_balance_sheet_pdf(data: dict):
         ["Revenue"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["monthly_revenue"]],
         ["Expense"] + [f"{PDF_CURRENCY_SYMBOL}{v:,.0f}" for v in data["monthly_expenses"]],
     ]
-    tbl = Table(tdata, colWidths=[0.7*inch] + [0.535*inch]*12)
+    tbl = Table(tdata, colWidths=[0.7*inch] + [6.42*inch / max(1, len(months))]*len(months))
     tbl.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,0), colors.HexColor("#0F172A")),
         ("TEXTCOLOR",     (0,0), (-1,0), colors.white),
@@ -19926,17 +19951,17 @@ def _build_balance_sheet_pdf(data: dict):
 def export_balance_sheet(fmt):
     """Export Balance Sheet as Excel (detailed PIMS-format workbook), PDF, or CSV (monthly rows)."""
     try:
-        year_param = request.args.get("year", str(datetime.now(COMPANY_TZ).year))
-        try:
-            year = int(year_param)
-        except (ValueError, TypeError):
-            year = datetime.now(COMPANY_TZ).year
-
-        data = _compute_balance_sheet_data(year)
+        start, end, period_error = _balance_sheet_period(request.args)
+        if period_error:
+            flash(period_error, "danger")
+            return redirect(url_for("financial") + "?tab=balance-sheet")
+        data = _compute_balance_sheet_data(start, end)
+        year = data["year"]
+        file_tag = data["file_tag"]
 
         if fmt == "csv":
             import csv, io as _io
-            months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+            months = data["month_labels"]
             out = _io.StringIO()
             w = csv.writer(out)
             w.writerow(["Month", "Revenue", "Expenses", "Net Profit"])
@@ -19945,14 +19970,14 @@ def export_balance_sheet(fmt):
                 exp = data["monthly_expenses"][i]
                 w.writerow([m, f"{rev:.2f}", f"{exp:.2f}", f"{rev - exp:.2f}"])
             w.writerow(["Total", f"{data['total_revenue']:.2f}", f"{data['total_expenses']:.2f}", f"{data['net_profit']:.2f}"])
-            return _export_response(out, "csv", f"balance_sheet_{year}")
+            return _export_response(out, "csv", f"balance_sheet_{file_tag}")
 
         if fmt == "pdf":
             buf = _build_balance_sheet_pdf(data)
             if not buf:
                 flash("PDF export is unavailable on this server.", "danger")
                 return redirect(url_for("financial") + "?tab=balance-sheet")
-            return _export_response(buf, "pdf", f"balance_sheet_{year}")
+            return _export_response(buf, "pdf", f"balance_sheet_{file_tag}")
 
         # fmt == "excel" — detailed PIMS-format workbook (unpack shared data first)
         monthly_revenue   = data["monthly_revenue"]
@@ -19972,7 +19997,7 @@ def export_balance_sheet(fmt):
         # Create workbook
         wb = Workbook()
         ws = wb.active
-        ws.title = "Annual Summary"
+        ws.title = "Annual Summary" if data["file_tag"].isdigit() else "Period Summary"
 
         # Hide gridlines
         ws.sheet_view.showGridLines = False
@@ -20033,7 +20058,7 @@ def export_balance_sheet(fmt):
 
         ws.merge_cells('B5:O5')
         subtitle = ws['B5']
-        subtitle.value = f"ANNUAL FINANCIAL SUMMARY - {year}"
+        subtitle.value = data["period_title"].upper()
         subtitle.font = subtitle_font
         subtitle.alignment = center_align
         subtitle.fill = white_fill
@@ -20045,7 +20070,7 @@ def export_balance_sheet(fmt):
         ws['B12'].alignment = center_align
         ws['B12'].border = thin_border
 
-        months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        months = data["month_labels"]
         for i, month in enumerate(months, 3):
             cell = ws.cell(row=12, column=i, value=month)
             cell.font = header_font
@@ -20318,7 +20343,7 @@ def export_balance_sheet(fmt):
             output,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
-            download_name=f'Balance_Sheet_Annual_{year}.xlsx'
+            download_name=f'Balance_Sheet_{file_tag}.xlsx'
         )
 
     except Exception as e:

@@ -4993,15 +4993,72 @@ function viewReceipt(expId) {
       <p class="text-muted small mb-0">Revenue, expenses &amp; salaries for <strong>{{ selected_year }}</strong> &nbsp;—&nbsp; <span id="bsPeriodLabel" style="color:#0D9488;font-weight:600;">Full Year</span></p>
     </div>
     <div class="dropdown">
-      <button class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-download me-1"></i>Export</button>
-      <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-        <li><h6 class="dropdown-header" style="font-size:12px;">EXPORT OPTIONS</h6></li>
-        <li><a class="dropdown-item" href="{{ url_for('export_balance_sheet', fmt='pdf') }}?year={{ selected_year }}"><i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF Report</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('export_balance_sheet', fmt='excel') }}?year={{ selected_year }}"><i class="bi bi-file-earmark-excel text-success me-2"></i>Excel (.xlsx)</a></li>
-        <li><hr class="dropdown-divider my-1"></li>
-        <li><a class="dropdown-item" href="{{ url_for('export_balance_sheet', fmt='csv') }}?year={{ selected_year }}"><i class="bi bi-filetype-csv me-2" style="color:#0F766E;"></i>CSV (monthly rows)</a></li>
-      </ul>
+      <button class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+        <i class="bi bi-download me-1"></i>Report Export
+      </button>
+      <div class="dropdown-menu dropdown-menu-end shadow p-3" style="width:330px;">
+        <div class="fw-bold mb-1">Report period</div>
+        <div class="text-muted mb-2" style="font-size:13px;">Leave both dates empty for the whole of {{ selected_year }}.</div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label mb-1" for="bsExportFrom">From</label>
+            <input type="date" id="bsExportFrom" class="form-control form-control-sm">
+          </div>
+          <div class="col-6">
+            <label class="form-label mb-1" for="bsExportTo">To</label>
+            <input type="date" id="bsExportTo" class="form-control form-control-sm">
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-1 mb-2">
+          <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setBsExportRange('month')">This month</button>
+          <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setBsExportRange('quarter')">This quarter</button>
+          <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setBsExportRange('ytd')">Jan 1 – today</button>
+          <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setBsExportRange('clear')">Whole {{ selected_year }}</button>
+        </div>
+        <div class="small text-danger mb-2" id="bsExportError" style="display:none;"></div>
+        <div class="fw-bold mb-1">Download as</div>
+        <div class="d-grid gap-1">
+          <button type="button" class="btn btn-sm btn-light text-start" onclick="bsExport('pdf')"><i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF Report</button>
+          <button type="button" class="btn btn-sm btn-light text-start" onclick="bsExport('excel')"><i class="bi bi-file-earmark-excel text-success me-2"></i>Excel (.xlsx)</button>
+          <button type="button" class="btn btn-sm btn-light text-start" onclick="bsExport('csv')"><i class="bi bi-filetype-csv me-2" style="color:#0F766E;"></i>CSV (monthly rows)</button>
+        </div>
+      </div>
     </div>
+    <script>
+    // Balance Sheet "Report Export": download for the picked From/To period, or the whole selected year
+    const BS_EXPORT_URLS = {
+      pdf: "{{ url_for('export_balance_sheet', fmt='pdf') }}",
+      excel: "{{ url_for('export_balance_sheet', fmt='excel') }}",
+      csv: "{{ url_for('export_balance_sheet', fmt='csv') }}"
+    };
+    function bsIso(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function setBsExportRange(kind) {
+      const from = document.getElementById('bsExportFrom'), to = document.getElementById('bsExportTo');
+      const now = new Date();
+      if (kind === 'clear') { from.value = ''; to.value = ''; }
+      else if (kind === 'month') { from.value = bsIso(new Date(now.getFullYear(), now.getMonth(), 1)); to.value = bsIso(now); }
+      else if (kind === 'quarter') { from.value = bsIso(new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)); to.value = bsIso(now); }
+      else if (kind === 'ytd') { from.value = bsIso(new Date(now.getFullYear(), 0, 1)); to.value = bsIso(now); }
+      document.getElementById('bsExportError').style.display = 'none';
+    }
+    function bsExport(fmt) {
+      const from = document.getElementById('bsExportFrom').value, to = document.getElementById('bsExportTo').value;
+      const err = document.getElementById('bsExportError');
+      const fail = msg => { err.textContent = msg; err.style.display = ''; };
+      if ((from && !to) || (!from && to)) return fail('Pick both a From and a To date, or leave both empty.');
+      if (from && to) {
+        if (to < from) return fail('The To date is before the From date.');
+        const [fy, fm] = from.split('-').map(Number), [ty, tm] = to.split('-').map(Number);
+        if ((ty - fy) * 12 + tm - fm + 1 > 12) return fail('A report can cover at most 12 months.');
+      }
+      err.style.display = 'none';
+      const params = new URLSearchParams({ year: '{{ selected_year }}' });
+      if (from && to) { params.set('date_from', from); params.set('date_to', to); }
+      window.location.href = BS_EXPORT_URLS[fmt] + '?' + params.toString();
+    }
+    </script>
   </div>
 
   <!-- Filter Bar -->
