@@ -937,8 +937,22 @@ a[href*="filter_expense"]:hover {
   </div>
 
   <!-- Expense Log Header -->
+  {% set can_bulk_delete = user_role in ('admin', 'accountant') %}
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h6 class="panel-title mb-0"><i class="bi bi-receipt me-2"></i>Expense Log</h6>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <h6 class="panel-title mb-0"><i class="bi bi-receipt me-2"></i>Expense Log</h6>
+      {% if can_bulk_delete %}
+      <!-- Shown once expenses are ticked -->
+      <div id="expBulkBar" class="d-none align-items-center gap-2 px-3 py-1 rounded-pill"
+           style="background:#fff1f2;border:1px solid #fecdd3;">
+        <span class="fw-semibold" style="color:#be123c;" id="expBulkCount">0 selected</span>
+        <button type="button" class="btn btn-sm btn-danger py-0" id="expBulkDeleteBtn" onclick="bulkDeleteExpenses()">
+          <i class="bi bi-trash me-1"></i>Delete selected
+        </button>
+        <button type="button" class="btn btn-sm btn-link text-secondary py-0" onclick="clearExpenseTicks()">Clear</button>
+      </div>
+      {% endif %}
+    </div>
 
     <!-- Dropdown Button for Add Expense -->
     <div class="dropdown">
@@ -965,6 +979,12 @@ a[href*="filter_expense"]:hover {
       <table class="table table-hover table-sm mb-0 align-middle" id="expenseTable">
         <thead style="background:#1e293b;">
           <tr>
+            {% if can_bulk_delete %}
+            <th style="width:40px;" class="text-center">
+              <input type="checkbox" class="form-check-input" id="expSelectAll" title="Select all expenses on this page"
+                     onclick="toggleAllExpenseTicks(this.checked)">
+            </th>
+            {% endif %}
             <th style="color:#fff;font-weight:700;">Expense Date</th>
             <th style="color:#fff;font-weight:700;">Expense Type</th>
             <th style="color:#fff;font-weight:700;">Expense Name</th>
@@ -986,9 +1006,18 @@ a[href*="filter_expense"]:hover {
             data-date="{{ exp.get('date','') | format_date }}"
             data-created-at="{{ exp.get('created_at','') }}"
             data-expense-id="{{ exp.get('firebase_id','') }}">
+            {% if can_bulk_delete %}
+            <td class="text-center exp-tick-cell">
+              {% if exp.get('firebase_id') %}
+              <input type="checkbox" class="form-check-input exp-tick" data-id="{{ exp.firebase_id }}"
+                     data-label="{{ exp.get('expense_name') or exp.get('description') or exp.get('vendor') or 'Expense' }}"
+                     data-amount="{{ exp.get('amount',0)|float }}" onchange="updateExpenseTicks()">
+              {% endif %}
+            </td>
+            {% endif %}
             <td class="text-muted small">{{ exp.get('date','—') | format_date }}</td>
             <td class="small text-muted">{{ exp.get('expense_type','—') }}</td>
-            <td class="small text-muted">{{ exp.get('expense_name','—') or exp.get('description','—') }}</td>
+            <td class="small text-muted exp-name-cell">{{ exp.get('expense_name','—') or exp.get('description','—') }}</td>
             <td class="small text-muted">{{ exp.get('category','—') }}</td>
             <td class="fw-medium">{{ exp.get('vendor','—') }}</td>
             <td class="text-muted small">
@@ -1017,7 +1046,7 @@ a[href*="filter_expense"]:hover {
                 {{ exp.get('project_number','—') or '—' }}
               {% endif %}
             </td>
-            <td class="text-end fw-semibold">{{ currency_symbol }}{{ "{:,.2f}".format((exp.get('remaining_due',0) if exp.get('expense_type') == 'Commission' else exp.get('amount',0))|float) }}</td>
+            <td class="text-end fw-semibold exp-amount-cell">{{ currency_symbol }}{{ "{:,.2f}".format((exp.get('remaining_due',0) if exp.get('expense_type') == 'Commission' else exp.get('amount',0))|float) }}</td>
             <td class="small">
               {% set _sub = exp.get('submitted_by_name','') or exp.get('created_by','') or exp.get('submitted_by','') or '' %}
               <div class="text-muted">{{ _sub.split('@')[0].replace('.',' ').title() if '@' in _sub else (_sub or '—') }}</div>
@@ -1069,6 +1098,80 @@ a[href*="filter_expense"]:hover {
   </div>
 
 </div><!-- /tab-expenses -->
+
+{% if can_bulk_delete %}
+<script>
+// ── Tick expenses to delete several at once ──
+function expenseTicks(onlyChecked) {
+  return Array.from(document.querySelectorAll('#expenseTableBody .exp-tick'))
+    .filter(cb => (!onlyChecked || cb.checked));
+}
+function updateExpenseTicks() {
+  const ticked = expenseTicks(true);
+  const bar = document.getElementById('expBulkBar');
+  bar.classList.toggle('d-none', !ticked.length);
+  bar.classList.toggle('d-flex', ticked.length > 0);
+  const total = ticked.reduce((s, cb) => s + Number(cb.dataset.amount || 0), 0);
+  document.getElementById('expBulkCount').textContent = ticked.length + ' selected · ' + CURRENCY_SYMBOL +
+    total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  expenseTicks(false).forEach(cb => cb.closest('tr').classList.toggle('table-active', cb.checked));
+  const visible = expenseTicks(false).filter(cb => cb.offsetParent !== null);
+  const all = document.getElementById('expSelectAll');
+  const visTicked = visible.filter(cb => cb.checked).length;
+  all.checked = visible.length > 0 && visTicked === visible.length;
+  all.indeterminate = visTicked > 0 && visTicked < visible.length;
+}
+// Header box: only the expenses visible on this page (after search, filters and paging)
+function toggleAllExpenseTicks(on) {
+  expenseTicks(false).forEach(cb => { if (cb.offsetParent !== null) cb.checked = on; });
+  updateExpenseTicks();
+}
+function clearExpenseTicks() {
+  expenseTicks(false).forEach(cb => { cb.checked = false; });
+  updateExpenseTicks();
+}
+// Paging changes which rows are visible: refresh the header box
+document.addEventListener('click', e => { if (e.target.closest('#expensePagerWrap')) setTimeout(updateExpenseTicks, 0); });
+
+function bulkDeleteExpenses() {
+  const ticked = expenseTicks(true);
+  if (!ticked.length) return;
+  showDeleteConfirmation(
+    'Delete ' + ticked.length + ' expense(s)',
+    'Delete the ' + ticked.length + ' ticked expense(s)? Each one is archived for recovery.',
+    async function () {
+      const btn = document.getElementById('expBulkDeleteBtn');
+      const count = document.getElementById('expBulkCount');
+      btn.disabled = true;
+      let done = 0;
+      const failed = [];
+      // One at a time through the normal delete, so archiving, statement files and
+      // commission reversals all happen exactly as for a single delete
+      for (const cb of ticked) {
+        count.textContent = 'Deleting ' + (done + failed.length + 1) + ' of ' + ticked.length + '…';
+        try {
+          const fd = new FormData();
+          fd.append('page', expenseCurrentPage || 1);
+          const r = await fetch('/financial/expense/' + encodeURIComponent(cb.dataset.id) + '/delete',
+            { method: 'POST', body: fd, headers: { 'Accept': 'application/json' }, redirect: 'manual' });
+          if (r.type === 'opaqueredirect') { failed.push(cb.dataset.label + ' (login expired)'); break; }
+          if (r.ok) done++; else failed.push(cb.dataset.label);
+        } catch (e) {
+          failed.push(cb.dataset.label);
+        }
+      }
+      if (failed.length) {
+        alert(done + ' expense(s) deleted. These could not be deleted:\n\n' + failed.join('\n') +
+              '\n\nRefresh the page and try them again.');
+        window.location.href = '/financial?tab=expenses&page=' + (expenseCurrentPage || 1);
+      } else {
+        showSuccessToast('Expenses Deleted', done + ' expense(s) archived and removed from the list');
+        setTimeout(() => { window.location.href = '/financial?tab=expenses&page=' + (expenseCurrentPage || 1); }, 1500);
+      }
+    });
+}
+</script>
+{% endif %}
 
 <!-- ARCHIVED EXPENSES TAB ????????????????????????????????????????????????????? -->
 <div class="tab-pane fade {{ 'show active' if active_tab == 'archived-expenses' else '' }}" id="tab-archived-expenses">
@@ -1494,9 +1597,9 @@ function updateExpenseSummaryCards() {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   expenseFilteredRows.forEach(row => {
-    const amount = parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,₹]/g,'') || 0);
+    const amount = parseFloat(row.querySelector('td.exp-amount-cell')?.textContent.replace(/[$,₹]/g,'') || 0);
     const dateCell = row.querySelector('td:first-child')?.textContent?.trim() || '';
-    const expenseName = row.querySelector('td:nth-child(3)')?.textContent?.trim() || '';
+    const expenseName = row.querySelector('td.exp-name-cell')?.textContent?.trim() || '';
 
     filteredTotal += amount;
     filteredCount++;
@@ -1571,7 +1674,7 @@ function renderExpenseTable() {
   const currentPageRows = expenseFilteredRows.slice(start, end);
   currentPageRows.forEach(row => {
     row.style.display = '';
-    total += parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,₹]/g,'') || 0);
+    total += parseFloat(row.querySelector('td.exp-amount-cell')?.textContent.replace(/[$,₹]/g,'') || 0);
   });
 
   const alert = document.getElementById('expenseFilterAlert');
@@ -1584,7 +1687,7 @@ function renderExpenseTable() {
     const active = search || type || vendor || dateFrom || dateTo;
     alert.style.display = active ? '' : 'none';
     if (active) {
-      const grandTotal = expenseFilteredRows.reduce((sum, row) => sum + parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,₹]/g,'') || 0), 0);
+      const grandTotal = expenseFilteredRows.reduce((sum, row) => sum + parseFloat(row.querySelector('td.exp-amount-cell')?.textContent.replace(/[$,₹]/g,'') || 0), 0);
       alert.textContent = `Showing ${expenseFilteredRows.length} of ${rows.length} entries — ₹${grandTotal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} total`;
     }
   }
@@ -1806,9 +1909,9 @@ function resetExpenseSummaryCards() {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   allRows.forEach(row => {
-    const amount = parseFloat(row.querySelector('td:nth-child(7)')?.textContent.replace(/[$,₹]/g,'') || 0);
+    const amount = parseFloat(row.querySelector('td.exp-amount-cell')?.textContent.replace(/[$,₹]/g,'') || 0);
     const dateCell = row.querySelector('td:first-child')?.textContent?.trim() || '';
-    const expenseName = row.querySelector('td:nth-child(3)')?.textContent?.trim() || '';
+    const expenseName = row.querySelector('td.exp-name-cell')?.textContent?.trim() || '';
 
     allTotal += amount;
     allCount++;
@@ -1893,7 +1996,7 @@ function exportExpenseCSV() {
   const headers = ['Date','Expense Type','Expense Name','Category','Vendor','Project','Amount','Submitted By'];
   const lines = [headers.map(h => '"'+h+'"').join(',')];
   rows.forEach(function(row) {
-    const cells = row.querySelectorAll('td');
+    const cells = Array.from(row.querySelectorAll('td')).filter(td => !td.classList.contains('exp-tick-cell'));
     function cellText(i) {
       return (cells[i] ? cells[i].textContent.trim().replace(/\s+/g,' ') : '').replace(/"/g,'""');
     }
