@@ -25507,12 +25507,12 @@ _PDF_TEXT_DATE = re.compile(r"\b(?:(?P<m1>jan|feb|mar|apr|may|jun|jul|aug|sep|oc
                             r"nov|dec)[a-z]*\.?,?\s+(?P<y2>\d{4}))\b", re.I)
 # Section headings that say which way the lines below them go, e.g. "Other Debits From Your Account"
 _PDF_SECTIONS = [
-    ("balance", re.compile(r"daily (ledger )?balance", re.I)),
-    ("checks", re.compile(r"\bchecks? (paid|cleared)\b", re.I)),
-    ("debit", re.compile(r"\b(debits?|withdrawals?|payments?|fees)( and other \w+)? (from|out of) your account\b|"
-                         r"\bwithdrawals and (other )?(debits|subtractions)\b|\belectronic withdrawals\b", re.I)),
-    ("credit", re.compile(r"\b(credits?|deposits?)( and other \w+)? (to|into) your account\b|"
-                          r"\bdeposits and (other )?(credits|additions)\b", re.I)),
+    ("balance", re.compile(r"daily\s+(ledger\s+)?balance", re.I)),
+    ("checks", re.compile(r"\bchecks?\s+(paid|cleared)\b", re.I)),
+    ("debit", re.compile(r"\b(debits?|withdrawals?|payments?|fees)(\s+and\s+other\s+\w+)?\s+(from|out\s+of)\s+your\s+account\b|"
+                         r"\bwithdrawals\s+and\s+(other\s+)?(debits|subtractions)\b|\belectronic\s+withdrawals\b", re.I)),
+    ("credit", re.compile(r"\b(credits?|deposits?)(\s+and\s+other\s+\w+)?\s+(to|into)\s+your\s+account\b|"
+                          r"\bdeposits\s+and\s+(other\s+)?(credits|additions)\b", re.I)),
 ]
 # A paid check: "1080  09-15  11,800.00" (some PDFs glue the date onto the amount: "11,800.0009-15")
 _PDF_CHECK = re.compile(r"(?<!\S)(?P<no>\d{3,7})\*?\s+(?:(?P<d1>\d{1,2}[-/]\d{1,2}(?:[-/]\d{2,4})?)\s+)?"
@@ -25549,14 +25549,20 @@ def _pdf_money(match) -> dict:
             "sign": sign, "mark": mark, "cur": cur}
 
 
-def _statement_rows_from_pdf_text(reader):
+def _statement_rows_from_pdf_text(reader, warnings=None, ocr=False, totals_out=None):
     """Read transactions from a text-based (downloaded, not scanned) PDF bank or card statement, without AI.
 
     Each transaction line starts with a date and has its amount after the description. Bank statements
     with a running balance are read by how the balance moves; card statements and others by the sign or
     Cr/Dr mark on the amount. Returns (rows, credits, currency) - rows and credits are empty when the PDF
-    has no readable transaction lines (e.g. a scan); currency is "USD", "INR" or ""."""
-    entries, opening, full_text, section = [], None, [], None
+    has no readable transaction lines (e.g. a scan); currency is "USD", "INR" or "".
+
+    `warnings` (a list) gets a message for each section whose printed Total differs from its rows - a sign
+    of a misread amount in text recognition. With `ocr` (text read from a picture) rows whose date or amount
+    couldn't be read are kept, flagged date_unreadable / amount_unreadable, so they can be fixed by hand.
+    `totals_out` (a list) gets each printed payments Total as (total, line ids) instead of a warning, the ids
+    matching the rows' "_line", so the caller can check the Totals after correcting rows."""
+    entries, opening, full_text, section, totals = [], None, [], None, []
     for page in reader.pages:
         try:
             text = page.extract_text(extraction_mode="layout") or ""
@@ -25578,10 +25584,20 @@ def _statement_rows_from_pdf_text(reader):
                 for c in checks:
                     entries.append({"date_raw": c["d1"] or c["d2"], "description": f"Check #{c['no']}",
                                     "money": [_pdf_money(_PDF_MONEY.search(c["amt"]))],
-                                    "closed": True, "section": "debit"})
+                                    "closed": True, "section": "debit", "group": "checks"})
                 if checks:
                     continue
+            if ocr and m and not money and section in ("debit", "credit") and \
+                    re.search(r"[A-Za-z]{3}", m.group(2)) and re.search(r"\d\s*[.,]?\s*\S*\s*$", m.group(2)):
+                # A transaction line whose amount text recognition garbled ("3s .70", "0.613"): keep it to fill in
+                entries.append({"date_raw": m.group(1), "description": " ".join(m.group(2).split()[:-1]) or m.group(2).strip(),
+                                "money": [{"size": 0.0, "value": 0.0, "sign": "", "mark": "", "cur": ""}],
+                                "closed": False, "section": section, "amount_unreadable": m.group(2).split()[-1]})
+                continue
             if not m or not money:
+                if not m and money and section in ("debit", "credit") and re.match(r"\s*total\b", line, re.I):
+                    # A section's printed Total, checked against its rows below
+                    totals.append((section, _pdf_money(money[-1])["size"], len(entries)))
                 if not m and opening is None and money and \
                         re.search(r"opening\s+balance|balance\s+b/?f|brought forward", line, re.I):
                     opening = _pdf_money(money[-1])["value"]
@@ -25611,6 +25627,25 @@ def _statement_rows_from_pdf_text(reader):
     if not entries:
         return [], 0, ""
     doc_text = "\n".join(full_text)
+
+    # Each printed section Total should equal its rows since that section's previous Total
+    for i, e in enumerate(entries):
+        e["line"] = i
+    if warnings is not None or totals_out is not None:
+        start = {}
+        for sec, printed, end in totals:
+            span = [e for e in entries[start.get(sec, 0):end] if e.get("group", e.get("section")) == sec]
+            start[sec] = end
+            if totals_out is not None:
+                if sec == "debit" and span and all(len(e["money"]) == 1 for e in span):
+                    totals_out.append((printed, {e["line"] for e in span}))
+            elif span and all(len(e["money"]) == 1 for e in span):
+                found = round(sum(e["money"][0]["size"] for e in span), 2)
+                if abs(found - printed) > 0.005:
+                    name = "deposits" if sec == "credit" else "payments"
+                    warnings.append(f"The statement's Total for {name} is {printed:,.2f}, but the {len(span)} {name} "
+                                    f"read add up to {found:,.2f}. An amount was probably misread: compare each "
+                                    f"amount with the statement and correct it.")
 
     # Indian banks write 03/04/2026 for 3 April; switch only if a date proves month-first
     day_first = True
@@ -25687,13 +25722,19 @@ def _statement_rows_from_pdf_text(reader):
             direction, unknown = "debit", True
         if bal is not None:
             prev = bal
-        if not e["date"] or not tok["size"]:
+        if (not e["date"] and not ocr) or (not tok["size"] and not e.get("amount_unreadable")):
             continue
         if direction == "credit":
             credits += 1
             continue
         rows.append({"date": e["date"], "description": e["description"], "amount": round(tok["size"], 2),
                      "direction_unknown": unknown})
+        if totals_out is not None:
+            rows[-1]["_line"] = e["line"]
+        if not e["date"]:
+            rows[-1]["date_unreadable"] = e["date_raw"]
+        if e.get("amount_unreadable"):
+            rows[-1]["amount_unreadable"] = e["amount_unreadable"]
 
     curs = {x["cur"] for e in entries for x in e["money"] if x["cur"]}
     currency = "USD" if curs & {"$", "USD"} else ("INR" if curs else "")
@@ -25714,8 +25755,112 @@ def _ocr_statement_pages(texts):
     for text in texts if isinstance(texts, list) else []:
         t = re.sub(r"(?<=\d) +([.,]) *(?=\d)", r"\1", str(text or ""))
         t = re.sub(r"(?<=\d)[Oo](?=[\d.,-])|(?<=[\d.,-])[Oo](?=\d)", "0", t)
+        # A dash read as a space in a month-day date: "09 15" -> "09-15"
+        # (at the start of a line, or after a check number)
+        t = re.sub(r"(?m)^(\s*(?:\d{3,7}\s+)?)(0[1-9]|1[0-2]) ([0-3]\d)(?=\s)", r"\1\2-\3", t)
+        # Thousands dot read for a comma: "11.800.00" -> "11,800.00"
+        t = re.sub(r"(?<=\d)\.(?=\d{3}[.,]\d{2}(?!\d))", ",", t)
+        # A dropped decimal point at the end of a line: "464 27" -> "464.27"
+        t = re.sub(r"(?m)(?<=\d) (\d{2})[ |]*$", r".\1", t)
         pages.append(SimpleNamespace(extract_text=lambda extraction_mode=None, _t=t: _t))
     return SimpleNamespace(pages=pages)
+
+
+def _statement_rows_from_ocr(readings, warnings):
+    """Rows from one or more text-recognition readings of a picture statement (each a list of page texts).
+
+    The reading with the fewest problems (Totals not adding up, unreadable dates or amounts, lines whose
+    direction is unknown) is used. Its rows are paired by date with the other reading's: a row whose
+    partner has a different amount is flagged `recheck` (one of the two misread it), and payments only the
+    other reading found are reported."""
+    def totals_mismatch(rows, totals):
+        """Messages for printed payments Totals that the rows (as they are now) don't add up to."""
+        out = []
+        for printed, lines in totals:
+            span = [r for r in rows if r.get("_line") in lines]
+            found = round(sum(r["amount"] for r in span), 2)
+            if abs(found - printed) > 0.005:
+                out.append(f"The statement's Total for payments is {printed:,.2f}, but the {len(span)} payments read "
+                           f"add up to {found:,.2f}. An amount was probably misread: compare each amount with the "
+                           f"statement and correct it.")
+        return out
+
+    results = []
+    for n, pages in enumerate(readings):
+        totals = []
+        rows, credits, currency = _statement_rows_from_pdf_text(_ocr_statement_pages(pages), ocr=True, totals_out=totals)
+        problems = len(totals_mismatch(rows, totals)) + sum(
+            1 for r in rows if r.get("date_unreadable") or r.get("amount_unreadable") or r.get("direction_unknown"))
+        results.append({"problems": problems, "rows": rows, "credits": credits, "currency": currency,
+                        "totals": totals, "n": n})
+    if not results:
+        return [], 0, ""
+    results.sort(key=lambda x: (x["problems"], -len(x["rows"]), x["n"]))
+    best = results[0]
+    rows = best["rows"]
+    if len(results) > 1 and results[1]["rows"]:
+        alt = [r for r in results[1]["rows"] if not r.get("amount_unreadable") and not r.get("direction_unknown")]
+        used = set()
+        # Same date and amount: the readings agree
+        for r in rows:
+            k = next((j for j, a in enumerate(alt) if j not in used and a["date"] == r["date"] and a["amount"] == r["amount"]), None)
+            if k is not None:
+                used.add(k)
+                r["_agreed"] = True
+        # Same date, different amount: the next unpaired row of that date in the other reading
+        differ = []
+        for r in rows:
+            if r.pop("_agreed", False) or not r["date"]:
+                continue
+            k = next((j for j, a in enumerate(alt) if j not in used and a["date"] == r["date"]), None)
+            if k is None:
+                continue
+            used.add(k)
+            r["recheck"] = True
+            if r.get("amount_unreadable"):
+                # Only the other reading could read this amount: use it, to be checked
+                r["amount"] = alt[k]["amount"]
+                del r["amount_unreadable"]
+            else:
+                differ.append(alt[k]["amount"])
+        extra = [a for j, a in enumerate(alt) if j not in used and a["date"] and
+                 not any(r["date"] == a["date"] and r.get("amount_unreadable") for r in rows)]
+        filled = sum(1 for r in rows if r.get("recheck")) - len(differ)
+        if differ:
+            warnings.append(f"A second reading of the picture gave different amounts for {len(differ)} row(s), highlighted "
+                            f"in yellow (it read " + ", ".join(f"{a:,.2f}" for a in differ[:8]) + "). "
+                            f"Compare them with the statement.")
+        if filled:
+            warnings.append(f"{filled} amount(s) could only be read once and are highlighted in yellow. Check them "
+                            f"against the statement.")
+    # Totals checked on the final rows (after amounts filled in from the second reading)
+    warnings[:0] = totals_mismatch(rows, best["totals"])
+    # Rows under a printed Total that matches are confirmed. Others (e.g. checks, which have no Total) can be
+    # misread the same way in both readings, so when some rows are confirmed the rest are highlighted.
+    confirmed = set()
+    for printed, lines in best["totals"]:
+        if not totals_mismatch(rows, [(printed, lines)]):
+            confirmed |= lines
+    unconfirmed = [r for r in rows if r.get("_line") not in confirmed and not r.get("recheck")]
+    if confirmed and unconfirmed:
+        for r in unconfirmed:
+            r["recheck"] = True
+        warnings.append(f"{len(unconfirmed)} amount(s) have no statement Total to check them against (such as checks) "
+                        f"and are highlighted in yellow. Compare them with the statement.")
+    elif not best["totals"]:
+        warnings.append("This statement has no Totals to check the amounts against. Compare each amount with the statement.")
+    for r in rows:
+        r.pop("_line", None)
+        if extra:
+            warnings.append("A second reading also found payment(s) not in this list: " + ", ".join(
+                f"{a['amount']:,.2f} on {a['date']}" for a in extra[:8]) + ". Check the statement for any missing row.")
+    undated = sum(1 for r in rows if r.get("date_unreadable"))
+    if undated:
+        warnings.append(f"{undated} row(s) have a date that couldn't be read (outlined in red). Enter it from the statement.")
+    no_amount = sum(1 for r in rows if r.get("amount_unreadable"))
+    if no_amount:
+        warnings.append(f"{no_amount} row(s) have an amount that couldn't be read (outlined in red). Enter it from the statement.")
+    return rows, best["credits"], best["currency"]
 
 
 def _statement_rows_from_pdf(raw: bytes, expense_types, categories_by_type):
@@ -25780,20 +25925,24 @@ def bank_statement_parse():
     if not raw.strip():
         return jsonify({"error": "This file is empty. Download the statement from your bank again and re-upload it."}), 400
     expense_types, categories_by_type = _expense_type_options()
-    notes = []
+    notes, warnings = [], []  # warnings: problems to fix before importing, shown in full
     try:
         needs_suggestions, currency = True, ""
         ocr_text = request.form.get("ocr_text")
         if f.filename.lower().endswith(".pdf") and ocr_text:
-            # A picture PDF the browser already read (free text recognition on the user's computer)
+            # A picture PDF the browser already read (free text recognition on the user's computer), as a
+            # list of readings - each a list of page texts - made with different image clean-ups
             try:
-                pages = json.loads(ocr_text)
+                readings = json.loads(ocr_text)
             except ValueError:
-                pages = []
-            rows, credits, currency = _statement_rows_from_pdf_text(_ocr_statement_pages(pages))
+                readings = []
+            readings = [p for p in readings if isinstance(p, list)] if isinstance(readings, list) else []
+            rows, credits, currency = _statement_rows_from_ocr(readings, warnings)
             if not rows and not credits:
                 raise ValueError("The picture was read, but no transactions were found in it. Make sure the picture "
                                  "is sharp and shows the transaction lines (date, description, amount).")
+            for r in rows:
+                r["from_picture"] = True  # date and amount can be corrected on the review screen
             notes.append("This statement is a picture, so its text was read by text recognition. Check each "
                          "date, amount and description against the statement before importing.")
         elif f.filename.lower().endswith(".pdf"):
@@ -25830,7 +25979,7 @@ def bank_statement_parse():
             # The books are kept in rupees: convert at the rate set in Settings, keeping the dollar figure
             rate = _safe_float((load_settings().get("company") or {}).get("bdt_exchange_rate", 0)) or 110
             for r in rows:
-                r["original_amount"], r["original_currency"] = r["amount"], "USD"
+                r["original_amount"], r["original_currency"], r["usd_rate"] = r["amount"], "USD", rate
                 r["amount"] = round(r["amount"] * rate, 2)
             notes.append(f"This statement is in US dollars. Amounts were converted at {CURRENCY_SYMBOL}{rate:g} "
                          f"per $1 (Settings → Company → INR Exchange Rate); the $ amount is kept in each expense's notes.")
@@ -25885,7 +26034,7 @@ def bank_statement_parse():
         for k in ("expense_type", "category", "vendor"):
             r.setdefault(k, "")
 
-    return jsonify({"rows": rows, "credits_skipped": credits, "ai_note": " ".join(notes),
+    return jsonify({"rows": rows, "credits_skipped": credits, "ai_note": " ".join(notes), "warnings": warnings,
                     "expense_types": expense_types, "categories_by_type": categories_by_type})
 
 
@@ -25906,6 +26055,14 @@ def bank_statement_import():
     if no_vendor:
         return jsonify({"success": False, "error": f"{len(no_vendor)} ticked row(s) have no vendor. "
                                                    f"Enter a vendor for each, or untick them."}), 400
+    no_date = [r for r in rows if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(r.get("date") or ""))]
+    if no_date:
+        return jsonify({"success": False, "error": f"{len(no_date)} ticked row(s) have no date. "
+                                                   f"Enter the date from the statement, or untick them."}), 400
+    no_amount = [r for r in rows if _safe_float(r.get("amount")) <= 0]
+    if no_amount:
+        return jsonify({"success": False, "error": f"{len(no_amount)} ticked row(s) have no amount. "
+                                                   f"Enter the amount from the statement, or untick them."}), 400
     batch_id = f"imp_{uuid.uuid4().hex[:16]}"
 
     # Keep the uploaded statement with the import so it can be opened later
