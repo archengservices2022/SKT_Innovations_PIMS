@@ -25514,6 +25514,25 @@ _PDF_SECTIONS = [
     ("credit", re.compile(r"\b(credits?|deposits?)(\s+and\s+other\s+\w+)?\s+(to|into)\s+your\s+account\b|"
                           r"\bdeposits\s+and\s+(other\s+)?(credits|additions)\b", re.I)),
 ]
+# Any other short heading for one direction, e.g. "ATM & DEBIT CARD WITHDRAWALS" or "Deposits and Additions".
+# Column headers ("Withdrawals  Deposits  Balance") name both or a column word, so they don't count.
+_PDF_DEBIT_HEADING = re.compile(r"\b(withdrawals?|debits?|purchases|fees|charges)\b", re.I)
+_PDF_CREDIT_HEADING = re.compile(r"\b(deposits?|credits?|additions)\b", re.I)
+_PDF_NOT_HEADING = re.compile(r"\b(date|amount|balance|description|narration|particulars|total|credit card)\b|\d", re.I)
+
+
+def _pdf_section_of(line):
+    """The section a heading line starts ("balance", "checks", "debit", "credit"), or None."""
+    for name, pattern in _PDF_SECTIONS:
+        if pattern.search(line):
+            return name
+    if len(line.split()) > 7 or _PDF_NOT_HEADING.search(line):
+        return None
+    debit, credit = bool(_PDF_DEBIT_HEADING.search(line)), bool(_PDF_CREDIT_HEADING.search(line))
+    return None if debit and credit and not re.search(r"payments? and", line, re.I) else \
+        "debit" if debit else "credit" if credit else None
+
+
 # A paid check: "1080  09-15  11,800.00" (some PDFs glue the date onto the amount: "11,800.0009-15")
 _PDF_CHECK = re.compile(r"(?<!\S)(?P<no>\d{3,7})\*?\s+(?:(?P<d1>\d{1,2}[-/]\d{1,2}(?:[-/]\d{2,4})?)\s+)?"
                         r"\$?(?P<amt>\d[\d,]*\.\d{2})(?P<d2>\d{1,2}[-/]\d{1,2}(?:[-/]\d{2,4})?)?")
@@ -25575,10 +25594,7 @@ def _statement_rows_from_pdf_text(reader, warnings=None, ocr=False, totals_out=N
             m = _PDF_TXN_LINE.match(line)
             money = list(_PDF_MONEY.finditer(line))
             if not m and not money and len(line.strip()) < 60:
-                for name, pattern in _PDF_SECTIONS:
-                    if pattern.search(line):
-                        section = name
-                        break
+                section = _pdf_section_of(line) or section
             if section == "checks" and not m:
                 checks = [c for c in _PDF_CHECK.finditer(line) if c["d1"] or c["d2"]]
                 for c in checks:
@@ -25636,16 +25652,17 @@ def _statement_rows_from_pdf_text(reader, warnings=None, ocr=False, totals_out=N
         for sec, printed, end in totals:
             span = [e for e in entries[start.get(sec, 0):end] if e.get("group", e.get("section")) == sec]
             start[sec] = end
-            if totals_out is not None:
-                if sec == "debit" and span and all(len(e["money"]) == 1 for e in span):
-                    totals_out.append((printed, {e["line"] for e in span}))
-            elif span and all(len(e["money"]) == 1 for e in span):
+            if not span or not all(len(e["money"]) == 1 for e in span):
+                continue
+            if totals_out is not None and sec == "debit":
+                totals_out.append((printed, {e["line"] for e in span}))
+            else:
                 found = round(sum(e["money"][0]["size"] for e in span), 2)
-                if abs(found - printed) > 0.005:
+                if warnings is not None and abs(found - printed) > 0.005:
                     name = "deposits" if sec == "credit" else "payments"
                     warnings.append(f"The statement's Total for {name} is {printed:,.2f}, but the {len(span)} {name} "
-                                    f"read add up to {found:,.2f}. An amount was probably misread: compare each "
-                                    f"amount with the statement and correct it.")
+                                    f"read add up to {found:,.2f}. Some rows may be misread, or under the wrong "
+                                    f"heading: compare them with the statement.")
 
     # Indian banks write 03/04/2026 for 3 April; switch only if a date proves month-first
     day_first = True
@@ -25659,14 +25676,16 @@ def _statement_rows_from_pdf_text(reader, warnings=None, ocr=False, totals_out=N
 
     # Card statements often print dates without a year: take it from the latest full date on the statement
     latest = None
+    # A statement can't be from a future year (text recognition can read 2026 as 2028)
+    last_year = datetime.now().year if ocr else 2099
     for a, b, y in _PDF_FULL_DATE.findall(doc_text):
         d, mo = (int(a), int(b)) if day_first else (int(b), int(a))
-        if 1 <= mo <= 12 and 1 <= d <= 31 and 1990 < int(y) < 2100:
+        if 1 <= mo <= 12 and 1 <= d <= 31 and 1990 < int(y) <= last_year:
             latest = max(latest or (0, 0), (int(y), mo))
     if latest is None:
         for t in _PDF_TEXT_DATE.finditer(doc_text):
             y, mo = int(t["y1"] or t["y2"]), _MONTHS[(t["m1"] or t["m2"]).lower()[:3]]
-            if 1990 < y < 2100:
+            if 1990 < y <= last_year:
                 latest = max(latest or (0, 0), (y, mo))
     for e in entries:
         raw_date = e["date_raw"]
@@ -25715,7 +25734,8 @@ def _statement_rows_from_pdf_text(reader, warnings=None, ocr=False, totals_out=N
             # On a card statement a minus is a payment or refund; on a bank statement it's money out
             direction = "credit" if is_card else "debit"
         elif is_card:
-            direction = "debit"
+            # The minus on a card payment can be faint or missing; its wording isn't
+            direction = "credit" if re.search(r"\bPAYMENT\W*(THANK ?YOU|RECEIVED)\b", e["description"], re.I) else "debit"
         elif _CREDIT_HINT.search(e["description"]) or any_negative:
             direction = "credit"
         else:
@@ -25787,15 +25807,18 @@ def _statement_rows_from_ocr(readings, warnings):
 
     results = []
     for n, pages in enumerate(readings):
-        totals = []
-        rows, credits, currency = _statement_rows_from_pdf_text(_ocr_statement_pages(pages), ocr=True, totals_out=totals)
-        problems = len(totals_mismatch(rows, totals)) + sum(
+        totals, deposit_warnings = [], []
+        rows, credits, currency = _statement_rows_from_pdf_text(_ocr_statement_pages(pages), deposit_warnings,
+                                                                ocr=True, totals_out=totals)
+        problems = len(totals_mismatch(rows, totals)) + len(deposit_warnings) + sum(
             1 for r in rows if r.get("date_unreadable") or r.get("amount_unreadable") or r.get("direction_unknown"))
         results.append({"problems": problems, "rows": rows, "credits": credits, "currency": currency,
-                        "totals": totals, "n": n})
+                        "totals": totals, "deposit_warnings": deposit_warnings, "n": n})
     if not results:
         return [], 0, ""
-    results.sort(key=lambda x: (x["problems"], -len(x["rows"]), x["n"]))
+    # Lines one reading found and the other didn't count as problems for the one that missed them
+    most = max(len(x["rows"]) + x["credits"] for x in results)
+    results.sort(key=lambda x: (x["problems"] + most - len(x["rows"]) - x["credits"], -len(x["rows"]), x["n"]))
     best = results[0]
     rows = best["rows"]
     if len(results) > 1 and results[1]["rows"]:
@@ -25833,8 +25856,11 @@ def _statement_rows_from_ocr(readings, warnings):
         if filled:
             warnings.append(f"{filled} amount(s) could only be read once and are highlighted in yellow. Check them "
                             f"against the statement.")
+        if extra:
+            warnings.append("A second reading also found payment(s) not in this list: " + ", ".join(
+                f"{a['amount']:,.2f} on {a['date']}" for a in extra[:8]) + ". Check the statement for any missing row.")
     # Totals checked on the final rows (after amounts filled in from the second reading)
-    warnings[:0] = totals_mismatch(rows, best["totals"])
+    warnings[:0] = totals_mismatch(rows, best["totals"]) + best["deposit_warnings"]
     # Rows under a printed Total that matches are confirmed. Others (e.g. checks, which have no Total) can be
     # misread the same way in both readings, so when some rows are confirmed the rest are highlighted.
     confirmed = set()
@@ -25851,9 +25877,6 @@ def _statement_rows_from_ocr(readings, warnings):
         warnings.append("This statement has no Totals to check the amounts against. Compare each amount with the statement.")
     for r in rows:
         r.pop("_line", None)
-        if extra:
-            warnings.append("A second reading also found payment(s) not in this list: " + ", ".join(
-                f"{a['amount']:,.2f} on {a['date']}" for a in extra[:8]) + ". Check the statement for any missing row.")
     undated = sum(1 for r in rows if r.get("date_unreadable"))
     if undated:
         warnings.append(f"{undated} row(s) have a date that couldn't be read (outlined in red). Enter it from the statement.")
@@ -25939,36 +25962,41 @@ def bank_statement_parse():
             readings = [p for p in readings if isinstance(p, list)] if isinstance(readings, list) else []
             rows, credits, currency = _statement_rows_from_ocr(readings, warnings)
             if not rows and not credits:
-                raise ValueError("The picture was read, but no transactions were found in it. Make sure the picture "
-                                 "is sharp and shows the transaction lines (date, description, amount).")
+                raise ValueError("The statement was read, but no transactions were found in it. If it's a picture, make "
+                                 "sure it's sharp and shows the transaction lines (date, description, amount). If it is, "
+                                 "its layout may be new: send this PDF to the PIMS admin so it can be added.")
             for r in rows:
                 r["from_picture"] = True  # date and amount can be corrected on the review screen
+            skipped = int(request.form.get("ocr_pages_skipped") or 0)
+            if skipped:
+                warnings.append(f"Only the first pages were read: {skipped} more page(s) of this PDF weren't. Upload "
+                                f"them as a separate PDF.")
             notes.append("This statement is a picture, so its text was read by text recognition. Check each "
                          "date, amount and description against the statement before importing.")
         elif f.filename.lower().endswith(".pdf"):
             reader = _open_statement_pdf(raw, request.form.get("pdf_password", ""))
-            rows, credits, currency = _statement_rows_from_pdf_text(reader)
+            rows, credits, currency = _statement_rows_from_pdf_text(reader, warnings)
             if not rows and not credits:
-                # No text lines to read (usually a scanned statement): only AI can read it
+                # No readable lines: a scan or picture (some scanners add a garbled text layer). AI reads it when
+                # it's available, otherwise the page reads the picture itself in the browser and sends the text back.
                 try:
                     rows, credits = _statement_rows_from_pdf(raw, expense_types, categories_by_type)
                     needs_suggestions = False
-                except RuntimeError as e:
-                    has_text = False
-                    for page in reader.pages:
-                        try:
-                            has_text = bool((page.extract_text() or "").strip())
-                        except Exception:
-                            pass
-                        if has_text:
-                            break
-                    if not has_text:
-                        # The page reads the picture itself (in the browser) and sends the text back
-                        return jsonify({"needs_ocr": True, "error": "This PDF is a picture, so its text has to be "
-                                        "read by text recognition."}), 422
-                    raise ValueError("This PDF has text, but its layout isn't one the app recognises yet, and AI isn't "
-                                     "available to read it: " + str(e) + " Download the statement as Excel or CSV "
-                                     "from your bank, or send this PDF to the PIMS admin so its layout can be added.")
+                except Exception as e:
+                    log.info(f"Statement needs browser text recognition (AI unavailable: {e})")
+                    return jsonify({"needs_ocr": True, "error": "This PDF has to be read by text recognition."}), 422
+            else:
+                # A mix of text and picture pages: the picture pages' rows would otherwise go unnoticed
+                picture_pages = []
+                for n, page in enumerate(reader.pages, 1):
+                    try:
+                        if not (page.extract_text() or "").strip() and len(page.images):
+                            picture_pages.append(n)
+                    except Exception as e:
+                        log.warning(f"Statement page {n} couldn't be checked for pictures: {e}")
+                if picture_pages:
+                    warnings.append("Page(s) " + ", ".join(map(str, picture_pages)) + " of this PDF are pictures and "
+                                    "weren't read. If they have transactions on them, add those rows by hand.")
         else:
             table = _read_statement_table(f.filename, raw)
             rows, credits = _statement_rows_from_table(table)

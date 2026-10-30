@@ -3008,6 +3008,74 @@ function bankCleanPicture(source, mode) {
   return out;
 }
 
+// A copy of a canvas turned clockwise by a quarter-turn multiple, optionally scaled down
+function bankTurn(canvas, degrees, scale) {
+  const swap = degrees % 180 !== 0, out = document.createElement('canvas');
+  out.width = (swap ? canvas.height : canvas.width) * scale;
+  out.height = (swap ? canvas.width : canvas.height) * scale;
+  const ctx = out.getContext('2d');
+  ctx.translate(out.width / 2, out.height / 2);
+  ctx.rotate(degrees * Math.PI / 180);
+  ctx.drawImage(canvas, -canvas.width * scale / 2, -canvas.height * scale / 2, canvas.width * scale, canvas.height * scale);
+  return out;
+}
+
+// A copy with scanner specks removed: each pixel becomes the median of the 5x5 square around it (a sliding
+// histogram per row keeps this fast on full pages)
+function bankDespeckle(canvas) {
+  const w = canvas.width, h = canvas.height, r = 2, half = ((2 * r + 1) ** 2 - 1) / 2;
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const ctx = out.getContext('2d');
+  ctx.drawImage(canvas, 0, 0);
+  const img = ctx.getImageData(0, 0, w, h), px = img.data, gray = new Uint8Array(w * h);
+  for (let i = 0; i < gray.length; i++) gray[i] = (px[4 * i] + px[4 * i + 1] + px[4 * i + 2]) / 3;
+  const at = (x, y) => gray[Math.max(0, Math.min(h - 1, y)) * w + Math.max(0, Math.min(w - 1, x))];
+  for (let y = 0; y < h; y++) {
+    const hist = new Uint16Array(256);
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) hist[at(dx, y + dy)]++;
+    for (let x = 0; x < w; x++) {
+      let seen = 0, v = 0;
+      while ((seen += hist[v]) <= half) v++;
+      px[4 * (y * w + x)] = px[4 * (y * w + x) + 1] = px[4 * (y * w + x) + 2] = v;
+      for (let dy = -r; dy <= r; dy++) { hist[at(x - r, y + dy)]--; hist[at(x + r + 1, y + dy)]++; }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return out;
+}
+
+// Share of dark pixels that are isolated dots: nothing else dark on a ring around them, which text never is.
+// Despeckling only helps pages that have such dots, and thins the text on others.
+function bankSpeckShare(canvas) {
+  const w = canvas.width, h = canvas.height, r = 8, px = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+  const dark = (x, y) => px[4 * (y * w + x) + 1] < 110;
+  const ring = [[r, 0], [-r, 0], [0, r], [0, -r], [6, 6], [-6, 6], [6, -6], [-6, -6]];
+  let total = 0, isolated = 0;
+  for (let y = r; y < h - r; y += 2) {
+    for (let x = r; x < w - r; x += 2) {
+      if (!dark(x, y)) continue;
+      total++;
+      if (!ring.some(([dx, dy]) => dark(x + dx, y + dy))) isolated++;
+    }
+  }
+  return total ? isolated / total : 0;
+}
+
+// Pages scanned sideways or upside down read as nonsense: when a small test reading scores badly, turn
+// the page to whichever way reads best
+async function bankUprightPage(worker, canvas) {
+  const scale = Math.min(1, 1500 / Math.max(canvas.width, canvas.height));
+  const score = async degrees => (await worker.recognize(bankTurn(canvas, degrees, scale))).data.confidence;
+  let bestScore = await score(0), best = 0;
+  if (bestScore >= 70) return canvas;
+  for (const degrees of [90, 180, 270]) {
+    const turned = await score(degrees);
+    if (turned > bestScore) { bestScore = turned; best = degrees; }
+  }
+  return best ? bankTurn(canvas, best, 1) : canvas;
+}
+
 async function bankOcrPdf(file, password, onProgress) {
   await bankLoadScript(BANK_PDFJS + 'pdf.min.js');
   await bankLoadScript(BANK_TESSERACT);
@@ -3017,6 +3085,7 @@ async function bankOcrPdf(file, password, onProgress) {
   const worker = await Tesseract.createWorker('eng');
   await worker.setParameters({ preserve_interword_spaces: '1' });
   const plain = [], full = [];  // two readings of every page, compared on the server
+  plain.skipped = Math.max(0, pdf.numPages - count);
   try {
     for (let n = 1; n <= count; n++) {
       onProgress('Reading page ' + n + ' of ' + count + ' of the picture (twice, to double-check)...');
@@ -3028,8 +3097,10 @@ async function bankOcrPdf(file, password, onProgress) {
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      plain.push((await worker.recognize(bankCleanPicture(canvas, 'plain'))).data.text);
-      full.push((await worker.recognize(bankCleanPicture(canvas, 'full'))).data.text);
+      const upright = await bankUprightPage(worker, canvas);
+      plain.push((await worker.recognize(bankCleanPicture(upright, 'plain'))).data.text);
+      const spotless = bankSpeckShare(upright) > 0.18 ? bankDespeckle(upright) : upright;
+      full.push((await worker.recognize(bankCleanPicture(spotless, 'full'))).data.text);
     }
   } finally {
     await worker.terminate();
@@ -3059,7 +3130,10 @@ function readBankStatement(ocrPages) {
   const fd = new FormData();
   fd.append('statement', file);
   fd.append('pdf_password', document.getElementById('bankPdfPassword').value);
-  if (ocrPages) fd.append('ocr_text', JSON.stringify(ocrPages));
+  if (ocrPages) {
+    fd.append('ocr_text', JSON.stringify(ocrPages));
+    fd.append('ocr_pages_skipped', ocrPages[0].skipped || 0);
+  }
   fetch('/financial/bank-statement/parse', { method: 'POST', body: fd })
     .then(bankJson)
     .then(res => {
