@@ -20012,15 +20012,46 @@ def export_balance_sheet(fmt):
 
         if fmt == "csv":
             import csv, io as _io
-            months = data["month_labels"]
             out = _io.StringIO()
+            out.write("﻿")  # UTF-8 marker so Excel shows "—" and non-English names correctly
             w = csv.writer(out)
-            w.writerow(["Month", "Revenue", "Expenses", "Net Profit"])
-            for i, m in enumerate(months):
-                rev = data["monthly_revenue"][i]
-                exp = data["monthly_expenses"][i]
-                w.writerow([m, f"{rev:.2f}", f"{exp:.2f}", f"{rev - exp:.2f}"])
-            w.writerow(["Total", f"{data['total_revenue']:.2f}", f"{data['total_expenses']:.2f}", f"{data['net_profit']:.2f}"])
+
+            def write_section(data):
+                """Monthly table, totals, salary and expense breakdowns - the same sections as the PDF."""
+                w.writerow([data["period_title"]])
+                w.writerow(["Month", "Revenue", "Expenses", "Net Profit"])
+                for m, rev, exp in zip(data["month_labels"], data["monthly_revenue"], data["monthly_expenses"]):
+                    w.writerow([m, f"{rev:.2f}", f"{exp:.2f}", f"{rev - exp:.2f}"])
+                w.writerow(["Total", f"{data['total_revenue']:.2f}", f"{data['total_expenses']:.2f}", f"{data['net_profit']:.2f}"])
+                w.writerow([])
+                for title, items in (("Salary - Inside America", data["salary_inside"]),
+                                     ("Salary - Outside America", data["salary_outside"])):
+                    w.writerow([title])
+                    w.writerow(["Employee", "Amount"])
+                    for name in sorted(items):
+                        w.writerow([name, f"{items[name]:.2f}"])
+                    if not items:
+                        w.writerow(["No records", ""])
+                    w.writerow(["Total", f"{sum(items.values()):.2f}"])
+                    w.writerow([])
+                breakdown = data["expense_breakdown"]
+                w.writerow(["Expense Breakdown"])
+                w.writerow(["Expense Item", "Amount"])
+                for name in sorted(breakdown, key=lambda n: breakdown[n], reverse=True):
+                    w.writerow([name, f"{breakdown[name]:.2f}"])
+                if not breakdown:
+                    w.writerow(["No records", ""])
+                w.writerow(["Total", f"{data['total_expenses']:.2f}"])
+
+            write_section(data)
+            if data["long_period"]:
+                # Each year of a long period again on its own, like the PDF pages and Excel sheets
+                from datetime import date as _date
+                for yr in range(start.year, end.year + 1):
+                    w.writerow([])
+                    w.writerow([])
+                    w.writerow([f"Year {yr}"])
+                    write_section(_compute_balance_sheet_data(max(start, _date(yr, 1, 1)), min(end, _date(yr, 12, 31))))
             return _export_response(out, "csv", f"balance_sheet_{file_tag}")
 
         if fmt == "pdf":
