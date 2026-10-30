@@ -25776,9 +25776,22 @@ def bank_statement_parse():
                     rows, credits = _statement_rows_from_pdf(raw, expense_types, categories_by_type)
                     needs_suggestions = False
                 except RuntimeError as e:
-                    raise ValueError("Couldn't find any transactions in this PDF. It may be a scanned image, which "
-                                     "needs AI to read, and AI isn't available right now: " + str(e) +
-                                     " Download the statement as Excel or CSV from your bank instead.")
+                    has_text = False
+                    for page in reader.pages:
+                        try:
+                            has_text = bool((page.extract_text() or "").strip())
+                        except Exception:
+                            pass
+                        if has_text:
+                            break
+                    if not has_text:
+                        raise ValueError("This PDF is a picture (a scan, phone photo or screenshot saved as PDF), so "
+                                         "there's no text in it for the app to read. Use the PDF downloaded from net "
+                                         "banking, or download the statement as Excel or CSV. Reading pictures needs AI, "
+                                         "which isn't available right now: " + str(e))
+                    raise ValueError("This PDF has text, but its layout isn't one the app recognises yet, and AI isn't "
+                                     "available to read it: " + str(e) + " Download the statement as Excel or CSV "
+                                     "from your bank, or send this PDF to the PIMS admin so its layout can be added.")
         else:
             table = _read_statement_table(f.filename, raw)
             rows, credits = _statement_rows_from_table(table)
