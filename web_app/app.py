@@ -25699,7 +25699,23 @@ def _statement_rows_from_pdf_text(reader):
     currency = "USD" if curs & {"$", "USD"} else ("INR" if curs else "")
     if not currency and (_USD_HEADING.search(doc_text) or re.search(r"(?<![A-Za-z])\$\s?\d", doc_text)):
         currency = "USD"
+    # No currency printed (common in pictures of statements): US-only banking words, and nothing Indian
+    if not currency and re.search(r"\b(ACH|Checks? Paid|POS Sig|Zelle|Routing Number)\b", doc_text, re.I) \
+            and not re.search(r"\b(UPI|NEFT|IMPS|RTGS|IFSC|INR|Rs\.?)\b|₹", doc_text, re.I):
+        currency = "USD"
     return rows, credits, currency
+
+
+def _ocr_statement_pages(texts):
+    """Page objects like a PdfReader's for text read from a picture PDF in the browser (Tesseract), tidied
+    for the parser: "68 .51" -> "68.51", and the letter O read inside a number -> 0."""
+    from types import SimpleNamespace
+    pages = []
+    for text in texts if isinstance(texts, list) else []:
+        t = re.sub(r"(?<=\d) +([.,]) *(?=\d)", r"\1", str(text or ""))
+        t = re.sub(r"(?<=\d)[Oo](?=[\d.,-])|(?<=[\d.,-])[Oo](?=\d)", "0", t)
+        pages.append(SimpleNamespace(extract_text=lambda extraction_mode=None, _t=t: _t))
+    return SimpleNamespace(pages=pages)
 
 
 def _statement_rows_from_pdf(raw: bytes, expense_types, categories_by_type):
@@ -25767,7 +25783,20 @@ def bank_statement_parse():
     notes = []
     try:
         needs_suggestions, currency = True, ""
-        if f.filename.lower().endswith(".pdf"):
+        ocr_text = request.form.get("ocr_text")
+        if f.filename.lower().endswith(".pdf") and ocr_text:
+            # A picture PDF the browser already read (free text recognition on the user's computer)
+            try:
+                pages = json.loads(ocr_text)
+            except ValueError:
+                pages = []
+            rows, credits, currency = _statement_rows_from_pdf_text(_ocr_statement_pages(pages))
+            if not rows and not credits:
+                raise ValueError("The picture was read, but no transactions were found in it. Make sure the picture "
+                                 "is sharp and shows the transaction lines (date, description, amount).")
+            notes.append("This statement is a picture, so its text was read by text recognition. Check each "
+                         "date, amount and description against the statement before importing.")
+        elif f.filename.lower().endswith(".pdf"):
             reader = _open_statement_pdf(raw, request.form.get("pdf_password", ""))
             rows, credits, currency = _statement_rows_from_pdf_text(reader)
             if not rows and not credits:
@@ -25785,10 +25814,9 @@ def bank_statement_parse():
                         if has_text:
                             break
                     if not has_text:
-                        raise ValueError("This PDF is a picture (a scan, phone photo or screenshot saved as PDF), so "
-                                         "there's no text in it for the app to read. Use the PDF downloaded from net "
-                                         "banking, or download the statement as Excel or CSV. Reading pictures needs AI, "
-                                         "which isn't available right now: " + str(e))
+                        # The page reads the picture itself (in the browser) and sends the text back
+                        return jsonify({"needs_ocr": True, "error": "This PDF is a picture, so its text has to be "
+                                        "read by text recognition."}), 422
                     raise ValueError("This PDF has text, but its layout isn't one the app recognises yet, and AI isn't "
                                      "available to read it: " + str(e) + " Download the statement as Excel or CSV "
                                      "from your bank, or send this PDF to the PIMS admin so its layout can be added.")
