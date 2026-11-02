@@ -190,7 +190,11 @@
           </select>
           {% endif %}
         </div>
-        <button type="button" class="btn btn-sm btn-primary" id="loadBtn" style="display:none;white-space:nowrap;padding:0.5rem 1rem;" onclick="openLoadModal()"></button>
+        <div class="d-flex align-items-center gap-2">
+          <span class="small text-muted" id="loadHiddenNote" style="display:none;"></span>
+          <button type="button" class="btn btn-sm btn-link p-0" id="loadClearBtn" style="display:none;white-space:nowrap;" onclick="clearProjectTicks()">Clear ticks</button>
+          <button type="button" class="btn btn-sm btn-primary" id="loadBtn" style="display:none;white-space:nowrap;padding:0.5rem 1rem;" onclick="openLoadModal()"></button>
+        </div>
       </div>
       <div class="d-flex gap-2 align-items-center flex-wrap">
         <span class="text-muted small" style="min-width:75px;">Start date:</span>
@@ -600,9 +604,9 @@ function updateRangeSelection(event) {
   const start = Math.min(startIdx, currentIdx);
   const end = Math.max(startIdx, currentIdx);
 
-  // Clear and select range
+  // Clear and select range (ticks outside the current filter stay)
   rows.forEach(r => r.classList.remove('table-active'));
-  window.selectedProjects = [];
+  window.selectedProjects = projectsNotListed();
 
   rows.slice(start, end + 1).forEach(r => {
     r.classList.add('table-active');
@@ -657,10 +661,10 @@ function selectProject(event, projectId) {
       }
     }
   } else {
-    // Single click: select only this
+    // Single click: select only this (ticks outside the current filter stay)
     document.querySelectorAll('.project-row.table-active').forEach(r => r.classList.remove('table-active'));
     row.classList.add('table-active');
-    window.selectedProjects = [projectId];
+    window.selectedProjects = [...projectsNotListed().filter(id => id !== projectId), projectId];
   }
 
   lastSelectedRow = row;
@@ -701,6 +705,7 @@ function syncProjectChecks() {
   const visible = [];
   document.querySelectorAll('#projectsTableBody .proj-select').forEach(cb => {
     cb.checked = window.selectedProjects.includes(cb.dataset.id);
+    cb.closest('.project-row').classList.toggle('table-active', cb.checked);
     if (cb.offsetParent !== null) visible.push(cb);
   });
   const all = document.getElementById('projSelectAll');
@@ -720,6 +725,39 @@ function updateLoadButton() {
   } else {
     btn.style.display = 'none';
   }
+  const hidden = projectsNotListed().length;
+  const note = document.getElementById('loadHiddenNote');
+  note.textContent = hidden + ' ticked project(s) not in this list';
+  note.style.display = hidden ? 'inline' : 'none';
+  document.getElementById('loadClearBtn').style.display = hidden ? 'inline-block' : 'none';
+  try { sessionStorage.setItem(PROJ_TICKS_KEY, JSON.stringify(window.selectedProjects)); } catch (e) {}
+}
+
+// Filters reload the page, so ticks are saved and brought back. Arriving from any
+// other page starts empty, so old ticks don't reappear later.
+const PROJ_TICKS_KEY = 'projectsTicked';
+
+function projectsNotListed() {
+  const listed = new Set(Array.from(document.querySelectorAll('#projectsTableBody .project-row'), r => r.dataset.projectId));
+  return window.selectedProjects.filter(id => !listed.has(id));
+}
+
+function restoreProjectTicks() {
+  let saved = [];
+  try {
+    const fromProjects = document.referrer && new URL(document.referrer).pathname === location.pathname;
+    if (fromProjects) saved = JSON.parse(sessionStorage.getItem(PROJ_TICKS_KEY) || '[]');
+    else sessionStorage.removeItem(PROJ_TICKS_KEY);
+  } catch (e) {}
+  if (Array.isArray(saved) && saved.length) {
+    window.selectedProjects = saved;
+    updateLoadButton();
+  }
+}
+
+function clearProjectTicks() {
+  window.selectedProjects = [];
+  updateLoadButton();
 }
 
 function getCurrentPage() {
@@ -944,6 +982,7 @@ function loadToInvoice() {
   }
 
   params.append('projects', projectsToLoad.join(','));
+  try { sessionStorage.removeItem(PROJ_TICKS_KEY); } catch (e) {}
   window.location.href = `{{ url_for('invoice_new') }}?${params.toString()}`;
 }
 
@@ -986,6 +1025,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
 
+    restoreProjectTicks();
   }
 
   // Close select dropdowns when clicking outside filter form
