@@ -1909,8 +1909,51 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
+def _send_reset_email_via_app(email: str) -> bool:
+    """Email a reset link that opens OUR /reset-password page (so the new password
+    is recorded for admins). Returns False if SMTP isn't set up or sending failed."""
+    try:
+        settings = load_settings()
+        em = settings.get("email", {})
+        if not (em.get("enabled") and em.get("smtp_user")):
+            return False
+        from firebase_admin import auth as fb_auth
+        from urllib.parse import urlparse, parse_qs
+        fb_link = fb_auth.generate_password_reset_link(email)
+        oob = (parse_qs(urlparse(fb_link).query).get("oobCode") or [""])[0]
+        if not oob:
+            return False
+        link = url_for("reset_password", email=email, oobCode=oob, _external=True)
+        co = settings.get("company", {})
+        from_name = em.get("from_name") or co.get("name") or "SKT Innovations"
+        html_body = f"""<html><body style="font-family:Arial,sans-serif;color:#1e293b;">
+<p>Hello,</p>
+<p>We received a request to reset the password for <strong>{email}</strong>.</p>
+<p><a href="{link}" style="display:inline-block;background:#1e3a8a;color:#fff;padding:10px 18px;
+border-radius:6px;text-decoration:none;">Reset password</a></p>
+<p style="font-size:0.85rem;color:#64748b;">If the button doesn't work, open this link:<br>{link}</p>
+<p style="font-size:0.85rem;color:#64748b;">If you didn't ask for this, you can ignore this email.</p>
+<p>{from_name}</p></body></html>"""
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Reset your password"
+        msg["From"] = f"{from_name} <{em['smtp_user']}>"
+        msg["To"] = email
+        msg.attach(MIMEText(html_body, "html"))
+        with smtplib.SMTP(em.get("smtp_host", "smtp.gmail.com"), int(em.get("smtp_port", 587)), timeout=15) as srv:
+            srv.ehlo(); srv.starttls()
+            srv.login(em["smtp_user"], em.get("smtp_password", ""))
+            srv.sendmail(em["smtp_user"], [email], msg.as_string())
+        return True
+    except Exception as e:
+        log.warning("App reset email failed for %s, falling back to Firebase email: %s", email, e)
+        return False
+
+
 def firebase_send_password_reset(email: str):
-    """Send password reset email using Firebase. Returns (success, error_msg)"""
+    """Send password reset email. Prefers our own link (via SMTP); falls back to
+    Firebase's email. Returns (success, error_msg)"""
+    if _send_reset_email_via_app(email):
+        return True, ""
     try:
         url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={FIREBASE_API_KEY}"
         resp = requests.post(url, json={"email": email, "requestType": "PASSWORD_RESET"}, timeout=10)
@@ -1999,7 +2042,7 @@ def api_change_password():
                                                   "returnSecureToken": True}, timeout=10)
         if upd_resp.status_code == 200:
             log.info("Password changed for %s", email)
-            _clear_admin_set_password(session.get("user_uid", ""))
+            _record_password(session.get("user_uid", ""), new_pw, email)
             return jsonify({"success": True, "message": "Password changed successfully."})
         err = upd_resp.json().get("error", {}).get("message", "Failed to update password.")
         return jsonify({"success": False, "error": err})
@@ -2058,6 +2101,18 @@ def api_admin_set_password():
         return jsonify({"success": False, "error": str(e) or "Failed to update password."})
 
 
+def _record_password(uid: str, new_pw: str, changed_by: str):
+    """Store the user's current password (encrypted) so an admin can view it."""
+    if not uid:
+        return
+    try:
+        fb_update(f"/users/{uid}", {"admin_set_pw":        _pw_encrypt(new_pw),
+                                    "password_changed_at": datetime.now(timezone.utc).isoformat(),
+                                    "password_changed_by": changed_by})
+    except Exception as e:
+        log.warning("Could not record password for %s: %s", uid, e)
+
+
 def _clear_admin_set_password(uid: str):
     """User picked their own password -> the stored admin-set one is no longer valid."""
     if not uid:
@@ -2068,6 +2123,21 @@ def _clear_admin_set_password(uid: str):
                                     "password_changed_by": "self"})
     except Exception as e:
         log.warning("Could not clear admin-set password for %s: %s", uid, e)
+
+
+def _password_changed_outside_app(uid: str, stored_at_iso: str) -> bool:
+    """True if Firebase Auth says the password changed after we stored the admin-set one."""
+    try:
+        from firebase_admin import auth as fb_auth
+        fb_ms = getattr(fb_auth.get_user(uid), "_data", {}).get("passwordUpdatedAt")
+        if not fb_ms or not stored_at_iso:
+            return False
+        stored_ms = datetime.fromisoformat(stored_at_iso).timestamp() * 1000
+        # We write password_changed_at right after the Firebase update; allow for clock skew.
+        return int(fb_ms) > stored_ms + 60_000
+    except Exception as e:
+        log.warning("Could not check Firebase password timestamp for %s: %s", uid, e)
+        return False
 
 
 @app.route("/api/admin/view-password", methods=["POST"])
@@ -2081,9 +2151,14 @@ def api_admin_view_password():
         return jsonify({"success": False, "error": "No user selected."})
     profile = fb_get(f"/users/{uid}") or {}
     token = profile.get("admin_set_pw")
+    if token and _password_changed_outside_app(uid, profile.get("password_changed_at", "")):
+        # e.g. the user reset it through the Firebase-hosted "forgot password" page,
+        # which never calls back into this server.
+        _clear_admin_set_password(uid)
+        token = None
     if not token:
-        return jsonify({"success": False, "error": "No admin-set password on record. "
-                        "The user has chosen their own password (or none was set here). "
+        return jsonify({"success": False, "error": "No password on record. The user changed it "
+                        "outside this app (or none was saved yet). "
                         "Use Set Password to give them a new one."})
     plain = _pw_decrypt(token)
     if plain is None:
@@ -2149,9 +2224,9 @@ def reset_password():
                             else:
                                 try:
                                     from firebase_admin import auth as fb_auth
-                                    _clear_admin_set_password(fb_auth.get_user_by_email(email).uid)
-                                except Exception:
-                                    pass
+                                    _record_password(fb_auth.get_user_by_email(email).uid, password, email)
+                                except Exception as e:
+                                    log.warning("Could not record reset password for %s: %s", email, e)
                                 ok, uid, err_msg = firebase_sign_in(email, password)
                                 if ok:
                                     profile = load_user_profile(uid)
@@ -2175,7 +2250,8 @@ def reset_password():
                 error = "An error occurred. Please try again later."
                 log.error("Reset password error: %s", str(e))
 
-    return render_template("auth/reset_password.html", email=email, error=error, message=message, valid_token=valid_token)
+    return render_template("auth/reset_password.html", email=email, oob_code=oob_code,
+                           error=error, message=message, valid_token=valid_token)
 
 # ── Routes: Dashboard ─────────────────────────────────────────────────────────
 @app.route("/")
