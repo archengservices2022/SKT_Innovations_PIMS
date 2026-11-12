@@ -2004,6 +2004,36 @@ def api_admin_send_reset_email():
         log.error("Admin reset email error: %s", e)
         return jsonify({"success": False, "error": "An error occurred."})
 
+
+@app.route("/api/admin/set-password", methods=["POST"])
+@login_required
+def api_admin_set_password():
+    """Admin sets a new password for any user directly (no email needed)."""
+    if session.get("user_role") != "admin":
+        return jsonify({"success": False, "error": "Admin access required."}), 403
+    if not FIREBASE_AVAILABLE:
+        return jsonify({"success": False, "error": "Firebase not available."})
+    try:
+        data   = request.get_json() or {}
+        uid    = (data.get("uid") or "").strip()
+        new_pw = data.get("new_password") or ""
+        if not uid:
+            return jsonify({"success": False, "error": "No user selected."})
+        if len(new_pw) < 6:
+            return jsonify({"success": False, "error": "Password must be at least 6 characters."})
+        from firebase_admin import auth as fb_auth
+        fb_auth.update_user(uid, password=new_pw)
+        fb_update(f"/users/{uid}", {
+            "password_changed_at": datetime.now(timezone.utc).isoformat(),
+            "password_changed_by": session.get("user_email", ""),
+            "updated_at":          datetime.now(timezone.utc).isoformat(),
+        })
+        log.info("Admin %s set a new password for uid %s", session.get("user_email"), uid)
+        return jsonify({"success": True, "message": "Password updated."})
+    except Exception as e:
+        log.error("Admin set password error: %s", e)
+        return jsonify({"success": False, "error": str(e) or "Failed to update password."})
+
 def firebase_reset_password_with_code(email: str, password: str, oob_code: str):
     """Reset password using Firebase OOB code. Returns (ok, error_msg)"""
     try:
