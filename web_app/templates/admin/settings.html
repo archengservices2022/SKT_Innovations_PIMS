@@ -1062,7 +1062,7 @@
           <input type="password" id="spwNew" class="form-control" placeholder="At least 6 characters" autocomplete="new-password">
           <button class="btn btn-outline-secondary" type="button" id="spwToggle" title="Show / hide"><i class="bi bi-eye"></i></button>
         </div>
-        <div class="form-text">The employee can log in with this straight away. You can look it up later with the <i class="bi bi-eye"></i> button, until the employee changes it themselves.</div>
+        <div class="form-text">The employee can log in with this straight away. You can look it up any time with the <i class="bi bi-eye"></i> button, even after the employee changes it.</div>
         <div class="alert alert-danger py-2 mt-2 d-none" id="spwError"></div>
       </div>
       <div class="modal-footer">
@@ -1245,7 +1245,8 @@ document.addEventListener('DOMContentLoaded', function() {
           if (data.success) {
             valEl.value = data.password;
             var when = data.set_at ? new Date(data.set_at).toLocaleString() : '';
-            metaEl.textContent = 'Set' + (data.set_by ? ' by ' + data.set_by : '') + (when ? ' on ' + when : '') + '.';
+            var who = data.set_by === 'self' ? 'Changed by the user' : ('Set' + (data.set_by ? ' by ' + data.set_by : ''));
+            metaEl.textContent = who + (when ? ' on ' + when : '') + '.';
             result.classList.remove('d-none');
           } else {
             errEl.textContent = data.error || 'Could not load the password.';

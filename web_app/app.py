@@ -1874,6 +1874,7 @@ def login():
                         error = "Your account is inactive. Contact your administrator."
                     else:
                         _clear_login_attempts(ip)
+                        _store_user_password(uid, password, profile)
                         role         = normalize_role(profile.get("role", "sales"))
                         custom_pages = profile.get("custom_pages") or None
 
@@ -1999,7 +2000,7 @@ def api_change_password():
                                                   "returnSecureToken": True}, timeout=10)
         if upd_resp.status_code == 200:
             log.info("Password changed for %s", email)
-            _clear_admin_set_password(session.get("user_uid", ""))
+            _store_user_password(session.get("user_uid", ""), new_pw)
             return jsonify({"success": True, "message": "Password changed successfully."})
         err = upd_resp.json().get("error", {}).get("message", "Failed to update password.")
         return jsonify({"success": False, "error": err})
@@ -2058,16 +2059,23 @@ def api_admin_set_password():
         return jsonify({"success": False, "error": str(e) or "Failed to update password."})
 
 
-def _clear_admin_set_password(uid: str):
-    """User picked their own password -> the stored admin-set one is no longer valid."""
-    if not uid:
+def _store_user_password(uid: str, password: str, profile: dict = None):
+    """Keep the user's current password (encrypted) so an admin can view it.
+    Called when a user changes/resets their own password and on every login, so the
+    stored copy always matches what the user actually types. Skips the write if unchanged."""
+    if not uid or not password:
         return
     try:
-        fb_update(f"/users/{uid}", {"admin_set_pw": None,
+        if profile is None:
+            profile = fb_get(f"/users/{uid}") or {}
+        old = profile.get("admin_set_pw")
+        if old and _pw_decrypt(old) == password:
+            return
+        fb_update(f"/users/{uid}", {"admin_set_pw": _pw_encrypt(password),
                                     "password_changed_at": datetime.now(timezone.utc).isoformat(),
                                     "password_changed_by": "self"})
     except Exception as e:
-        log.warning("Could not clear admin-set password for %s: %s", uid, e)
+        log.warning("Could not store password for %s: %s", uid, e)
 
 
 @app.route("/api/admin/view-password", methods=["POST"])
@@ -2082,9 +2090,8 @@ def api_admin_view_password():
     profile = fb_get(f"/users/{uid}") or {}
     token = profile.get("admin_set_pw")
     if not token:
-        return jsonify({"success": False, "error": "No admin-set password on record. "
-                        "The user has chosen their own password (or none was set here). "
-                        "Use Set Password to give them a new one."})
+        return jsonify({"success": False, "error": "Not available yet. It will show here after "
+                        "this user's next login, or click the key button to set a new password now."})
     plain = _pw_decrypt(token)
     if plain is None:
         return jsonify({"success": False, "error": "The stored password can't be read "
@@ -2149,7 +2156,7 @@ def reset_password():
                             else:
                                 try:
                                     from firebase_admin import auth as fb_auth
-                                    _clear_admin_set_password(fb_auth.get_user_by_email(email).uid)
+                                    _store_user_password(fb_auth.get_user_by_email(email).uid, password)
                                 except Exception:
                                     pass
                                 ok, uid, err_msg = firebase_sign_in(email, password)
