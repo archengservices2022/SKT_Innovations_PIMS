@@ -2196,23 +2196,7 @@ def reset_password():
     message = None
     valid_token = False
 
-    if oob_code and not email:
-        # Link from Firebase's own email template (action URL pointed here): it carries
-        # only oobCode. Look up the email without using up the code.
-        try:
-            r = requests.post(
-                f"https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key={FIREBASE_API_KEY}",
-                json={"oobCode": oob_code}, timeout=10)
-            if r.status_code == 200:
-                email = (r.json().get("email") or "").strip().lower()
-        except Exception as e:
-            log.warning("Could not verify reset code: %s", e)
-        if not email:
-            error = "This reset link is invalid or has expired. Please request a new one."
-
-    if error:
-        pass
-    elif not email or not oob_code:
+    if not email or not oob_code:
         error = "Invalid reset link. Please request a new one."
     else:
         if not FIREBASE_AVAILABLE:
