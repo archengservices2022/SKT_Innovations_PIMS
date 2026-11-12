@@ -536,6 +536,27 @@ if not _flask_secret:
     )
 app.secret_key = _flask_secret
 
+
+# Admin-set passwords are kept (encrypted) so an admin can look them up later.
+# Key: PASSWORD_VIEW_KEY if set, else derived from FLASK_SECRET. Only passwords an
+# admin typed in are stored; a user choosing their own password clears it.
+def _pw_fernet():
+    import base64, hashlib
+    from cryptography.fernet import Fernet
+    seed = os.environ.get("PASSWORD_VIEW_KEY") or _flask_secret
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(("pwview:" + seed).encode()).digest()))
+
+
+def _pw_encrypt(plain: str) -> str:
+    return _pw_fernet().encrypt(plain.encode()).decode()
+
+
+def _pw_decrypt(token: str):
+    try:
+        return _pw_fernet().decrypt(token.encode()).decode()
+    except Exception:
+        return None
+
 app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
     # Session cookie hardening
@@ -1978,6 +1999,7 @@ def api_change_password():
                                                   "returnSecureToken": True}, timeout=10)
         if upd_resp.status_code == 200:
             log.info("Password changed for %s", email)
+            _clear_admin_set_password(session.get("user_uid", ""))
             return jsonify({"success": True, "message": "Password changed successfully."})
         err = upd_resp.json().get("error", {}).get("message", "Failed to update password.")
         return jsonify({"success": False, "error": err})
@@ -2024,6 +2046,7 @@ def api_admin_set_password():
         from firebase_admin import auth as fb_auth
         fb_auth.update_user(uid, password=new_pw)
         fb_update(f"/users/{uid}", {
+            "admin_set_pw":        _pw_encrypt(new_pw),
             "password_changed_at": datetime.now(timezone.utc).isoformat(),
             "password_changed_by": session.get("user_email", ""),
             "updated_at":          datetime.now(timezone.utc).isoformat(),
@@ -2033,6 +2056,43 @@ def api_admin_set_password():
     except Exception as e:
         log.error("Admin set password error: %s", e)
         return jsonify({"success": False, "error": str(e) or "Failed to update password."})
+
+
+def _clear_admin_set_password(uid: str):
+    """User picked their own password -> the stored admin-set one is no longer valid."""
+    if not uid:
+        return
+    try:
+        fb_update(f"/users/{uid}", {"admin_set_pw": None,
+                                    "password_changed_at": datetime.now(timezone.utc).isoformat(),
+                                    "password_changed_by": "self"})
+    except Exception as e:
+        log.warning("Could not clear admin-set password for %s: %s", uid, e)
+
+
+@app.route("/api/admin/view-password", methods=["POST"])
+@login_required
+def api_admin_view_password():
+    """Admin views the last password an admin set for a user."""
+    if session.get("user_role") != "admin":
+        return jsonify({"success": False, "error": "Admin access required."}), 403
+    uid = ((request.get_json() or {}).get("uid") or "").strip()
+    if not uid:
+        return jsonify({"success": False, "error": "No user selected."})
+    profile = fb_get(f"/users/{uid}") or {}
+    token = profile.get("admin_set_pw")
+    if not token:
+        return jsonify({"success": False, "error": "No admin-set password on record. "
+                        "The user has chosen their own password (or none was set here). "
+                        "Use Set Password to give them a new one."})
+    plain = _pw_decrypt(token)
+    if plain is None:
+        return jsonify({"success": False, "error": "The stored password can't be read "
+                        "(the server key changed). Use Set Password to set a new one."})
+    log.info("Admin %s viewed the admin-set password for uid %s", session.get("user_email"), uid)
+    return jsonify({"success": True, "password": plain,
+                    "set_by": profile.get("password_changed_by", ""),
+                    "set_at": profile.get("password_changed_at", "")})
 
 def firebase_reset_password_with_code(email: str, password: str, oob_code: str):
     """Reset password using Firebase OOB code. Returns (ok, error_msg)"""
@@ -2087,6 +2147,11 @@ def reset_password():
                                 error = "Failed to reset password. " + err_msg
                                 log.error("Password reset failed for %s: %s", email, err_msg)
                             else:
+                                try:
+                                    from firebase_admin import auth as fb_auth
+                                    _clear_admin_set_password(fb_auth.get_user_by_email(email).uid)
+                                except Exception:
+                                    pass
                                 ok, uid, err_msg = firebase_sign_in(email, password)
                                 if ok:
                                     profile = load_user_profile(uid)
@@ -11814,7 +11879,7 @@ def payroll():
     # Build employee list from /users (Settings) — normalize 'username' → 'name' for template compatibility
     raw_users = _load_all_users()
     employee_profiles = [
-        dict(u, name=u.get("username", ""))
+        {**{k: v for k, v in u.items() if k != "admin_set_pw"}, "name": u.get("username", "")}
         for u in raw_users
         if u.get("active", True)
     ]
@@ -27053,6 +27118,9 @@ def user_new():
             "monthly_salary":  _safe_float(request.form.get("monthly_salary", 0)),
             "employee_type":   request.form.get("employee_type", "").strip(),
             "commission_rate": _safe_float(request.form.get("commission_rate", 0)),
+            "admin_set_pw":    _pw_encrypt(password),
+            "password_changed_at": datetime.now(timezone.utc).isoformat(),
+            "password_changed_by": session.get("user_email", ""),
             "created_at":     datetime.now(timezone.utc).isoformat(),
             "updated_at":     datetime.now(timezone.utc).isoformat(),
         }

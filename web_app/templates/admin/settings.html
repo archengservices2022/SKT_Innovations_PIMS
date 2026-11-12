@@ -568,6 +568,13 @@
                               title="Set New Password">
                         <i class="bi bi-key"></i>
                       </button>
+                      <button class="btn btn-xs btn-outline-secondary view-pw-btn"
+                              data-uid="{{ u.firebase_uid }}"
+                              data-email="{{ u.get('email','') | e }}"
+                              data-name="{{ u.get('username','') | e }}"
+                              title="View Password">
+                        <i class="bi bi-eye"></i>
+                      </button>
                       {% endif %}
                       {% if not _is_me %}
                       <form method="POST"
@@ -1055,12 +1062,39 @@
           <input type="password" id="spwNew" class="form-control" placeholder="At least 6 characters" autocomplete="new-password">
           <button class="btn btn-outline-secondary" type="button" id="spwToggle" title="Show / hide"><i class="bi bi-eye"></i></button>
         </div>
-        <div class="form-text">Passwords can't be viewed once saved, so share this one with the employee now. They can log in with it straight away.</div>
+        <div class="form-text">The employee can log in with this straight away. You can look it up later with the <i class="bi bi-eye"></i> button, until the employee changes it themselves.</div>
         <div class="alert alert-danger py-2 mt-2 d-none" id="spwError"></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button id="spwSaveBtn" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Update Password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin: View Password Modal -->
+<div class="modal fade" id="viewPasswordModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-eye me-2"></i>Password</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">For <strong id="vpwName"></strong> <span class="text-muted" id="vpwEmail"></span></p>
+        <div id="vpwLoading" class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Loading…</div>
+        <div id="vpwResult" class="d-none">
+          <div class="input-group mb-2">
+            <input type="text" id="vpwValue" class="form-control font-monospace" readonly>
+            <button class="btn btn-outline-secondary" type="button" id="vpwCopy" title="Copy"><i class="bi bi-clipboard"></i></button>
+          </div>
+          <div class="form-text" id="vpwMeta"></div>
+        </div>
+        <div class="alert alert-warning py-2 mb-0 d-none" id="vpwError"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -1174,6 +1208,54 @@ document.addEventListener('DOMContentLoaded', function() {
         saveBtn.disabled = false;
         errEl.textContent = 'Network error. Please try again.';
         errEl.classList.remove('d-none');
+      });
+    });
+  })();
+
+  (function() {
+    var modalEl = document.getElementById('viewPasswordModal');
+    if (!modalEl) return;
+    var loading = document.getElementById('vpwLoading');
+    var result  = document.getElementById('vpwResult');
+    var errEl   = document.getElementById('vpwError');
+    var valEl   = document.getElementById('vpwValue');
+    var metaEl  = document.getElementById('vpwMeta');
+    modalEl.addEventListener('hidden.bs.modal', function() { valEl.value = ''; });
+    document.getElementById('vpwCopy').addEventListener('click', function() {
+      var b = this;
+      navigator.clipboard.writeText(valEl.value).then(function() {
+        b.innerHTML = '<i class="bi bi-check-lg"></i>';
+        setTimeout(function() { b.innerHTML = '<i class="bi bi-clipboard"></i>'; }, 1500);
+      }).catch(function() { valEl.select(); });
+    });
+    document.querySelectorAll('.view-pw-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.getElementById('vpwName').textContent = btn.dataset.name;
+        document.getElementById('vpwEmail').textContent = '(' + btn.dataset.email + ')';
+        loading.classList.remove('d-none');
+        result.classList.add('d-none');
+        errEl.classList.add('d-none');
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        fetch('/api/admin/view-password', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({uid: btn.dataset.uid})
+        }).then(r => r.json()).then(data => {
+          loading.classList.add('d-none');
+          if (data.success) {
+            valEl.value = data.password;
+            var when = data.set_at ? new Date(data.set_at).toLocaleString() : '';
+            metaEl.textContent = 'Set' + (data.set_by ? ' by ' + data.set_by : '') + (when ? ' on ' + when : '') + '.';
+            result.classList.remove('d-none');
+          } else {
+            errEl.textContent = data.error || 'Could not load the password.';
+            errEl.classList.remove('d-none');
+          }
+        }).catch(function() {
+          loading.classList.add('d-none');
+          errEl.textContent = 'Network error. Please try again.';
+          errEl.classList.remove('d-none');
+        });
       });
     });
   })();
