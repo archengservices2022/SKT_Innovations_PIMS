@@ -436,6 +436,13 @@
               </a>
             </li>
             {% endif %}
+            {% if session.get('user_role') == 'admin' %}
+            <li class="nav-item ms-auto">
+              <button type="button" class="btn btn-sm btn-outline-dark" id="showAllPwBtn" style="font-size:14px;">
+                <i class="bi bi-eye me-1"></i><span>Show All Passwords</span>
+              </button>
+            </li>
+            {% endif %}
           </ul>
 
           {% macro user_table(group, label) %}
@@ -464,6 +471,9 @@
                       {% if _is_me %}<span class="badge bg-secondary ms-1" style="font-size:11px;">You</span>{% endif %}
                     </div>
                     <div class="text-muted" style="font-size:13px;">{{ u.get('email','—') }}</div>
+                    {% if session.get('user_role') == 'admin' %}
+                    <div class="pw-cell d-none mt-1" data-uid="{{ u.firebase_uid }}" style="font-size:13px;"></div>
+                    {% endif %}
                   </td>
                   <!-- Role (click the badge to change it — disabled for your own row,
                        so you can't accidentally demote yourself out of Settings) -->
@@ -1209,6 +1219,49 @@ document.addEventListener('DOMContentLoaded', function() {
         errEl.textContent = 'Network error. Please try again.';
         errEl.classList.remove('d-none');
       });
+    });
+  })();
+
+  (function() {
+    var btn = document.getElementById('showAllPwBtn');
+    if (!btn) return;
+    var shown = false;
+    var label = btn.querySelector('span');
+    function hideAll() {
+      document.querySelectorAll('.pw-cell').forEach(function(c) { c.textContent = ''; c.classList.add('d-none'); });
+      label.textContent = 'Show All Passwords';
+      btn.querySelector('i').className = 'bi bi-eye me-1';
+      shown = false;
+    }
+    btn.addEventListener('click', function() {
+      if (shown) { hideAll(); return; }
+      btn.disabled = true;
+      fetch('/api/admin/view-all-passwords', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'})
+        .then(r => r.json()).then(data => {
+          btn.disabled = false;
+          if (!data.success) { alert(data.error || 'Could not load passwords.'); return; }
+          var pw = data.passwords || {};
+          document.querySelectorAll('.pw-cell').forEach(function(c) {
+            var p = pw[c.dataset.uid];
+            c.innerHTML = '';
+            var icon = document.createElement('i');
+            icon.className = 'bi bi-key me-1 text-muted';
+            c.appendChild(icon);
+            var s = document.createElement('span');
+            if (p) {
+              s.className = 'font-monospace fw-semibold';
+              s.textContent = p;
+            } else {
+              s.className = 'text-muted fst-italic';
+              s.textContent = 'shows after next login';
+            }
+            c.appendChild(s);
+            c.classList.remove('d-none');
+          });
+          label.textContent = 'Hide Passwords';
+          btn.querySelector('i').className = 'bi bi-eye-slash me-1';
+          shown = true;
+        }).catch(function() { btn.disabled = false; alert('Network error. Please try again.'); });
     });
   })();
 

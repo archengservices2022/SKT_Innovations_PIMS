@@ -2078,6 +2078,24 @@ def _store_user_password(uid: str, password: str, profile: dict = None):
         log.warning("Could not store password for %s: %s", uid, e)
 
 
+@app.route("/api/admin/view-all-passwords", methods=["POST"])
+@login_required
+def api_admin_view_all_passwords():
+    """Admin views every user's stored password at once."""
+    if session.get("user_role") != "admin":
+        return jsonify({"success": False, "error": "Admin access required."}), 403
+    users = fb_get("/users") or {}
+    out = {}
+    if isinstance(users, dict):
+        for uid, u in users.items():
+            if isinstance(u, dict) and u.get("admin_set_pw"):
+                plain = _pw_decrypt(u["admin_set_pw"])
+                if plain is not None:
+                    out[uid] = plain
+    log.info("Admin %s viewed all stored passwords (%d)", session.get("user_email"), len(out))
+    return jsonify({"success": True, "passwords": out})
+
+
 @app.route("/api/admin/view-password", methods=["POST"])
 @login_required
 def api_admin_view_password():
