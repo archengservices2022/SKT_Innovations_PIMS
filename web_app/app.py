@@ -2258,12 +2258,13 @@ def reset_password():
 
                 if request.method == "POST":
                     password = request.form.get("password", "")
-                    confirm = request.form.get("confirm_password", "")
+                    # Single password box (Firebase-style page); confirm is optional.
+                    confirm = request.form.get("confirm_password", password)
 
-                    if not password or not confirm:
-                        error = "Please enter both password fields."
-                    elif len(password) < 8:
-                        error = "Password must be at least 8 characters long."
+                    if not password:
+                        error = "Enter a new password."
+                    elif len(password) < 6:
+                        error = "Password should be at least 6 characters."
                     elif password != confirm:
                         error = "Passwords do not match."
                     else:
