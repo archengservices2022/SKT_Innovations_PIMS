@@ -557,6 +557,14 @@ def _pw_decrypt(token: str):
     except Exception:
         return None
 
+
+@app.template_filter("pw_plain")
+def _pw_plain_filter(token):
+    """Settings > Users: show a user's stored password. Admins only."""
+    if not token or session.get("user_role") != "admin":
+        return ""
+    return _pw_decrypt(token) or ""
+
 app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
     # Session cookie hardening
@@ -2098,6 +2106,7 @@ def api_admin_set_password():
             "password_changed_by": session.get("user_email", ""),
             "updated_at":          datetime.now(timezone.utc).isoformat(),
         })
+        cache_bust("all_users")
         log.info("Admin %s set a new password for uid %s", session.get("user_email"), uid)
         return jsonify({"success": True, "message": "Password updated."})
     except Exception as e:
@@ -2120,50 +2129,10 @@ def _store_user_password(uid: str, password: str, profile: dict = None):
         fb_update(f"/users/{uid}", {"admin_set_pw": _pw_encrypt(password),
                                     "password_changed_at": datetime.now(timezone.utc).isoformat(),
                                     "password_changed_by": "self"})
+        cache_bust("all_users")
     except Exception as e:
         log.warning("Could not store password for %s: %s", uid, e)
 
-
-@app.route("/api/admin/view-all-passwords", methods=["POST"])
-@login_required
-def api_admin_view_all_passwords():
-    """Admin views every user's stored password at once."""
-    if session.get("user_role") != "admin":
-        return jsonify({"success": False, "error": "Admin access required."}), 403
-    users = fb_get("/users") or {}
-    out = {}
-    if isinstance(users, dict):
-        for uid, u in users.items():
-            if isinstance(u, dict) and u.get("admin_set_pw"):
-                plain = _pw_decrypt(u["admin_set_pw"])
-                if plain is not None:
-                    out[uid] = plain
-    log.info("Admin %s viewed all stored passwords (%d)", session.get("user_email"), len(out))
-    return jsonify({"success": True, "passwords": out})
-
-
-@app.route("/api/admin/view-password", methods=["POST"])
-@login_required
-def api_admin_view_password():
-    """Admin views the last password an admin set for a user."""
-    if session.get("user_role") != "admin":
-        return jsonify({"success": False, "error": "Admin access required."}), 403
-    uid = ((request.get_json() or {}).get("uid") or "").strip()
-    if not uid:
-        return jsonify({"success": False, "error": "No user selected."})
-    profile = fb_get(f"/users/{uid}") or {}
-    token = profile.get("admin_set_pw")
-    if not token:
-        return jsonify({"success": False, "error": "Not available yet. It will show here after "
-                        "this user's next login, or click the key button to set a new password now."})
-    plain = _pw_decrypt(token)
-    if plain is None:
-        return jsonify({"success": False, "error": "The stored password can't be read "
-                        "(the server key changed). Use Set Password to set a new one."})
-    log.info("Admin %s viewed the admin-set password for uid %s", session.get("user_email"), uid)
-    return jsonify({"success": True, "password": plain,
-                    "set_by": profile.get("password_changed_by", ""),
-                    "set_at": profile.get("password_changed_at", "")})
 
 def firebase_reset_password_with_code(email: str, password: str, oob_code: str):
     """Reset password using Firebase OOB code. Returns (ok, error_msg)"""
