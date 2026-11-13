@@ -1910,8 +1910,54 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
+def _send_app_reset_email(email: str):
+    """Email a reset link that opens THIS app's /reset-password page (not Firebase's
+    hosted page), so the new password is saved for admins the moment it's set.
+    Returns (sent, error_msg); sent=False with no error means SMTP isn't set up."""
+    em = (load_settings() or {}).get("email", {}) or {}
+    if not (em.get("enabled") and em.get("smtp_user")):
+        return False, ""
+    try:
+        from urllib.parse import urlparse, parse_qs
+        from firebase_admin import auth as fb_auth
+        fb_link  = fb_auth.generate_password_reset_link(email)
+        oob_code = (parse_qs(urlparse(fb_link).query).get("oobCode") or [""])[0]
+        if not oob_code:
+            return False, "Could not create reset link."
+        link = url_for("reset_password", email=email, oobCode=oob_code, _external=True)
+        co   = (load_settings() or {}).get("company", {}) or {}
+        html_body = f"""<html><body style="font-family:Arial,sans-serif;color:#1a1a1a;">
+<div style="max-width:560px;margin:0 auto;padding:24px;">
+  <h2 style="margin-top:0;">Reset your password</h2>
+  <p>We received a request to reset the password for <strong>{email}</strong>.</p>
+  <p style="margin:24px 0;"><a href="{link}" style="background:#0d6efd;color:#fff;padding:12px 22px;
+     border-radius:6px;text-decoration:none;font-weight:bold;">Reset Password</a></p>
+  <p style="font-size:13px;color:#555;">If the button doesn't work, open this link:<br>
+     <a href="{link}">{link}</a></p>
+  <p style="font-size:13px;color:#555;">If you didn't ask for this, you can ignore this email.</p>
+  <p style="margin-top:24px;">{co.get('name','')}</p>
+</div></body></html>"""
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Reset your password"
+        msg["From"]    = f"{em.get('from_name', co.get('name',''))} <{em.get('smtp_user','')}>"
+        msg["To"]      = email
+        msg.attach(MIMEText(html_body, "html"))
+        with smtplib.SMTP(em.get("smtp_host", "smtp.gmail.com"), int(em.get("smtp_port", 587)), timeout=15) as srv:
+            srv.ehlo(); srv.starttls()
+            srv.login(em.get("smtp_user", ""), em.get("smtp_password", ""))
+            srv.sendmail(em.get("smtp_user", ""), [email], msg.as_string())
+        return True, ""
+    except Exception as exc:
+        log.warning("App reset email failed for %s, falling back to Firebase email: %s", email, exc)
+        return False, ""
+
+
 def firebase_send_password_reset(email: str):
-    """Send password reset email using Firebase. Returns (success, error_msg)"""
+    """Send password reset email. Prefers the app's own email (link opens our reset
+    page); falls back to Firebase's email if SMTP isn't configured. Returns (success, error_msg)"""
+    sent, _ = _send_app_reset_email(email)
+    if sent:
+        return True, ""
     try:
         url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={FIREBASE_API_KEY}"
         resp = requests.post(url, json={"email": email, "requestType": "PASSWORD_RESET"}, timeout=10)
