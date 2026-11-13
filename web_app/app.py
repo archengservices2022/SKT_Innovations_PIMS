@@ -2269,20 +2269,10 @@ def reset_password():
                                     _store_user_password(fb_auth.get_user_by_email(email).uid, password)
                                 except Exception:
                                     pass
-                                ok, uid, err_msg = firebase_sign_in(email, password)
-                                if ok:
-                                    profile = load_user_profile(uid)
-                                    if profile and profile.get("active", True):
-                                        role = normalize_role(profile.get("role", "sales"))
-                                        session.permanent = True
-                                        session["user_email"] = email
-                                        session["user_uid"] = uid
-                                        session["user_name"] = profile.get("username", email.split("@")[0])
-                                        session["user_role"] = role
-                                        log.info("Password reset and auto-login for %s", email)
-                                        return redirect(url_for(first_page(role)))
-
-                                message = "Password reset successfully. You can now sign in with your new password."
+                                # No automatic login: the user signs in themselves.
+                                # The new password is already saved for admins above.
+                                session.clear()
+                                message = "Password changed. Please sign in with your new password."
                                 valid_token = False
                                 log.info("Password reset successful for %s", email)
                         except Exception as e:
