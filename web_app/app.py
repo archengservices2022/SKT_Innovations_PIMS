@@ -2127,6 +2127,10 @@ def _store_user_password(uid: str, password: str, profile: dict = None):
             profile = fb_get(f"/users/{uid}") or {}
         old = profile.get("admin_set_pw")
         if old and _pw_decrypt(old) == password:
+            # Same password, but it was just typed successfully, so the stored copy is
+            # confirmed current (clears "changed by user" after a reset to the same value).
+            fb_update(f"/users/{uid}", {"password_verified_at": datetime.now(timezone.utc).isoformat()})
+            cache_bust("all_users")
             return
         fb_update(f"/users/{uid}", {"admin_set_pw": _pw_encrypt(password),
                                     "password_changed_at": datetime.now(timezone.utc).isoformat(),
@@ -25235,7 +25239,8 @@ def settings():
                 stale = False
                 if u.get("admin_set_pw") and u.get("password_changed_at"):
                     try:
-                        ours_ms = datetime.fromisoformat(u["password_changed_at"]).timestamp() * 1000
+                        ours_ms = max(datetime.fromisoformat(u[k]).timestamp() * 1000
+                                      for k in ("password_changed_at", "password_verified_at") if u.get(k))
                         stale = changed_ms.get(u.get("firebase_uid"), 0) > ours_ms
                     except ValueError:
                         pass
