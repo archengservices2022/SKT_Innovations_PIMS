@@ -367,6 +367,17 @@
             <h6 class="section-heading mb-0">User Management</h6>
             <span class="text-muted small">{{ users|length }} user{{ 's' if users|length != 1 }}</span>
           </div>
+          {% set _reset_reqs = users | selectattr('pw_reset_requested_at') | list %}
+          {% if _reset_reqs and session.get('user_role') == 'admin' %}
+          <div class="alert alert-warning py-2 d-flex align-items-start gap-2" style="font-size:14px;">
+            <i class="bi bi-bell-fill mt-1"></i>
+            <div>
+              <strong>Password reset requested:</strong>
+              {% for r in _reset_reqs %}{{ r.get('username') or r.get('email') }}{{ ', ' if not loop.last }}{% endfor %}.
+              Click <i class="bi bi-key"></i> on their row to set a new password, then share it with them.
+            </div>
+          </div>
+          {% endif %}
 
           <!-- Role filter tabs -->
           {% set _g_admin    = users | selectattr('role','equalto','admin')    | list %}
@@ -466,6 +477,10 @@
                     <div class="fw-semibold">
                       {{ u.get('username','—') }}
                       {% if _is_me %}<span class="badge bg-secondary ms-1" style="font-size:11px;">You</span>{% endif %}
+                      {% if u.get('pw_reset_requested_at') and session.get('user_role') == 'admin' %}
+                      <span class="badge bg-warning text-dark ms-1" style="font-size:11px;" title="Forgot password: set a new one with the key button">
+                        <i class="bi bi-bell-fill me-1"></i>Reset requested</span>
+                      {% endif %}
                     </div>
                     <div class="text-muted" style="font-size:13px;">{{ u.get('email','—') }}</div>
                     {% if session.get('user_role') == 'admin' %}
@@ -566,12 +581,6 @@
                               data-custompages="{{ (u.get('custom_pages') or []) | join(',') }}"
                               title="Customize Pages{% if _role == 'accountant' %} (Grant Tabs){% endif %}">
                         <i class="bi bi-layout-sidebar"></i>
-                      </button>
-                      <button class="btn btn-xs btn-outline-warning send-reset-btn"
-                              data-email="{{ u.get('email','') | e }}"
-                              data-name="{{ u.get('username','') | e }}"
-                              title="Send Password Reset Email">
-                        <i class="bi bi-envelope-arrow-up"></i>
                       </button>
                       {% if session.get('user_role') == 'admin' %}
                       <button class="btn btn-xs btn-outline-dark set-pw-btn"

@@ -1997,12 +1997,14 @@ def api_forgot_password():
 
         user_found = False
         user_data = None
+        user_uid = ""
         users = fb_get("/users") or {}
 
         for uid, u_data in users.items():
             if isinstance(u_data, dict) and u_data.get("email", "").lower() == email:
                 user_found = True
                 user_data = u_data
+                user_uid = uid
                 break
 
         if not user_found:
@@ -2011,14 +2013,22 @@ def api_forgot_password():
         if not user_data.get("active", True):
             return jsonify({"success": False, "error": "Account does not exist. Please contact your administrator."})
 
-        ok, err_msg = firebase_send_password_reset(email)
-
-        if ok:
-            log.info("Password reset email sent via Firebase for %s", email)
-            return jsonify({"success": True, "message": f"Reset link sent to {email}. Please check your email to continue."})
-        else:
-            log.error("Firebase password reset failed for %s: %s", email, err_msg)
-            return jsonify({"success": False, "error": "Failed to send reset email. Please try again later."})
+        # No email: the request goes to the admins, who set a new password in
+        # Settings > Users (so they can see it) and share it with the user.
+        done_msg = ("Your request has been sent to the admin. They will set a new "
+                    "password and share it with you.")
+        if user_data.get("pw_reset_requested_at"):
+            return jsonify({"success": True, "message": done_msg})
+        fb_update(f"/users/{user_uid}", {"pw_reset_requested_at": datetime.now(timezone.utc).isoformat()})
+        cache_bust("all_users")
+        name = user_data.get("username") or email
+        for a_uid, a in users.items():
+            if isinstance(a, dict) and normalize_role(a.get("role", "")) == "admin" and a.get("active", True):
+                _push_notification(a_uid, "password_reset", "Password reset requested",
+                                   f"{name} ({email}) forgot their password. Set a new one in Settings > Users.",
+                                   url_for("settings") + "?tab=users")
+        log.info("Password reset requested by %s", email)
+        return jsonify({"success": True, "message": done_msg})
 
     except Exception as e:
         log.error("API forgot password error: %s", str(e))
@@ -2106,6 +2116,7 @@ def api_admin_set_password():
             "admin_set_pw":        _pw_encrypt(new_pw),
             "password_changed_at": datetime.now(timezone.utc).isoformat(),
             "password_changed_by": session.get("user_email", ""),
+            "pw_reset_requested_at": None,
             "updated_at":          datetime.now(timezone.utc).isoformat(),
         })
         cache_bust("all_users")
@@ -2129,12 +2140,14 @@ def _store_user_password(uid: str, password: str, profile: dict = None):
         if old and _pw_decrypt(old) == password:
             # Same password, but it was just typed successfully, so the stored copy is
             # confirmed current (clears "changed by user" after a reset to the same value).
-            fb_update(f"/users/{uid}", {"password_verified_at": datetime.now(timezone.utc).isoformat()})
+            fb_update(f"/users/{uid}", {"password_verified_at": datetime.now(timezone.utc).isoformat(),
+                                        "pw_reset_requested_at": None})
             cache_bust("all_users")
             return
         fb_update(f"/users/{uid}", {"admin_set_pw": _pw_encrypt(password),
                                     "password_changed_at": datetime.now(timezone.utc).isoformat(),
-                                    "password_changed_by": "self"})
+                                    "password_changed_by": "self",
+                                    "pw_reset_requested_at": None})
         cache_bust("all_users")
     except Exception as e:
         log.warning("Could not store password for %s: %s", uid, e)
