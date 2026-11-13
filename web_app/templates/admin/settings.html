@@ -176,6 +176,10 @@
             Used for sending invoices, welcome emails, and payment reminders.
             For Gmail, use an <strong>App Password</strong> (not your regular password).
           </p>
+          <p class="text-muted small">
+            <i class="bi bi-key me-1"></i>"Forgot password" emails always use these login details, even when
+            Enable Email Sending is off, so new passwords show in Users straight away.
+          </p>
           <form method="POST" action="{{ url_for('settings_email') }}">
             <div class="form-check form-switch mb-3">
               <input class="form-check-input" type="checkbox" name="enabled"

@@ -1922,8 +1922,10 @@ def _send_app_reset_email(email: str):
     """Email a reset link that opens THIS app's /reset-password page (not Firebase's
     hosted page), so the new password is saved for admins the moment it's set.
     Returns (sent, error_msg); sent=False with no error means SMTP isn't set up."""
+    # Uses the SMTP login from Settings > Email even when "Enable Email Sending" is
+    # off, so password resets work without turning on client emails (reminders etc.).
     em = (load_settings() or {}).get("email", {}) or {}
-    if not (em.get("enabled") and em.get("smtp_user")):
+    if not (em.get("smtp_user") and em.get("smtp_password")):
         return False, ""
     try:
         from urllib.parse import urlparse, parse_qs
