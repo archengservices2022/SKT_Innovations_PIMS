@@ -25221,6 +25221,25 @@ def _has_approved_delete_request(uid, entity_type, entity_id):
 @role_required("settings")
 def settings():
     all_users = _load_all_users()
+    # A password changed outside the app (Firebase's own reset page) makes the stored
+    # copy out of date. Firebase records when the password last changed; if that is
+    # newer than our copy, don't show the old password.
+    if session.get("user_role") == "admin" and FIREBASE_AVAILABLE:
+        try:
+            from firebase_admin import auth as fb_auth
+            changed_ms = {r.uid: (r.tokens_valid_after_timestamp or 0)
+                          for r in fb_auth.list_users().iterate_all()}
+            for u in all_users:
+                stale = False
+                if u.get("admin_set_pw") and u.get("password_changed_at"):
+                    try:
+                        ours_ms = datetime.fromisoformat(u["password_changed_at"]).timestamp() * 1000
+                        stale = changed_ms.get(u.get("firebase_uid"), 0) > ours_ms
+                    except ValueError:
+                        pass
+                u["_pw_stale"] = stale
+        except Exception as e:
+            log.warning("Could not check password change times: %s", e)
     # Normalize role to lowercase so template selectattr filters match reliably
     for _u in all_users:
         if isinstance(_u, dict) and _u.get("role"):

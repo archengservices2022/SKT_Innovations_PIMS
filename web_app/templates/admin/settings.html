@@ -465,10 +465,11 @@
                     </div>
                     <div class="text-muted" style="font-size:13px;">{{ u.get('email','—') }}</div>
                     {% if session.get('user_role') == 'admin' %}
-                    {% set _pw = u.get('admin_set_pw') | pw_plain %}
+                    {% set _pw = '' if u.get('_pw_stale') else (u.get('admin_set_pw') | pw_plain) %}
                     <div class="mt-1" style="font-size:13px;">
                       <i class="bi bi-key me-1 text-muted"></i>
                       {% if _pw %}<span class="font-monospace fw-semibold">{{ _pw }}</span>
+                      {% elif u.get('_pw_stale') %}<span class="text-muted fst-italic">changed by user, shows after next login</span>
                       {% else %}<span class="text-muted fst-italic">shows after next login</span>{% endif %}
                     </div>
                     {% endif %}
