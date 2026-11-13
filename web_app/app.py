@@ -2013,19 +2013,22 @@ def api_forgot_password():
         if not user_data.get("active", True):
             return jsonify({"success": False, "error": "Account does not exist. Please contact your administrator."})
 
-        # The user resets it themselves through a link that opens THIS app's reset page,
-        # so admins see the new password straight away. 1) the app's own email if SMTP
-        # is set up, else 2) Firebase's email-link email. Only if both fail does the
-        # request go to the admins.
-        sent, _ = _send_app_reset_email(email)
-        if not sent:
-            sent, link_err = firebase_send_signin_link_for_reset(email)
+        # Firebase's own reset email and page. The new password reaches the app (and
+        # shows to admins) the next time the user logs in.
+        try:
+            r = requests.post(
+                f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={FIREBASE_API_KEY}",
+                json={"email": email, "requestType": "PASSWORD_RESET"}, timeout=10)
+            sent = r.status_code == 200
             if not sent:
-                log.warning("Email-link reset not available for %s: %s", email, link_err)
+                log.error("Firebase password reset failed for %s: %s", email, r.text[:300])
+        except Exception as e:
+            sent = False
+            log.error("Firebase password reset failed for %s: %s", email, e)
         if sent:
-            log.info("Password reset link sent to %s", email)
-            return jsonify({"success": True, "message": "We've sent a link to your email. "
-                            "Open it to set a new password (check spam if you don't see it)."})
+            log.info("Password reset email sent via Firebase for %s", email)
+            return jsonify({"success": True, "message": "Reset link sent to your email. "
+                            "Please check your email to continue (check spam if you don't see it)."})
 
         done_msg = ("Your request has been sent to the admin. They will set a new "
                     "password and share it with you.")
