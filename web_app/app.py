@@ -2013,8 +2013,20 @@ def api_forgot_password():
         if not user_data.get("active", True):
             return jsonify({"success": False, "error": "Account does not exist. Please contact your administrator."})
 
-        # No email: the request goes to the admins, who set a new password in
-        # Settings > Users (so they can see it) and share it with the user.
+        # The user resets it themselves through a link that opens THIS app's reset page,
+        # so admins see the new password straight away. 1) the app's own email if SMTP
+        # is set up, else 2) Firebase's email-link email. Only if both fail does the
+        # request go to the admins.
+        sent, _ = _send_app_reset_email(email)
+        if not sent:
+            sent, link_err = firebase_send_signin_link_for_reset(email)
+            if not sent:
+                log.warning("Email-link reset not available for %s: %s", email, link_err)
+        if sent:
+            log.info("Password reset link sent to %s", email)
+            return jsonify({"success": True, "message": "We've sent a link to your email. "
+                            "Open it to set a new password (check spam if you don't see it)."})
+
         done_msg = ("Your request has been sent to the admin. They will set a new "
                     "password and share it with you.")
         if user_data.get("pw_reset_requested_at"):
@@ -2153,8 +2165,41 @@ def _store_user_password(uid: str, password: str, profile: dict = None):
         log.warning("Could not store password for %s: %s", uid, e)
 
 
-def firebase_reset_password_with_code(email: str, password: str, oob_code: str):
+def firebase_send_signin_link_for_reset(email: str):
+    """Forgot password without the Firebase Action URL setting: send Firebase's
+    "email link" sign-in email. Firebase forwards that link to our /reset-password
+    page (continueUrl, an Authorized domain), where the user sets the new password,
+    so the app sees it. Needs Email link sign-in enabled in Firebase. Returns (ok, err)."""
+    try:
+        resp = requests.post(
+            f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={FIREBASE_API_KEY}",
+            json={"requestType": "EMAIL_SIGNIN", "email": email,
+                  "continueUrl": url_for("reset_password", email=email, _external=True),
+                  "canHandleCodeInApp": True},
+            timeout=10)
+        if resp.status_code == 200:
+            return True, ""
+        return False, resp.json().get("error", {}).get("message", "Failed to send email")
+    except Exception as exc:
+        return False, str(exc)
+
+
+def firebase_reset_password_with_code(email: str, password: str, oob_code: str, mode: str = ""):
     """Reset password using Firebase OOB code. Returns (ok, error_msg)"""
+    if mode == "signIn":
+        # Code from the email-link flow: it proves the user owns the email. Use it,
+        # then set the new password with the Admin SDK.
+        try:
+            r = requests.post(
+                f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithEmailLink?key={FIREBASE_API_KEY}",
+                json={"email": email, "oobCode": oob_code}, timeout=10)
+            if r.status_code != 200:
+                return False, r.json().get("error", {}).get("message", "This link has expired. Request a new one.")
+            from firebase_admin import auth as fb_auth
+            fb_auth.update_user(r.json().get("localId"), password=password)
+            return True, ""
+        except Exception as exc:
+            return False, str(exc)
     try:
         url = f"https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key={FIREBASE_API_KEY}"
         resp = requests.post(url, json={
@@ -2213,7 +2258,8 @@ def reset_password():
                         error = "Passwords do not match."
                     else:
                         try:
-                            ok, err_msg = firebase_reset_password_with_code(email, password, oob_code)
+                            ok, err_msg = firebase_reset_password_with_code(
+                                email, password, oob_code, request.args.get("mode", ""))
                             if not ok:
                                 error = "Failed to reset password. " + err_msg
                                 log.error("Password reset failed for %s: %s", email, err_msg)
