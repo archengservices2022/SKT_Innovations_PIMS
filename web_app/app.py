@@ -2157,6 +2157,18 @@ def firebase_reset_password_with_code(email: str, password: str, oob_code: str):
 def reset_password():
     email = request.args.get("email", "").strip().lower()
     oob_code = request.args.get("oobCode", "").strip()
+    # Firebase's own reset email (with its Action URL pointed here) sends only
+    # ?mode=resetPassword&oobCode=..., no email. Look the email up from the code
+    # (this only checks the code, it doesn't use it up).
+    if oob_code and not email and FIREBASE_AVAILABLE:
+        try:
+            vr = requests.post(
+                f"https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key={FIREBASE_API_KEY}",
+                json={"oobCode": oob_code}, timeout=10)
+            if vr.status_code == 200:
+                email = (vr.json().get("email") or "").strip().lower()
+        except Exception as e:
+            log.warning("Could not verify reset code: %s", e)
     error = None
     message = None
     valid_token = False
