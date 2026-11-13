@@ -2028,7 +2028,7 @@ def api_forgot_password():
         if sent:
             log.info("Password reset email sent via Firebase for %s", email)
             return jsonify({"success": True, "message": "Reset link sent to your email. "
-                            "Please check your email to continue (check spam if you don't see it)."})
+                            "Please check your email to continue."})
 
         done_msg = ("Your request has been sent to the admin. They will set a new "
                     "password and share it with you.")
