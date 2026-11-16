@@ -14992,6 +14992,10 @@ def _sync_adjustment_to_expense(adjustment_id, adjustment, advance_data, advance
     """Create or update expense record for an adjustment"""
     try:
         adjustment_type = adjustment.get("type", "").strip()
+        if adjustment_type in ADJUSTMENT_TYPES_WITHOUT_EXPENSE:
+            # Cash Adjustment: the employee paid the advance back in cash. It only
+            # reduces the advance balance; it is not a company expense.
+            return
         adjustment_amount = _safe_float(adjustment.get("amount", 0))
         adjustment_date = adjustment.get("date", "")
         adjustment_remarks = adjustment.get("remarks", "")
@@ -15635,7 +15639,9 @@ def _delete_advance_adjustment_core(data):
         return ({"success": False, "error": str(e)}), 500
 
 # ── Employee-level Advance & Commission Adjustment ledger ───────────────────────
-ADVANCE_ADJUSTMENT_TYPES = ["Payroll Deduction", "Commission Deduction", "Manual Adjustment"]
+ADVANCE_ADJUSTMENT_TYPES = ["Payroll Deduction", "Commission Deduction", "Manual Adjustment", "Cash Adjustment"]
+# Adjustment types that only reduce the advance balance and never create a Finance expense.
+ADJUSTMENT_TYPES_WITHOUT_EXPENSE = {"Cash Adjustment"}
 # What people see. The stored value stays "Commission Deduction": the commission and expense
 # logic (and every existing record) key off it.
 ADJUSTMENT_TYPE_LABELS = {"Commission Deduction": "Commission Adjustment"}
