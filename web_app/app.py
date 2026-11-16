@@ -16174,7 +16174,7 @@ def advance_adjustment_export_pdf():
     elems.append(tbl)
 
     # ── One ledger per employee ──────────────────────────────────────────────
-    ledger_hdr = ["Date", "Type", "Description", "Advance Amount", "Commission Adjustment", "Balance", "Submitted By"]
+    ledger_hdr = ["Date", "Type", "Description", "Advance Amount", "Adjustment Amount", "Balance", "Submitted By"]
     col_w = [0.85*inch, 1.3*inch, 3.2*inch, 1.15*inch, 1.55*inch, 1.0*inch, 1.15*inch]
     for r in summary:
         ledger = _build_employee_advance_ledger(r["employee_name"])
