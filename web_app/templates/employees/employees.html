@@ -2880,10 +2880,10 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
                 {% if c.status == 'Pending' %}
                 <button class="btn btn-xs btn-outline-success"
                         onclick="openMedReview('{{ c.firebase_id }}','{{ c.employee_name }}','{{ c.amount_claimed }}','approve')"
-                        title="Approve"><i class="bi bi-check-lg"></i></button>
+                        title="Approve"><i class="bi bi-check-lg me-1"></i>Approve</button>
                 <button class="btn btn-xs btn-outline-danger ms-1"
                         onclick="openMedReview('{{ c.firebase_id }}','{{ c.employee_name }}','{{ c.amount_claimed }}','reject')"
-                        title="Reject"><i class="bi bi-x-lg"></i></button>
+                        title="Reject"><i class="bi bi-x-lg me-1"></i>Reject</button>
                 {% else %}
                 <span class="text-muted small me-1">{{ c.reviewed_by or '' }}</span>
                 {% if c.status == 'Approved' and c.get('firebase_id') %}
