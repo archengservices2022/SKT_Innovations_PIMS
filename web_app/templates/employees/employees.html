@@ -2271,7 +2271,7 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
                   {% endif %}
                 {% elif st == 'Approved' %}
                   <span class="badge bg-success">Approved</span>
-                  {% if (e.get('payment_status') or 'Paid') == 'Unpaid' %}<span class="badge bg-warning text-dark">Unpaid</span>{% else %}<span class="badge" style="background:#0f766e;">Paid</span>{% endif %}
+                  {% if (e.get('payment_status') or 'Paid') == 'Unpaid' %}<span class="badge bg-warning text-dark">Unpaid</span>{% else %}<span class="badge" style="background:#0f766e;">Paid</span>{% if e.get('paid_date') %}<div style="font-size:12px;color:#0f766e;">Paid on {{ e.paid_date | format_date }}</div>{% endif %}{% endif %}
                   {% if reviewed_at %}
                   <div class="text-muted small" style="margin-top:3px;">{{ reviewed_at[:10] | format_date }}</div>
                   {% endif %}
@@ -2528,7 +2528,7 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
               </div>
               {% else %}
               <span class="badge" style="background:#0f766e;">Paid</span>
-              {% if e.get('paid_date') %}<div class="text-muted" style="font-size:12px;">{{ e.paid_date | format_date }}</div>{% endif %}
+              {% if e.get('paid_date') %}<div style="font-size:12px;color:#0f766e;">Paid on {{ e.paid_date | format_date }}</div>{% endif %}
               {% endif %}
               {% if reviewed_by %}
               <div class="text-muted small" style="font-size:13px;margin-top:4px;">by <strong>{{ reviewed_by }}</strong></div>
@@ -2859,7 +2859,7 @@ document.getElementById('editOwnProfileModal').addEventListener('show.bs.modal',
                   </div>
                   {% else %}
                   <span class="badge" style="background:#0f766e;">Paid</span>
-                  {% if c.get('paid_date') %}<div class="text-muted" style="font-size:12px;">Paid {{ c.paid_date | format_date }}</div>{% endif %}
+                  {% if c.get('paid_date') %}<div style="font-size:12px;color:#0f766e;">Paid on {{ c.paid_date | format_date }}</div>{% endif %}
                   {% endif %}
                 {% elif cs == 'Rejected' %}
                   <span class="badge bg-danger">{{ cs }}</span>

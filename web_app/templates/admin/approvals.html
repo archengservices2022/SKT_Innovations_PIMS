@@ -434,6 +434,7 @@
                   <th>Status</th>
                   <th>Reviewed By</th>
                   <th>Reviewed At</th>
+                  <th>Paid On</th>
                 </tr>
               </thead>
               <tbody>
@@ -465,12 +466,12 @@
                       </div>
                       {% elif item.payment_status == 'Paid' %}
                       <span class="badge" style="background:#0f766e;">Paid</span>
-                      {% if item.paid_date %}<div class="text-muted" style="font-size:12px;">{{ item.paid_date | format_date }}</div>{% endif %}
                       {% endif %}
                     {% else %}<span class="badge bg-danger">{{ item.status }}</span>{% endif %}
                   </td>
                   <td class="text-muted">{{ item.reviewed_by or '—' }}</td>
                   <td class="text-muted text-nowrap">{{ (item.reviewed_at[:10] | format_date) if item.reviewed_at else '—' }}</td>
+                  <td class="text-nowrap">{% if item.status == 'Approved' and item.payment_status == 'Paid' and item.paid_date %}<span style="color:#0f766e;font-weight:600;">{{ item.paid_date | format_date }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                 </tr>
                 {% endfor %}
               </tbody>
@@ -499,6 +500,7 @@
                   <th>Status</th>
                   <th>Reviewed By</th>
                   <th>Reviewed At</th>
+                  <th>Paid On</th>
                 </tr>
               </thead>
               <tbody>
@@ -530,12 +532,12 @@
                       </div>
                       {% elif item.payment_status == 'Paid' %}
                       <span class="badge" style="background:#0f766e;">Paid</span>
-                      {% if item.paid_date %}<div class="text-muted" style="font-size:12px;">{{ item.paid_date | format_date }}</div>{% endif %}
                       {% endif %}
                     {% else %}<span class="badge bg-danger">{{ item.status }}</span>{% endif %}
                   </td>
                   <td class="text-muted">{{ item.reviewed_by or '—' }}</td>
                   <td class="text-muted text-nowrap">{{ (item.reviewed_at[:10] | format_date) if item.reviewed_at else '—' }}</td>
+                  <td class="text-nowrap">{% if item.status == 'Approved' and item.payment_status == 'Paid' and item.paid_date %}<span style="color:#0f766e;font-weight:600;">{{ item.paid_date | format_date }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
                 </tr>
                 {% endfor %}
               </tbody>
