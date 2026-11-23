@@ -794,7 +794,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!_mp) return;
     var err = document.getElementById('mpError');
     btn.disabled = true;
-    fetch('/api/approvals/' + _mp.cat + '/' + _mp.id + '/paid', {
+    fetch('/api/mark-claim-paid/' + _mp.cat + '/' + _mp.id, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({paid_date: document.getElementById('mpDate').value})

@@ -25625,7 +25625,7 @@ def _approval_payment_fields(old: dict, approved: bool) -> dict:
     return {"payment_status": "Unpaid"}
 
 
-@app.route("/api/approvals/<kind>/<item_id>/paid", methods=["POST"])
+@app.route("/api/mark-claim-paid/<kind>/<item_id>", methods=["POST"])
 @login_required
 def api_approval_mark_paid(kind, item_id):
     """Mark an approved Expense or Medical claim as paid and record the expense."""
